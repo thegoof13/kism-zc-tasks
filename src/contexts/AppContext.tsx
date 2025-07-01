@@ -44,8 +44,23 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'SET_ERROR':
       return { ...state, loading: false };
 
-    case 'LOAD_STATE':
-      return { ...action.state, loading: false };
+    case 'LOAD_STATE': {
+      // Deep merge settings to ensure all default properties are preserved
+      const mergedSettings = {
+        ...initialState.settings,
+        ...action.state.settings,
+        ai: {
+          ...initialState.settings.ai,
+          ...action.state.settings?.ai,
+        },
+      };
+
+      return { 
+        ...action.state, 
+        settings: mergedSettings,
+        loading: false 
+      };
+    }
 
     case 'TOGGLE_TASK': {
       const task = state.tasks.find(t => t.id === action.taskId);
