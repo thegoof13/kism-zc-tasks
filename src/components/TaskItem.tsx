@@ -19,7 +19,8 @@ export function TaskItem({ task, displayMode, onEdit, onRestore }: TaskItemProps
   const completedByProfile = task.completedBy ? state.profiles.find(p => p.id === task.completedBy) : null;
   
   const handleToggle = () => {
-    if (activeProfile) {
+    // Only allow checking (completing) tasks, not unchecking
+    if (!task.isCompleted && activeProfile) {
       dispatch({ 
         type: 'TOGGLE_TASK', 
         taskId: task.id, 
@@ -92,10 +93,11 @@ export function TaskItem({ task, displayMode, onEdit, onRestore }: TaskItemProps
         onClick={handleToggle}
         className={`flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
           task.isCompleted
-            ? 'bg-success-500 border-success-500 scale-110'
-            : 'border-neutral-300 dark:border-neutral-600 hover:border-success-400 dark:hover:border-success-400'
+            ? 'bg-success-500 border-success-500 scale-110 cursor-default'
+            : 'border-neutral-300 dark:border-neutral-600 hover:border-success-400 dark:hover:border-success-400 cursor-pointer'
         }`}
-        aria-label={task.isCompleted ? 'Mark as incomplete' : 'Mark as complete'}
+        aria-label={task.isCompleted ? 'Task completed - use menu to uncheck' : 'Mark as complete'}
+        disabled={task.isCompleted}
       >
         {task.isCompleted && (
           <Check className="w-4 h-4 text-white animate-scale-in" />
