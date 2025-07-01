@@ -93,8 +93,10 @@ else
   echo "Repository $GITHUB_USER/$REPO_NAME already exists on GitHub. Skipping creation."
 fi
 
-# Set remote and push
-if ! git remote | grep -q origin; then
+# Set or update remote to ensure it points to the correct repo
+if git remote | grep -q origin; then
+  git remote set-url origin "https://github.com/$GITHUB_USER/$REPO_NAME.git"
+else
   git remote add origin "https://github.com/$GITHUB_USER/$REPO_NAME.git"
 fi
 
