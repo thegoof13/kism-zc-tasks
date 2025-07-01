@@ -2,8 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, ReactNode } fr
 import { AppState, Task, TaskGroup, UserProfile, HistoryEntry } from '../types';
 import { defaultGroups, defaultProfiles, defaultSettings } from '../utils/defaultData';
 import { shouldResetTask } from '../utils/recurrence';
-import { useAuth } from '../hooks/useAuth';
-import { DatabaseService } from '../services/database';
+import { ApiService } from '../services/api';
 
 type AppAction = 
   | { type: 'TOGGLE_TASK'; taskId: string; profileId: string }
@@ -313,92 +312,72 @@ function appReducer(state: AppState, action: AppAction): AppState {
 const AppContext = createContext<{
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
-  syncWithDatabase: () => Promise<void>;
 } | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
-  const { user } = useAuth();
 
-  // Sync data with database
-  const syncWithDatabase = async () => {
-    if (!user) return;
-
-    try {
-      dispatch({ type: 'SET_LOADING', loading: true });
-
-      const [profiles, groups, tasks, history, settings] = await Promise.all([
-        DatabaseService.getProfiles(user.id),
-        DatabaseService.getTaskGroups(user.id),
-        DatabaseService.getTasks(user.id),
-        DatabaseService.getHistory(user.id),
-        DatabaseService.getSettings(user.id),
-      ]);
-
-      // If no data exists, create default data
-      if (profiles.length === 0) {
-        const defaultProfile = await DatabaseService.createProfile(user.id, defaultProfiles[0]);
-        profiles.push(defaultProfile);
-      }
-
-      if (groups.length === 0) {
-        for (const group of defaultGroups) {
-          const createdGroup = await DatabaseService.createTaskGroup(user.id, group);
-          groups.push(createdGroup);
-        }
-      }
-
-      const activeProfileId = settings?.activeProfileId || profiles[0]?.id || '';
-      const appSettings = settings || defaultSettings;
-
-      dispatch({
-        type: 'LOAD_STATE',
-        state: {
-          tasks,
-          groups,
-          profiles,
-          history,
-          settings: appSettings,
-          activeProfileId,
-          loading: false,
-        },
-      });
-    } catch (error) {
-      console.error('Failed to sync with database:', error);
-      dispatch({ type: 'SET_LOADING', loading: false });
-    }
-  };
-
-  // Load data when user changes
+  // Load data from server on mount
   useEffect(() => {
-    if (user) {
-      syncWithDatabase();
-    } else {
-      dispatch({ type: 'SET_LOADING', loading: false });
-    }
-  }, [user]);
-
-  // Sync changes to database when state changes
-  useEffect(() => {
-    if (!user || state.loading) return;
-
-    const syncChanges = async () => {
+    const loadData = async () => {
       try {
-        // Save settings
-        await DatabaseService.updateSettings(user.id, {
-          ...state.settings,
-          activeProfileId: state.activeProfileId,
-        });
+        dispatch({ type: 'SET_LOADING', loading: true });
+        const userData = await ApiService.getUserData();
+        
+        // Convert date strings back to Date objects
+        userData.tasks = userData.tasks.map((task: any) => ({
+          ...task,
+          createdAt: new Date(task.createdAt),
+          completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
+        }));
+        userData.groups = userData.groups.map((group: any) => ({
+          ...group,
+          createdAt: new Date(group.createdAt),
+        }));
+        userData.profiles = userData.profiles.map((profile: any) => ({
+          ...profile,
+          createdAt: new Date(profile.createdAt),
+        }));
+        userData.history = userData.history.map((entry: any) => ({
+          ...entry,
+          timestamp: new Date(entry.timestamp),
+        }));
+        
+        dispatch({ type: 'LOAD_STATE', state: userData });
       } catch (error) {
-        console.error('Failed to sync settings:', error);
+        console.error('Failed to load data:', error);
+        dispatch({ type: 'SET_LOADING', loading: false });
       }
     };
 
-    syncChanges();
-  }, [user, state.settings, state.activeProfileId, state.loading]);
+    loadData();
+  }, []);
+
+  // Save data to server whenever state changes (debounced)
+  useEffect(() => {
+    if (state.loading) return;
+
+    const saveData = async () => {
+      try {
+        await ApiService.saveUserData(state);
+      } catch (error) {
+        console.error('Failed to save data:', error);
+      }
+    };
+
+    const timeoutId = setTimeout(saveData, 1000); // Debounce saves by 1 second
+    return () => clearTimeout(timeoutId);
+  }, [state]);
+
+  // Reset recurring tasks on app load
+  useEffect(() => {
+    if (!state.loading) {
+      dispatch({ type: 'RESET_RECURRING_TASKS' });
+    }
+  }, [state.loading]);
 
   return (
-    <AppContext.Provider value={{ state, dispatch, syncWithDatabase }}>
+    <AppContext.Provider value={{ state, dispatch }}>
       {children}
     </AppContext.Provider>
   );
