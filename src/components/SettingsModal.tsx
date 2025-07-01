@@ -120,7 +120,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             )}
 
             {activeTab === 'ai' && (
-              <AISettings
+              <AISettingsPanel
                 settings={state.settings.ai}
                 dispatch={dispatch}
                 onOpenQuery={() => setShowAIQuery(true)}
@@ -170,7 +170,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 }
 
 // AI Settings Component
-function AISettings({ settings, dispatch, onOpenQuery }: any) {
+function AISettingsPanel({ settings, dispatch, onOpenQuery }: any) {
   const [apiKey, setApiKey] = useState(settings.apiKey);
   const [provider, setProvider] = useState(settings.provider);
   const [model, setModel] = useState(settings.model);
