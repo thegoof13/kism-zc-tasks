@@ -145,7 +145,7 @@ export function TaskItem({ task, displayMode, onEdit, onRestore }: TaskItemProps
               </button>
 
               {showMenu && (
-                <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-neutral-800 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-700 py-1 z-20 animate-slide-down">
+                <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-neutral-800 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-700 py-1 z-[9999] animate-slide-down">
                   {/* Edit option - always available */}
                   <button
                     onClick={handleEdit}
@@ -209,7 +209,7 @@ export function TaskItem({ task, displayMode, onEdit, onRestore }: TaskItemProps
       {/* Close menu when clicking outside */}
       {showMenu && (
         <div
-          className="fixed inset-0 z-10"
+          className="fixed inset-0 z-[9998]"
           onClick={() => setShowMenu(false)}
         />
       )}
