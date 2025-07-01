@@ -366,19 +366,68 @@ function HistorySettings({ history, tasks, profiles, aiSettings, onOpenQuery }: 
       completed: history.filter((h: any) => h.action === 'completed').length,
       unchecked: history.filter((h: any) => h.action === 'unchecked').length,
       reset: history.filter((h: any) => h.action === 'reset').length,
-      restored: history.filter((h: any) => h.action === 'restored').length,
     };
     return stats;
   };
 
+  const getAnalytics = () => {
+    const now = new Date();
+    const fourteenDaysAgo = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000));
+    
+    // Filter history to last 14 days
+    const recentHistory = history.filter((entry: any) => 
+      new Date(entry.timestamp) >= fourteenDaysAgo
+    );
+
+    // Calculate most productive day
+    const dailyCompletions: { [key: string]: number } = {};
+    recentHistory
+      .filter((entry: any) => entry.action === 'completed')
+      .forEach((entry: any) => {
+        const date = new Date(entry.timestamp).toDateString();
+        dailyCompletions[date] = (dailyCompletions[date] || 0) + 1;
+      });
+
+    const mostProductiveDay = Object.entries(dailyCompletions)
+      .sort(([,a], [,b]) => b - a)[0];
+
+    // Calculate top collaborator (for tasks assigned to multiple profiles)
+    const multiProfileTasks = tasks.filter((task: any) => task.profiles.length > 1);
+    const collaboratorCompletions: { [key: string]: number } = {};
+    
+    recentHistory
+      .filter((entry: any) => 
+        entry.action === 'completed' && 
+        multiProfileTasks.some((task: any) => task.id === entry.taskId)
+      )
+      .forEach((entry: any) => {
+        collaboratorCompletions[entry.profileName] = (collaboratorCompletions[entry.profileName] || 0) + 1;
+      });
+
+    const topCollaborator = Object.entries(collaboratorCompletions)
+      .sort(([,a], [,b]) => b - a)[0];
+
+    return {
+      mostProductiveDay: mostProductiveDay ? {
+        date: mostProductiveDay[0],
+        count: mostProductiveDay[1]
+      } : null,
+      topCollaborator: topCollaborator ? {
+        name: topCollaborator[0],
+        count: topCollaborator[1]
+      } : null,
+      multiProfileTaskCount: multiProfileTasks.length
+    };
+  };
+
   const stats = getActionStats();
+  const analytics = getAnalytics();
 
   const getActionIcon = (action: string) => {
     switch (action) {
       case 'completed': return '✅';
       case 'unchecked': return '❌';
       case 'reset': return '🔄';
-      case 'restored': return '↩️';
       default: return '📝';
     }
   };
@@ -388,7 +437,6 @@ function HistorySettings({ history, tasks, profiles, aiSettings, onOpenQuery }: 
       case 'completed': return 'text-success-600 dark:text-success-400';
       case 'unchecked': return 'text-error-600 dark:text-error-400';
       case 'reset': return 'text-warning-600 dark:text-warning-400';
-      case 'restored': return 'text-primary-600 dark:text-primary-400';
       default: return 'text-neutral-600 dark:text-neutral-400';
     }
   };
@@ -430,8 +478,59 @@ function HistorySettings({ history, tasks, profiles, aiSettings, onOpenQuery }: 
         </div>
       )}
 
+      {/* Analytics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="card p-4">
+          <h4 className="font-medium text-neutral-900 dark:text-neutral-100 mb-3">
+            📅 Most Productive Day (Last 14 Days)
+          </h4>
+          {analytics.mostProductiveDay ? (
+            <div>
+              <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                {new Date(analytics.mostProductiveDay.date).toLocaleDateString('en-US', { 
+                  weekday: 'long', 
+                  month: 'short', 
+                  day: 'numeric' 
+                })}
+              </div>
+              <div className="text-sm text-neutral-600 dark:text-neutral-400">
+                {analytics.mostProductiveDay.count} tasks completed
+              </div>
+            </div>
+          ) : (
+            <div className="text-neutral-500 dark:text-neutral-400">
+              No completed tasks in the last 14 days
+            </div>
+          )}
+        </div>
+
+        <div className="card p-4">
+          <h4 className="font-medium text-neutral-900 dark:text-neutral-100 mb-3">
+            🤝 Top Collaborator (Last 14 Days)
+          </h4>
+          {analytics.topCollaborator ? (
+            <div>
+              <div className="text-2xl font-bold text-success-600 dark:text-success-400">
+                {analytics.topCollaborator.name}
+              </div>
+              <div className="text-sm text-neutral-600 dark:text-neutral-400">
+                {analytics.topCollaborator.count} shared tasks completed
+              </div>
+            </div>
+          ) : analytics.multiProfileTaskCount > 0 ? (
+            <div className="text-neutral-500 dark:text-neutral-400">
+              No shared task completions in the last 14 days
+            </div>
+          ) : (
+            <div className="text-neutral-500 dark:text-neutral-400">
+              No tasks assigned to multiple profiles
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div className="card p-4 text-center">
           <div className="text-2xl font-bold text-success-600 dark:text-success-400">
             {stats.completed}
@@ -456,14 +555,6 @@ function HistorySettings({ history, tasks, profiles, aiSettings, onOpenQuery }: 
             Reset
           </div>
         </div>
-        <div className="card p-4 text-center">
-          <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-            {stats.restored}
-          </div>
-          <div className="text-sm text-neutral-600 dark:text-neutral-400">
-            Restored
-          </div>
-        </div>
       </div>
 
       {/* Filters */}
@@ -486,7 +577,6 @@ function HistorySettings({ history, tasks, profiles, aiSettings, onOpenQuery }: 
           <option value="completed">Completed</option>
           <option value="unchecked">Unchecked</option>
           <option value="reset">Reset</option>
-          <option value="restored">Restored</option>
         </select>
       </div>
 
@@ -536,13 +626,15 @@ function HistorySettings({ history, tasks, profiles, aiSettings, onOpenQuery }: 
               • <strong>{stats.reset}</strong> tasks were reset (unchecked but history preserved)
             </p>
             <p>
-              • <strong>{stats.restored}</strong> tasks were fully restored (history cleared)
-            </p>
-            <p>
               • Total completion rate: <strong>
-                {Math.round((stats.completed / (stats.completed + stats.unchecked + stats.reset + stats.restored)) * 100)}%
+                {Math.round((stats.completed / (stats.completed + stats.unchecked + stats.reset)) * 100)}%
               </strong>
             </p>
+            {analytics.multiProfileTaskCount > 0 && (
+              <p>
+                • <strong>{analytics.multiProfileTaskCount}</strong> tasks are assigned to multiple profiles
+              </p>
+            )}
           </div>
         </div>
       )}
