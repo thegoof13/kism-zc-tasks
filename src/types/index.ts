@@ -58,12 +58,28 @@ export interface HistoryEntry {
   details?: string;
 }
 
+export interface AISettings {
+  apiKey: string;
+  provider: 'openai' | 'anthropic' | 'gemini';
+  model: string;
+  enabled: boolean;
+}
+
+export interface AIQuery {
+  id: string;
+  query: string;
+  response: string;
+  timestamp: Date;
+  userId: string;
+}
+
 export interface AppSettings {
   theme: 'light' | 'dark' | 'system';
   showCompletedCount: boolean;
   enableNotifications: boolean;
   autoArchiveCompleted: boolean;
   archiveDays: number;
+  ai: AISettings;
 }
 
 export interface AppState {

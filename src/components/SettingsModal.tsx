@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
-import { X, Plus, Edit, Trash2, Download, Upload, History, BarChart3 } from 'lucide-react';
+import { X, Plus, Edit, Trash2, Download, Upload, History, BarChart3, Brain, MessageSquare, Key, Zap } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
-import { TaskGroup, UserProfile, CompletedDisplayMode } from '../types';
+import { TaskGroup, UserProfile, CompletedDisplayMode, AISettings } from '../types';
 import { getAvailableIcons } from '../utils/icons';
+import { AIQueryModal } from './AIQueryModal';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type SettingsTab = 'groups' | 'profiles' | 'data' | 'preferences' | 'history';
+type SettingsTab = 'groups' | 'profiles' | 'data' | 'preferences' | 'history' | 'ai';
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { state, dispatch } = useApp();
   const [activeTab, setActiveTab] = useState<SettingsTab>('groups');
   const [editingGroup, setEditingGroup] = useState<TaskGroup | null>(null);
   const [editingProfile, setEditingProfile] = useState<UserProfile | null>(null);
+  const [showAIQuery, setShowAIQuery] = useState(false);
 
   const handleExportData = () => {
     const dataStr = JSON.stringify(state, null, 2);
@@ -76,6 +78,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               {[
                 { id: 'groups', label: 'Groups', icon: '📁' },
                 { id: 'profiles', label: 'Profiles', icon: '👥' },
+                { id: 'ai', label: 'AI Assistant', icon: '🤖' },
                 { id: 'history', label: 'History', icon: '📊' },
                 { id: 'data', label: 'Data', icon: '💾' },
                 { id: 'preferences', label: 'Preferences', icon: '⚙️' },
@@ -116,11 +119,21 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               />
             )}
 
+            {activeTab === 'ai' && (
+              <AISettings
+                settings={state.settings.ai}
+                dispatch={dispatch}
+                onOpenQuery={() => setShowAIQuery(true)}
+              />
+            )}
+
             {activeTab === 'history' && (
               <HistorySettings
                 history={state.history}
                 tasks={state.tasks}
                 profiles={state.profiles}
+                aiSettings={state.settings.ai}
+                onOpenQuery={() => setShowAIQuery(true)}
               />
             )}
             
@@ -141,12 +154,202 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
         </div>
       </div>
+
+      {/* AI Query Modal */}
+      <AIQueryModal
+        isOpen={showAIQuery}
+        onClose={() => setShowAIQuery(false)}
+        history={state.history}
+        tasks={state.tasks}
+        profiles={state.profiles}
+        groups={state.groups}
+        aiSettings={state.settings.ai}
+      />
+    </div>
+  );
+}
+
+// AI Settings Component
+function AISettings({ settings, dispatch, onOpenQuery }: any) {
+  const [apiKey, setApiKey] = useState(settings.apiKey);
+  const [provider, setProvider] = useState(settings.provider);
+  const [model, setModel] = useState(settings.model);
+  const [enabled, setEnabled] = useState(settings.enabled);
+
+  const handleSave = () => {
+    dispatch({
+      type: 'UPDATE_SETTINGS',
+      updates: {
+        ai: {
+          apiKey,
+          provider,
+          model,
+          enabled: enabled && apiKey.trim() !== '',
+        },
+      },
+    });
+    alert('AI settings saved successfully!');
+  };
+
+  const modelOptions = {
+    openai: ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+    anthropic: ['claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'],
+    gemini: ['gemini-pro', 'gemini-pro-vision'],
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100">
+            AI Assistant Configuration
+          </h3>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
+            Configure AI to analyze your task history and answer questions
+          </p>
+        </div>
+        <Brain className="w-6 h-6 text-primary-500" />
+      </div>
+
+      {/* Enable AI */}
+      <div className="card p-4">
+        <label className="flex items-center justify-between">
+          <div>
+            <span className="font-medium text-neutral-900 dark:text-neutral-100">
+              Enable AI Assistant
+            </span>
+            <p className="text-sm text-neutral-600 dark:text-neutral-400">
+              Turn on AI-powered insights and task analysis
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+            className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+          />
+        </label>
+      </div>
+
+      {/* API Provider */}
+      <div className="card p-4 space-y-4">
+        <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
+          API Configuration
+        </h4>
+        
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            AI Provider
+          </label>
+          <select
+            value={provider}
+            onChange={(e) => {
+              setProvider(e.target.value);
+              setModel(modelOptions[e.target.value as keyof typeof modelOptions][0]);
+            }}
+            className="input-primary"
+          >
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="gemini">Google Gemini</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            Model
+          </label>
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="input-primary"
+          >
+            {modelOptions[provider as keyof typeof modelOptions].map(modelOption => (
+              <option key={modelOption} value={modelOption}>
+                {modelOption}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+            <div className="flex items-center space-x-2">
+              <Key className="w-4 h-4" />
+              <span>API Key</span>
+            </div>
+          </label>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder={`Enter your ${provider} API key`}
+            className="input-primary"
+          />
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+            Your API key is stored locally and never shared
+          </p>
+        </div>
+      </div>
+
+      {/* AI Features */}
+      <div className="card p-4">
+        <h4 className="font-medium text-neutral-900 dark:text-neutral-100 mb-3">
+          AI Features
+        </h4>
+        <div className="space-y-3">
+          <div className="flex items-center space-x-3 p-3 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+            <BarChart3 className="w-5 h-5 text-primary-500" />
+            <div>
+              <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                History Analysis
+              </span>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                Get insights about your task completion patterns and trends
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-3 p-3 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+            <MessageSquare className="w-5 h-5 text-primary-500" />
+            <div>
+              <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                Task Questions
+              </span>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                Ask questions about your tasks and get intelligent answers
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex space-x-3">
+        <button
+          onClick={handleSave}
+          className="btn-primary"
+        >
+          <Zap className="w-4 h-4 mr-2" />
+          Save AI Settings
+        </button>
+        
+        {enabled && apiKey && (
+          <button
+            onClick={onOpenQuery}
+            className="btn-secondary"
+          >
+            <MessageSquare className="w-4 h-4 mr-2" />
+            Ask AI Question
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
 // History Settings Component
-function HistorySettings({ history, tasks, profiles }: any) {
+function HistorySettings({ history, tasks, profiles, aiSettings, onOpenQuery }: any) {
   const [filter, setFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -196,8 +399,36 @@ function HistorySettings({ history, tasks, profiles }: any) {
         <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100">
           Task History & Analytics
         </h3>
-        <BarChart3 className="w-5 h-5 text-neutral-500" />
+        <div className="flex items-center space-x-2">
+          {aiSettings.enabled && aiSettings.apiKey && (
+            <button
+              onClick={onOpenQuery}
+              className="btn-primary text-sm"
+            >
+              <Brain className="w-4 h-4 mr-2" />
+              Ask AI
+            </button>
+          )}
+          <BarChart3 className="w-5 h-5 text-neutral-500" />
+        </div>
       </div>
+
+      {/* AI Insights Banner */}
+      {aiSettings.enabled && aiSettings.apiKey && (
+        <div className="card p-4 bg-gradient-to-r from-primary-50 to-primary-100 dark:from-primary-900/20 dark:to-primary-800/20 border-primary-200 dark:border-primary-700">
+          <div className="flex items-center space-x-3">
+            <Brain className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+            <div>
+              <h4 className="font-medium text-primary-900 dark:text-primary-100">
+                AI-Powered Insights Available
+              </h4>
+              <p className="text-sm text-primary-700 dark:text-primary-300">
+                Click "Ask AI" to get intelligent analysis of your task patterns and trends
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -840,7 +1071,7 @@ function DataSettings({ onExport, onImport, historyCount }: any) {
           </h4>
           <div className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
             <p>History entries: {historyCount}</p>
-            <p>Data stored locally in your browser</p>
+            <p>Data stored on local server in JSON format</p>
           </div>
         </div>
       </div>

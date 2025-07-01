@@ -60,6 +60,12 @@ export const defaultSettings: AppSettings = {
   enableNotifications: false,
   autoArchiveCompleted: false,
   archiveDays: 30,
+  ai: {
+    apiKey: '',
+    provider: 'openai',
+    model: 'gpt-4',
+    enabled: false,
+  },
 };
 
 export const sampleTasks: Task[] = [

@@ -10,6 +10,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DATA_DIR = path.join(__dirname, 'data');
+const AI_LOG_FILE = path.join(DATA_DIR, 'ai_queries.log');
 
 // Middleware
 app.use(cors());
@@ -49,6 +50,19 @@ async function writeJsonFile(filename, data) {
     console.log('Saved data to:', filePath);
   } catch (error) {
     console.error('Error writing JSON file:', error);
+    throw error;
+  }
+}
+
+// Helper function to append to AI log file
+async function appendToAILog(logEntry) {
+  try {
+    const timestamp = new Date().toISOString();
+    const logLine = `[${timestamp}] ${JSON.stringify(logEntry)}\n`;
+    await fs.appendFile(AI_LOG_FILE, logLine, 'utf8');
+    console.log('AI query logged');
+  } catch (error) {
+    console.error('Error writing to AI log:', error);
     throw error;
   }
 }
@@ -175,6 +189,12 @@ function getDefaultUserData() {
       enableNotifications: false,
       autoArchiveCompleted: false,
       archiveDays: 30,
+      ai: {
+        apiKey: '',
+        provider: 'openai',
+        model: 'gpt-4',
+        enabled: false,
+      },
     },
     activeProfileId: 'default',
   };
@@ -222,12 +242,67 @@ app.post('/api/data/:userId', async (req, res) => {
   }
 });
 
+// Log AI queries
+app.post('/api/ai/log', async (req, res) => {
+  try {
+    const { query, response, timestamp } = req.body;
+    
+    const logEntry = {
+      query,
+      response: response.substring(0, 500) + (response.length > 500 ? '...' : ''), // Truncate long responses
+      timestamp,
+      userId: '1', // Simple user ID for now
+    };
+    
+    await appendToAILog(logEntry);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error logging AI query:', error);
+    res.status(500).json({ error: 'Failed to log AI query' });
+  }
+});
+
+// Get AI query logs (optional endpoint for viewing logs)
+app.get('/api/ai/logs', async (req, res) => {
+  try {
+    const logs = await fs.readFile(AI_LOG_FILE, 'utf8');
+    const logEntries = logs.split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        try {
+          const match = line.match(/^\[(.*?)\] (.*)$/);
+          if (match) {
+            return {
+              timestamp: match[1],
+              ...JSON.parse(match[2])
+            };
+          }
+          return null;
+        } catch {
+          return null;
+        }
+      })
+      .filter(entry => entry !== null)
+      .slice(-100); // Return last 100 entries
+    
+    res.json(logEntries);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      res.json([]); // No logs yet
+    } else {
+      console.error('Error reading AI logs:', error);
+      res.status(500).json({ error: 'Failed to read AI logs' });
+    }
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
-    dataDir: DATA_DIR 
+    dataDir: DATA_DIR,
+    features: ['tasks', 'ai-logging']
   });
 });
 
@@ -244,6 +319,7 @@ async function startServer() {
     app.listen(PORT, () => {
       console.log(`🚀 ZenTasks server running on port ${PORT}`);
       console.log(`📁 Data directory: ${DATA_DIR}`);
+      console.log(`🤖 AI logging enabled: ${AI_LOG_FILE}`);
       console.log(`🌐 API available at: http://localhost:${PORT}/api`);
     });
   } catch (error) {
