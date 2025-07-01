@@ -146,6 +146,7 @@ export function TaskItem({ task, displayMode, onEdit, onRestore }: TaskItemProps
 
               {showMenu && (
                 <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-neutral-800 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-700 py-1 z-20 animate-slide-down">
+                  {/* Edit option - always available */}
                   <button
                     onClick={handleEdit}
                     className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
@@ -154,7 +155,8 @@ export function TaskItem({ task, displayMode, onEdit, onRestore }: TaskItemProps
                     <span className="text-sm text-neutral-700 dark:text-neutral-300">Edit</span>
                   </button>
                   
-                  {task.isCompleted ? (
+                  {/* Completed task options */}
+                  {task.isCompleted && (
                     <>
                       <button
                         onClick={handleUncheck}
@@ -180,8 +182,9 @@ export function TaskItem({ task, displayMode, onEdit, onRestore }: TaskItemProps
                         <span className="text-sm text-neutral-700 dark:text-neutral-300">Restore</span>
                       </button>
                     </>
-                  ) : null}
+                  )}
                   
+                  {/* Delete option - always available */}
                   <button
                     onClick={handleDelete}
                     className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-error-50 dark:hover:bg-error-900/20 transition-colors duration-200"
