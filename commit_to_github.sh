@@ -84,11 +84,13 @@ fi
 git add .
 git commit -m "Initial commit"
 
-# Create GitHub repo
-if gh repo view "$GITHUB_USER/$REPO_NAME" > /dev/null 2>&1; then
-  echo "Repository $GITHUB_USER/$REPO_NAME already exists on GitHub. Skipping creation."
-else
+# Create GitHub repo if it doesn't exist
+REPO_EXISTS=$(gh repo view "$GITHUB_USER/$REPO_NAME" > /dev/null 2>&1 && echo yes || echo no)
+if [ "$REPO_EXISTS" = "no" ]; then
+  echo "Remote repo $GITHUB_USER/$REPO_NAME does not exist. Creating it now..."
   gh repo create "$GITHUB_USER/$REPO_NAME" --public --source=. --remote=origin --push
+else
+  echo "Repository $GITHUB_USER/$REPO_NAME already exists on GitHub. Skipping creation."
 fi
 
 # Set remote and push
