@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Clock, MoreVertical, Edit, Trash2, RotateCcw, RefreshCw, X } from 'lucide-react';
+import { Check, Clock, MoreVertical, Edit, Trash2, RefreshCw, X } from 'lucide-react';
 import { Task, CompletedDisplayMode } from '../types';
 import { useApp } from '../contexts/AppContext';
 import { getRecurrenceLabel } from '../utils/recurrence';
@@ -11,7 +11,7 @@ interface TaskItemProps {
   onRestore?: (task: Task) => void;
 }
 
-export function TaskItem({ task, displayMode, onEdit, onRestore }: TaskItemProps) {
+export function TaskItem({ task, displayMode, onEdit }: TaskItemProps) {
   const { state, dispatch } = useApp();
   const [showMenu, setShowMenu] = useState(false);
   
@@ -50,13 +50,6 @@ export function TaskItem({ task, displayMode, onEdit, onRestore }: TaskItemProps
   const handleEdit = () => {
     if (onEdit) {
       onEdit(task);
-    }
-    setShowMenu(false);
-  };
-
-  const handleRestore = () => {
-    if (onRestore) {
-      onRestore(task);
     }
     setShowMenu(false);
   };
@@ -172,14 +165,6 @@ export function TaskItem({ task, displayMode, onEdit, onRestore }: TaskItemProps
                       >
                         <RefreshCw className="w-4 h-4 text-warning-500" />
                         <span className="text-sm text-neutral-700 dark:text-neutral-300">Reset</span>
-                      </button>
-                      
-                      <button
-                        onClick={handleRestore}
-                        className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
-                      >
-                        <RotateCcw className="w-4 h-4 text-primary-500" />
-                        <span className="text-sm text-neutral-700 dark:text-neutral-300">Restore</span>
                       </button>
                     </>
                   )}

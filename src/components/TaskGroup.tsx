@@ -11,10 +11,9 @@ interface TaskGroupProps {
   onAddTask: (groupId: string) => void;
   onEditGroup: (group: TaskGroupType) => void;
   onEditTask: (task: Task) => void;
-  onRestoreTask: (task: Task) => void;
 }
 
-export function TaskGroup({ group, tasks, onAddTask, onEditTask, onRestoreTask }: TaskGroupProps) {
+export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProps) {
   const { state, dispatch } = useApp();
   
   const IconComponent = getIconComponent(group.icon);
@@ -119,7 +118,6 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask, onRestoreTask }
                 task={task} 
                 displayMode={group.completedDisplayMode}
                 onEdit={onEditTask}
-                onRestore={onRestoreTask}
               />
             ))
           )}
@@ -137,7 +135,6 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask, onRestoreTask }
                     task={task}
                     displayMode="grey-out"
                     onEdit={onEditTask}
-                    onRestore={onRestoreTask}
                   />
                 ))}
               </div>

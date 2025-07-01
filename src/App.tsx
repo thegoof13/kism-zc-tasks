@@ -5,7 +5,6 @@ import { Header } from './components/Header';
 import { TaskGroup } from './components/TaskGroup';
 import { AddTaskModal } from './components/AddTaskModal';
 import { EditTaskModal } from './components/EditTaskModal';
-import { RestoreResetModal } from './components/RestoreResetModal';
 import { SettingsModal } from './components/SettingsModal';
 import { Task } from './types';
 
@@ -25,10 +24,8 @@ function AppContent() {
   const [showAddTask, setShowAddTask] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showEditTask, setShowEditTask] = useState(false);
-  const [showRestoreTask, setShowRestoreTask] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [restoringTask, setRestoringTask] = useState<Task | null>(null);
 
   if (state.loading) {
     return <LoadingSpinner />;
@@ -55,11 +52,6 @@ function AppContent() {
   const handleEditTask = (task: Task) => {
     setEditingTask(task);
     setShowEditTask(true);
-  };
-
-  const handleRestoreTask = (task: Task) => {
-    setRestoringTask(task);
-    setShowRestoreTask(true);
   };
 
   return (
@@ -102,7 +94,6 @@ function AppContent() {
                 onAddTask={handleAddTask}
                 onEditGroup={handleEditGroup}
                 onEditTask={handleEditTask}
-                onRestoreTask={handleRestoreTask}
               />
             );
           })}
@@ -156,17 +147,6 @@ function AppContent() {
             setEditingTask(null);
           }}
           task={editingTask}
-        />
-      )}
-
-      {restoringTask && (
-        <RestoreResetModal
-          isOpen={showRestoreTask}
-          onClose={() => {
-            setShowRestoreTask(false);
-            setRestoringTask(null);
-          }}
-          task={restoringTask}
         />
       )}
       
