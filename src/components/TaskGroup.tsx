@@ -59,7 +59,7 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask, onRestoreTask }
   }
 
   return (
-    <div className="card mb-4 overflow-hidden animate-slide-up">
+    <div className="card mb-4 animate-slide-up">
       {/* Group Header */}
       <div className="flex items-center justify-between p-4 border-b border-neutral-100 dark:border-neutral-700">
         <button
