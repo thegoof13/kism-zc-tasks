@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Clock, MoreVertical, Edit, Trash2, RotateCcw } from 'lucide-react';
+import { Check, Clock, MoreVertical, Edit, Trash2, RotateCcw, RefreshCw, X } from 'lucide-react';
 import { Task, CompletedDisplayMode } from '../types';
 import { useApp } from '../contexts/AppContext';
 import { getRecurrenceLabel } from '../utils/recurrence';
@@ -28,6 +28,17 @@ export function TaskItem({ task, displayMode, onEdit, onRestore }: TaskItemProps
     }
   };
 
+  const handleUncheck = () => {
+    if (activeProfile) {
+      dispatch({ 
+        type: 'TOGGLE_TASK', 
+        taskId: task.id, 
+        profileId: activeProfile.id 
+      });
+    }
+    setShowMenu(false);
+  };
+
   const handleDelete = () => {
     if (window.confirm(`Are you sure you want to delete "${task.title}"?`)) {
       dispatch({ type: 'DELETE_TASK', taskId: task.id });
@@ -46,6 +57,14 @@ export function TaskItem({ task, displayMode, onEdit, onRestore }: TaskItemProps
     if (onRestore) {
       onRestore(task);
     }
+    setShowMenu(false);
+  };
+
+  const handleReset = () => {
+    dispatch({
+      type: 'RESET_TASK',
+      taskId: task.id,
+    });
     setShowMenu(false);
   };
 
@@ -124,7 +143,7 @@ export function TaskItem({ task, displayMode, onEdit, onRestore }: TaskItemProps
               </button>
 
               {showMenu && (
-                <div className="absolute right-0 top-full mt-1 w-36 bg-white dark:bg-neutral-800 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-700 py-1 z-20 animate-slide-down">
+                <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-neutral-800 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-700 py-1 z-20 animate-slide-down">
                   <button
                     onClick={handleEdit}
                     className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
@@ -133,15 +152,33 @@ export function TaskItem({ task, displayMode, onEdit, onRestore }: TaskItemProps
                     <span className="text-sm text-neutral-700 dark:text-neutral-300">Edit</span>
                   </button>
                   
-                  {task.isCompleted && (
-                    <button
-                      onClick={handleRestore}
-                      className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
-                    >
-                      <RotateCcw className="w-4 h-4 text-neutral-500" />
-                      <span className="text-sm text-neutral-700 dark:text-neutral-300">Restore</span>
-                    </button>
-                  )}
+                  {task.isCompleted ? (
+                    <>
+                      <button
+                        onClick={handleUncheck}
+                        className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+                      >
+                        <X className="w-4 h-4 text-neutral-500" />
+                        <span className="text-sm text-neutral-700 dark:text-neutral-300">Uncheck</span>
+                      </button>
+                      
+                      <button
+                        onClick={handleReset}
+                        className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+                      >
+                        <RefreshCw className="w-4 h-4 text-warning-500" />
+                        <span className="text-sm text-neutral-700 dark:text-neutral-300">Reset</span>
+                      </button>
+                      
+                      <button
+                        onClick={handleRestore}
+                        className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+                      >
+                        <RotateCcw className="w-4 h-4 text-primary-500" />
+                        <span className="text-sm text-neutral-700 dark:text-neutral-300">Restore</span>
+                      </button>
+                    </>
+                  ) : null}
                   
                   <button
                     onClick={handleDelete}
