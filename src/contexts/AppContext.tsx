@@ -10,6 +10,7 @@ type AppAction =
   | { type: 'DELETE_TASK'; taskId: string }
   | { type: 'RESTORE_TASK'; taskId: string }
   | { type: 'RESET_TASK'; taskId: string }
+  | { type: 'UNCHECK_TASK'; taskId: string; profileId: string }
   | { type: 'ADD_GROUP'; group: Omit<TaskGroup, 'id' | 'createdAt' | 'order'> }
   | { type: 'UPDATE_GROUP'; groupId: string; updates: Partial<TaskGroup> }
   | { type: 'DELETE_GROUP'; groupId: string }
@@ -51,10 +52,42 @@ function appReducer(state: AppState, action: AppAction): AppState {
         id: Date.now().toString(),
         taskId: action.taskId,
         profileId: action.profileId,
-        action: isCompleting ? 'completed' : 'uncompleted',
+        action: isCompleting ? 'completed' : 'unchecked',
         timestamp: new Date(),
         taskTitle: task.title,
         profileName: profile?.name || 'Unknown',
+        details: isCompleting ? 'Task marked as completed' : 'Task unchecked via toggle',
+      };
+
+      return {
+        ...state,
+        tasks: state.tasks.map(t => t.id === action.taskId ? updatedTask : t),
+        history: [historyEntry, ...state.history],
+      };
+    }
+
+    case 'UNCHECK_TASK': {
+      const task = state.tasks.find(t => t.id === action.taskId);
+      if (!task || !task.isCompleted) return state;
+
+      const profile = state.profiles.find(p => p.id === action.profileId);
+      
+      const updatedTask = {
+        ...task,
+        isCompleted: false,
+        completedBy: undefined,
+        completedAt: undefined,
+      };
+
+      const historyEntry: HistoryEntry = {
+        id: Date.now().toString(),
+        taskId: action.taskId,
+        profileId: action.profileId,
+        action: 'unchecked',
+        timestamp: new Date(),
+        taskTitle: task.title,
+        profileName: profile?.name || 'Unknown',
+        details: 'Task unchecked via menu - completion history preserved',
       };
 
       return {
@@ -106,13 +139,25 @@ function appReducer(state: AppState, action: AppAction): AppState {
         completedAt: undefined,
       };
 
-      // Remove all history entries for this task
+      // Create history entry for restore action
+      const historyEntry: HistoryEntry = {
+        id: Date.now().toString(),
+        taskId: action.taskId,
+        profileId: state.activeProfileId,
+        action: 'restored',
+        timestamp: new Date(),
+        taskTitle: task.title,
+        profileName: state.profiles.find(p => p.id === state.activeProfileId)?.name || 'Unknown',
+        details: 'Task restored - all completion history removed',
+      };
+
+      // Remove all previous history entries for this task
       const filteredHistory = state.history.filter(h => h.taskId !== action.taskId);
 
       return {
         ...state,
         tasks: state.tasks.map(t => t.id === action.taskId ? updatedTask : t),
-        history: filteredHistory,
+        history: [historyEntry, ...filteredHistory],
       };
     }
 
@@ -127,9 +172,21 @@ function appReducer(state: AppState, action: AppAction): AppState {
         completedAt: undefined,
       };
 
+      const historyEntry: HistoryEntry = {
+        id: Date.now().toString(),
+        taskId: action.taskId,
+        profileId: state.activeProfileId,
+        action: 'reset',
+        timestamp: new Date(),
+        taskTitle: task.title,
+        profileName: state.profiles.find(p => p.id === state.activeProfileId)?.name || 'Unknown',
+        details: 'Task reset - unchecked but completion history preserved',
+      };
+
       return {
         ...state,
         tasks: state.tasks.map(t => t.id === action.taskId ? updatedTask : t),
+        history: [historyEntry, ...state.history],
       };
     }
 

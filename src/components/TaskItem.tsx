@@ -32,7 +32,7 @@ export function TaskItem({ task, displayMode, onEdit, onRestore }: TaskItemProps
   const handleUncheck = () => {
     if (activeProfile) {
       dispatch({ 
-        type: 'TOGGLE_TASK', 
+        type: 'UNCHECK_TASK', 
         taskId: task.id, 
         profileId: activeProfile.id 
       });

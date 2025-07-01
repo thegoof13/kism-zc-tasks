@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Edit, Trash2, Download, Upload } from 'lucide-react';
+import { X, Plus, Edit, Trash2, Download, Upload, History, BarChart3 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { TaskGroup, UserProfile, CompletedDisplayMode } from '../types';
 import { getAvailableIcons } from '../utils/icons';
@@ -9,7 +9,7 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-type SettingsTab = 'groups' | 'profiles' | 'data' | 'preferences';
+type SettingsTab = 'groups' | 'profiles' | 'data' | 'preferences' | 'history';
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { state, dispatch } = useApp();
@@ -56,7 +56,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       
-      <div className="relative w-full max-w-2xl mx-4 bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in max-h-[90vh] overflow-hidden">
+      <div className="relative w-full max-w-4xl mx-4 bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in max-h-[90vh] overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
           <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
             Settings
@@ -76,6 +76,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               {[
                 { id: 'groups', label: 'Groups', icon: '📁' },
                 { id: 'profiles', label: 'Profiles', icon: '👥' },
+                { id: 'history', label: 'History', icon: '📊' },
                 { id: 'data', label: 'Data', icon: '💾' },
                 { id: 'preferences', label: 'Preferences', icon: '⚙️' },
               ].map(tab => (
@@ -114,6 +115,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 dispatch={dispatch}
               />
             )}
+
+            {activeTab === 'history' && (
+              <HistorySettings
+                history={state.history}
+                tasks={state.tasks}
+                profiles={state.profiles}
+              />
+            )}
             
             {activeTab === 'data' && (
               <DataSettings
@@ -132,6 +141,180 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// History Settings Component
+function HistorySettings({ history, tasks, profiles }: any) {
+  const [filter, setFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredHistory = history.filter((entry: any) => {
+    const matchesFilter = filter === 'all' || entry.action === filter;
+    const matchesSearch = searchTerm === '' || 
+      entry.taskTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      entry.profileName.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
+
+  const getActionStats = () => {
+    const stats = {
+      completed: history.filter((h: any) => h.action === 'completed').length,
+      unchecked: history.filter((h: any) => h.action === 'unchecked').length,
+      reset: history.filter((h: any) => h.action === 'reset').length,
+      restored: history.filter((h: any) => h.action === 'restored').length,
+    };
+    return stats;
+  };
+
+  const stats = getActionStats();
+
+  const getActionIcon = (action: string) => {
+    switch (action) {
+      case 'completed': return '✅';
+      case 'unchecked': return '❌';
+      case 'reset': return '🔄';
+      case 'restored': return '↩️';
+      default: return '📝';
+    }
+  };
+
+  const getActionColor = (action: string) => {
+    switch (action) {
+      case 'completed': return 'text-success-600 dark:text-success-400';
+      case 'unchecked': return 'text-error-600 dark:text-error-400';
+      case 'reset': return 'text-warning-600 dark:text-warning-400';
+      case 'restored': return 'text-primary-600 dark:text-primary-400';
+      default: return 'text-neutral-600 dark:text-neutral-400';
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100">
+          Task History & Analytics
+        </h3>
+        <BarChart3 className="w-5 h-5 text-neutral-500" />
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="card p-4 text-center">
+          <div className="text-2xl font-bold text-success-600 dark:text-success-400">
+            {stats.completed}
+          </div>
+          <div className="text-sm text-neutral-600 dark:text-neutral-400">
+            Completed
+          </div>
+        </div>
+        <div className="card p-4 text-center">
+          <div className="text-2xl font-bold text-error-600 dark:text-error-400">
+            {stats.unchecked}
+          </div>
+          <div className="text-sm text-neutral-600 dark:text-neutral-400">
+            Unchecked
+          </div>
+        </div>
+        <div className="card p-4 text-center">
+          <div className="text-2xl font-bold text-warning-600 dark:text-warning-400">
+            {stats.reset}
+          </div>
+          <div className="text-sm text-neutral-600 dark:text-neutral-400">
+            Reset
+          </div>
+        </div>
+        <div className="card p-4 text-center">
+          <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+            {stats.restored}
+          </div>
+          <div className="text-sm text-neutral-600 dark:text-neutral-400">
+            Restored
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <input
+            type="text"
+            placeholder="Search tasks or profiles..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="input-primary"
+          />
+        </div>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="input-primary w-full sm:w-auto"
+        >
+          <option value="all">All Actions</option>
+          <option value="completed">Completed</option>
+          <option value="unchecked">Unchecked</option>
+          <option value="reset">Reset</option>
+          <option value="restored">Restored</option>
+        </select>
+      </div>
+
+      {/* History List */}
+      <div className="space-y-2 max-h-96 overflow-y-auto">
+        {filteredHistory.length === 0 ? (
+          <div className="text-center py-8 text-neutral-500 dark:text-neutral-400">
+            <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>No history entries found</p>
+          </div>
+        ) : (
+          filteredHistory.map((entry: any) => (
+            <div key={entry.id} className="card p-4 flex items-start space-x-3">
+              <div className="text-lg">{getActionIcon(entry.action)}</div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-neutral-900 dark:text-neutral-100 truncate">
+                    {entry.taskTitle}
+                  </h4>
+                  <span className={`text-sm font-medium ${getActionColor(entry.action)}`}>
+                    {entry.action}
+                  </span>
+                </div>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
+                  {entry.details || `Task ${entry.action} by ${entry.profileName}`}
+                </p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                  {new Date(entry.timestamp).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Insights */}
+      {history.length > 0 && (
+        <div className="card p-4">
+          <h4 className="font-medium text-neutral-900 dark:text-neutral-100 mb-2">
+            Quick Insights
+          </h4>
+          <div className="space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
+            <p>
+              • <strong>{stats.unchecked}</strong> tasks were accidentally checked and unchecked
+            </p>
+            <p>
+              • <strong>{stats.reset}</strong> tasks were reset (unchecked but history preserved)
+            </p>
+            <p>
+              • <strong>{stats.restored}</strong> tasks were fully restored (history cleared)
+            </p>
+            <p>
+              • Total completion rate: <strong>
+                {Math.round((stats.completed / (stats.completed + stats.unchecked + stats.reset + stats.restored)) * 100)}%
+              </strong>
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

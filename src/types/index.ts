@@ -51,10 +51,11 @@ export interface HistoryEntry {
   id: string;
   taskId: string;
   profileId: string;
-  action: 'completed' | 'uncompleted';
+  action: 'completed' | 'unchecked' | 'reset' | 'restored';
   timestamp: Date;
   taskTitle: string;
   profileName: string;
+  details?: string; // Additional context about the action
 }
 
 export interface AppSettings {
