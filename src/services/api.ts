@@ -1,15 +1,18 @@
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = '/api';
 
 export class ApiService {
-  private static userId = 'user1'; // Simple user ID for now
+  private static userId = '1'; // Simple user ID for now
 
   static async getUserData() {
     try {
+      console.log('Fetching user data...');
       const response = await fetch(`${API_BASE_URL}/data/${this.userId}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch user data');
+        throw new Error(`HTTP ${response.status}: Failed to fetch user data`);
       }
-      return await response.json();
+      const data = await response.json();
+      console.log('User data loaded successfully');
+      return data;
     } catch (error) {
       console.error('Error fetching user data:', error);
       throw error;
@@ -18,6 +21,7 @@ export class ApiService {
 
   static async saveUserData(data: any) {
     try {
+      console.log('Saving user data...');
       const response = await fetch(`${API_BASE_URL}/data/${this.userId}`, {
         method: 'POST',
         headers: {
@@ -27,10 +31,12 @@ export class ApiService {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to save user data');
+        throw new Error(`HTTP ${response.status}: Failed to save user data`);
       }
       
-      return await response.json();
+      const result = await response.json();
+      console.log('User data saved successfully');
+      return result;
     } catch (error) {
       console.error('Error saving user data:', error);
       throw error;
@@ -40,8 +46,14 @@ export class ApiService {
   static async checkHealth() {
     try {
       const response = await fetch(`${API_BASE_URL}/health`);
-      return response.ok;
+      if (response.ok) {
+        const health = await response.json();
+        console.log('Server health check:', health);
+        return true;
+      }
+      return false;
     } catch (error) {
+      console.error('Health check failed:', error);
       return false;
     }
   }

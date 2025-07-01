@@ -23,15 +23,16 @@ type AppAction =
   | { type: 'UPDATE_SETTINGS'; updates: Partial<AppState['settings']> }
   | { type: 'RESET_RECURRING_TASKS' }
   | { type: 'LOAD_STATE'; state: AppState }
-  | { type: 'SET_LOADING'; loading: boolean };
+  | { type: 'SET_LOADING'; loading: boolean }
+  | { type: 'SET_ERROR'; error: string | null };
 
 const initialState: AppState = {
   tasks: [],
-  groups: [],
-  profiles: [],
+  groups: defaultGroups,
+  profiles: defaultProfiles,
   history: [],
   settings: defaultSettings,
-  activeProfileId: '',
+  activeProfileId: 'default',
   loading: true,
 };
 
@@ -39,6 +40,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SET_LOADING':
       return { ...state, loading: action.loading };
+
+    case 'SET_ERROR':
+      return { ...state, loading: false };
 
     case 'LOAD_STATE':
       return { ...action.state, loading: false };
@@ -322,31 +326,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const loadData = async () => {
       try {
         dispatch({ type: 'SET_LOADING', loading: true });
+        
+        // Check if server is available
+        const isHealthy = await ApiService.checkHealth();
+        if (!isHealthy) {
+          console.warn('Server not available, using default data');
+          dispatch({ type: 'SET_LOADING', loading: false });
+          return;
+        }
+
         const userData = await ApiService.getUserData();
         
         // Convert date strings back to Date objects
-        userData.tasks = userData.tasks.map((task: any) => ({
-          ...task,
-          createdAt: new Date(task.createdAt),
-          completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
-        }));
-        userData.groups = userData.groups.map((group: any) => ({
-          ...group,
-          createdAt: new Date(group.createdAt),
-        }));
-        userData.profiles = userData.profiles.map((profile: any) => ({
-          ...profile,
-          createdAt: new Date(profile.createdAt),
-        }));
-        userData.history = userData.history.map((entry: any) => ({
-          ...entry,
-          timestamp: new Date(entry.timestamp),
-        }));
+        if (userData.tasks) {
+          userData.tasks = userData.tasks.map((task: any) => ({
+            ...task,
+            createdAt: new Date(task.createdAt),
+            completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
+          }));
+        }
+        
+        if (userData.groups) {
+          userData.groups = userData.groups.map((group: any) => ({
+            ...group,
+            createdAt: new Date(group.createdAt),
+          }));
+        }
+        
+        if (userData.profiles) {
+          userData.profiles = userData.profiles.map((profile: any) => ({
+            ...profile,
+            createdAt: new Date(profile.createdAt),
+          }));
+        }
+        
+        if (userData.history) {
+          userData.history = userData.history.map((entry: any) => ({
+            ...entry,
+            timestamp: new Date(entry.timestamp),
+          }));
+        }
         
         dispatch({ type: 'LOAD_STATE', state: userData });
       } catch (error) {
         console.error('Failed to load data:', error);
-        dispatch({ type: 'SET_LOADING', loading: false });
+        dispatch({ type: 'SET_ERROR', error: error.message });
       }
     };
 
@@ -371,7 +395,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Reset recurring tasks on app load
   useEffect(() => {
-    if (!state.loading) {
+    if (!state.loading && state.tasks.length > 0) {
       dispatch({ type: 'RESET_RECURRING_TASKS' });
     }
   }, [state.loading]);

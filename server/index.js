@@ -13,14 +13,16 @@ const DATA_DIR = path.join(__dirname, 'data');
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Ensure data directory exists
 async function ensureDataDir() {
   try {
     await fs.access(DATA_DIR);
+    console.log('Data directory exists:', DATA_DIR);
   } catch {
     await fs.mkdir(DATA_DIR, { recursive: true });
+    console.log('Created data directory:', DATA_DIR);
   }
 }
 
@@ -34,14 +36,21 @@ async function readJsonFile(filename) {
     if (error.code === 'ENOENT') {
       return null; // File doesn't exist
     }
+    console.error('Error reading JSON file:', error);
     throw error;
   }
 }
 
 // Helper function to write JSON file
 async function writeJsonFile(filename, data) {
-  const filePath = path.join(DATA_DIR, filename);
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+  try {
+    const filePath = path.join(DATA_DIR, filename);
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+    console.log('Saved data to:', filePath);
+  } catch (error) {
+    console.error('Error writing JSON file:', error);
+    throw error;
+  }
 }
 
 // Helper function to get user data file path
@@ -51,6 +60,7 @@ function getUserDataFile(userId) {
 
 // Initialize default user data
 function getDefaultUserData() {
+  const now = new Date().toISOString();
   return {
     tasks: [
       {
@@ -59,7 +69,7 @@ function getDefaultUserData() {
         groupId: 'personal',
         recurrence: 'daily',
         isCompleted: false,
-        createdAt: new Date().toISOString(),
+        createdAt: now,
         profiles: ['default'],
         order: 0,
       },
@@ -69,7 +79,7 @@ function getDefaultUserData() {
         groupId: 'work',
         recurrence: 'work-daily',
         isCompleted: false,
-        createdAt: new Date().toISOString(),
+        createdAt: now,
         profiles: ['default'],
         order: 0,
       },
@@ -79,7 +89,7 @@ function getDefaultUserData() {
         groupId: 'health',
         recurrence: 'breakfast',
         isCompleted: false,
-        createdAt: new Date().toISOString(),
+        createdAt: now,
         profiles: ['default'],
         order: 0,
       },
@@ -89,7 +99,7 @@ function getDefaultUserData() {
         groupId: 'household',
         recurrence: 'weekly',
         isCompleted: false,
-        createdAt: new Date().toISOString(),
+        createdAt: now,
         profiles: ['default'],
         order: 0,
       },
@@ -100,8 +110,8 @@ function getDefaultUserData() {
         recurrence: 'daily',
         isCompleted: true,
         completedBy: 'default',
-        completedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
+        completedAt: now,
+        createdAt: now,
         profiles: ['default'],
         order: 1,
       },
@@ -115,7 +125,7 @@ function getDefaultUserData() {
         completedDisplayMode: 'grey-out',
         isCollapsed: false,
         order: 0,
-        createdAt: new Date().toISOString(),
+        createdAt: now,
       },
       {
         id: 'work',
@@ -125,7 +135,7 @@ function getDefaultUserData() {
         completedDisplayMode: 'grey-drop',
         isCollapsed: false,
         order: 1,
-        createdAt: new Date().toISOString(),
+        createdAt: now,
       },
       {
         id: 'health',
@@ -135,7 +145,7 @@ function getDefaultUserData() {
         completedDisplayMode: 'grey-out',
         isCollapsed: false,
         order: 2,
-        createdAt: new Date().toISOString(),
+        createdAt: now,
       },
       {
         id: 'household',
@@ -145,7 +155,7 @@ function getDefaultUserData() {
         completedDisplayMode: 'separate-completed',
         isCollapsed: false,
         order: 3,
-        createdAt: new Date().toISOString(),
+        createdAt: now,
       },
     ],
     profiles: [
@@ -155,7 +165,7 @@ function getDefaultUserData() {
         color: '#6366F1',
         avatar: '👤',
         isActive: true,
-        createdAt: new Date().toISOString(),
+        createdAt: now,
       },
     ],
     history: [],
@@ -180,11 +190,12 @@ app.get('/api/data/:userId', async (req, res) => {
     let userData = await readJsonFile(filename);
     
     if (!userData) {
-      // Create default data for new user
+      console.log('Creating default data for user:', userId);
       userData = getDefaultUserData();
       await writeJsonFile(filename, userData);
     }
     
+    console.log('Sending user data for:', userId);
     res.json(userData);
   } catch (error) {
     console.error('Error reading user data:', error);
@@ -199,7 +210,11 @@ app.post('/api/data/:userId', async (req, res) => {
     const userData = req.body;
     const filename = getUserDataFile(userId);
     
-    await writeJsonFile(filename, userData);
+    // Remove loading flag before saving
+    const { loading, ...dataToSave } = userData;
+    
+    await writeJsonFile(filename, dataToSave);
+    console.log('Saved user data for:', userId);
     res.json({ success: true });
   } catch (error) {
     console.error('Error saving user data:', error);
@@ -209,16 +224,32 @@ app.post('/api/data/:userId', async (req, res) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    dataDir: DATA_DIR 
+  });
+});
+
+// Error handling middleware
+app.use((error, req, res, next) => {
+  console.error('Server error:', error);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 // Start server
 async function startServer() {
-  await ensureDataDir();
-  app.listen(PORT, () => {
-    console.log(`ZenTasks server running on port ${PORT}`);
-    console.log(`Data directory: ${DATA_DIR}`);
-  });
+  try {
+    await ensureDataDir();
+    app.listen(PORT, () => {
+      console.log(`🚀 ZenTasks server running on port ${PORT}`);
+      console.log(`📁 Data directory: ${DATA_DIR}`);
+      console.log(`🌐 API available at: http://localhost:${PORT}/api`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
 }
 
-startServer().catch(console.error);
+startServer();
