@@ -53,7 +53,9 @@
       "title": "Exercise routine",
       "groupId": "health",
       "recurrence": "daily",
-      "isCompleted": false,
+      "isCompleted": true,
+      "completedBy": "default",
+      "completedAt": "2025-07-01T13:10:27.817Z",
       "createdAt": "2025-07-01T12:24:37.489Z",
       "profiles": [
         "default"
@@ -114,6 +116,16 @@
     }
   ],
   "history": [
+    {
+      "id": "1751375427817",
+      "taskId": "task-5",
+      "profileId": "default",
+      "action": "completed",
+      "timestamp": "2025-07-01T13:10:27.817Z",
+      "taskTitle": "Exercise routine",
+      "profileName": "Me",
+      "details": "Task marked as completed"
+    },
     {
       "id": "1751375422141",
       "taskId": "task-5",
