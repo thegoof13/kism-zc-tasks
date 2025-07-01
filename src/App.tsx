@@ -1,13 +1,58 @@
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { AppProvider, useApp } from './contexts/AppContext';
+import { useAuth } from './hooks/useAuth';
 import { Header } from './components/Header';
 import { TaskGroup } from './components/TaskGroup';
 import { AddTaskModal } from './components/AddTaskModal';
 import { EditTaskModal } from './components/EditTaskModal';
 import { RestoreResetModal } from './components/RestoreResetModal';
 import { SettingsModal } from './components/SettingsModal';
+import { AuthModal } from './components/AuthModal';
 import { Task } from './types';
+
+function LoadingSpinner() {
+  return (
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-500 rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-neutral-600 dark:text-neutral-400">Loading ZenTasks...</p>
+      </div>
+    </div>
+  );
+}
+
+function AuthRequired() {
+  const [showAuth, setShowAuth] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center">
+      <div className="text-center max-w-md mx-auto px-4">
+        <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center mx-auto mb-6">
+          <Plus className="w-8 h-8 text-white" />
+        </div>
+        <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-4">
+          Welcome to ZenTasks
+        </h1>
+        <p className="text-neutral-600 dark:text-neutral-400 mb-8">
+          Smart task management with recurring tasks and multi-profile support. 
+          Sign in to sync your data across all devices.
+        </p>
+        <button
+          onClick={() => setShowAuth(true)}
+          className="btn-primary"
+        >
+          Get Started
+        </button>
+      </div>
+
+      <AuthModal
+        isOpen={showAuth}
+        onClose={() => setShowAuth(false)}
+      />
+    </div>
+  );
+}
 
 function AppContent() {
   const { state } = useApp();
@@ -18,6 +63,10 @@ function AppContent() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [restoringTask, setRestoringTask] = useState<Task | null>(null);
+
+  if (state.loading) {
+    return <LoadingSpinner />;
+  }
 
   // Sort groups by order
   const sortedGroups = [...state.groups].sort((a, b) => a.order - b.order);
@@ -164,6 +213,16 @@ function AppContent() {
 }
 
 function App() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  if (!user) {
+    return <AuthRequired />;
+  }
+
   return (
     <AppProvider>
       <AppContent />

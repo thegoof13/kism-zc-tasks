@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { AppState, Task, TaskGroup, UserProfile, HistoryEntry } from '../types';
-import { defaultGroups, defaultProfiles, defaultSettings, sampleTasks } from '../utils/defaultData';
+import { defaultGroups, defaultProfiles, defaultSettings } from '../utils/defaultData';
 import { shouldResetTask } from '../utils/recurrence';
+import { useAuth } from '../hooks/useAuth';
+import { DatabaseService } from '../services/database';
 
 type AppAction = 
   | { type: 'TOGGLE_TASK'; taskId: string; profileId: string }
@@ -21,19 +23,27 @@ type AppAction =
   | { type: 'SET_ACTIVE_PROFILE'; profileId: string }
   | { type: 'UPDATE_SETTINGS'; updates: Partial<AppState['settings']> }
   | { type: 'RESET_RECURRING_TASKS' }
-  | { type: 'LOAD_STATE'; state: AppState };
+  | { type: 'LOAD_STATE'; state: AppState }
+  | { type: 'SET_LOADING'; loading: boolean };
 
 const initialState: AppState = {
-  tasks: sampleTasks,
-  groups: defaultGroups,
-  profiles: defaultProfiles,
+  tasks: [],
+  groups: [],
+  profiles: [],
   history: [],
   settings: defaultSettings,
-  activeProfileId: 'default',
+  activeProfileId: '',
+  loading: true,
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
+    case 'SET_LOADING':
+      return { ...state, loading: action.loading };
+
+    case 'LOAD_STATE':
+      return { ...action.state, loading: false };
+
     case 'TOGGLE_TASK': {
       const task = state.tasks.find(t => t.id === action.taskId);
       if (!task) return state;
@@ -139,7 +149,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
         completedAt: undefined,
       };
 
-      // Create history entry for restore action
       const historyEntry: HistoryEntry = {
         id: Date.now().toString(),
         taskId: action.taskId,
@@ -151,7 +160,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
         details: 'Task restored - all completion history removed',
       };
 
-      // Remove all previous history entries for this task
       const filteredHistory = state.history.filter(h => h.taskId !== action.taskId);
 
       return {
@@ -297,10 +305,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     }
 
-    case 'LOAD_STATE': {
-      return action.state;
-    }
-
     default:
       return state;
   }
@@ -309,55 +313,92 @@ function appReducer(state: AppState, action: AppAction): AppState {
 const AppContext = createContext<{
   state: AppState;
   dispatch: React.Dispatch<AppAction>;
+  syncWithDatabase: () => Promise<void>;
 } | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+  const { user } = useAuth();
 
-  // Load state from localStorage on mount
-  useEffect(() => {
-    const savedState = localStorage.getItem('zentasks-state');
-    if (savedState) {
-      try {
-        const parsedState = JSON.parse(savedState);
-        // Convert date strings back to Date objects
-        parsedState.tasks = parsedState.tasks.map((task: any) => ({
-          ...task,
-          createdAt: new Date(task.createdAt),
-          completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
-        }));
-        parsedState.groups = parsedState.groups.map((group: any) => ({
-          ...group,
-          createdAt: new Date(group.createdAt),
-        }));
-        parsedState.profiles = parsedState.profiles.map((profile: any) => ({
-          ...profile,
-          createdAt: new Date(profile.createdAt),
-        }));
-        parsedState.history = parsedState.history.map((entry: any) => ({
-          ...entry,
-          timestamp: new Date(entry.timestamp),
-        }));
-        
-        dispatch({ type: 'LOAD_STATE', state: parsedState });
-      } catch (error) {
-        console.warn('Failed to load saved state:', error);
+  // Sync data with database
+  const syncWithDatabase = async () => {
+    if (!user) return;
+
+    try {
+      dispatch({ type: 'SET_LOADING', loading: true });
+
+      const [profiles, groups, tasks, history, settings] = await Promise.all([
+        DatabaseService.getProfiles(user.id),
+        DatabaseService.getTaskGroups(user.id),
+        DatabaseService.getTasks(user.id),
+        DatabaseService.getHistory(user.id),
+        DatabaseService.getSettings(user.id),
+      ]);
+
+      // If no data exists, create default data
+      if (profiles.length === 0) {
+        const defaultProfile = await DatabaseService.createProfile(user.id, defaultProfiles[0]);
+        profiles.push(defaultProfile);
       }
+
+      if (groups.length === 0) {
+        for (const group of defaultGroups) {
+          const createdGroup = await DatabaseService.createTaskGroup(user.id, group);
+          groups.push(createdGroup);
+        }
+      }
+
+      const activeProfileId = settings?.activeProfileId || profiles[0]?.id || '';
+      const appSettings = settings || defaultSettings;
+
+      dispatch({
+        type: 'LOAD_STATE',
+        state: {
+          tasks,
+          groups,
+          profiles,
+          history,
+          settings: appSettings,
+          activeProfileId,
+          loading: false,
+        },
+      });
+    } catch (error) {
+      console.error('Failed to sync with database:', error);
+      dispatch({ type: 'SET_LOADING', loading: false });
     }
-  }, []);
+  };
 
-  // Save state to localStorage whenever it changes
+  // Load data when user changes
   useEffect(() => {
-    localStorage.setItem('zentasks-state', JSON.stringify(state));
-  }, [state]);
+    if (user) {
+      syncWithDatabase();
+    } else {
+      dispatch({ type: 'SET_LOADING', loading: false });
+    }
+  }, [user]);
 
-  // Reset recurring tasks on app load
+  // Sync changes to database when state changes
   useEffect(() => {
-    dispatch({ type: 'RESET_RECURRING_TASKS' });
-  }, []);
+    if (!user || state.loading) return;
+
+    const syncChanges = async () => {
+      try {
+        // Save settings
+        await DatabaseService.updateSettings(user.id, {
+          ...state.settings,
+          activeProfileId: state.activeProfileId,
+        });
+      } catch (error) {
+        console.error('Failed to sync settings:', error);
+      }
+    };
+
+    syncChanges();
+  }, [user, state.settings, state.activeProfileId, state.loading]);
 
   return (
-    <AppContext.Provider value={{ state, dispatch }}>
+    <AppContext.Provider value={{ state, dispatch, syncWithDatabase }}>
       {children}
     </AppContext.Provider>
   );

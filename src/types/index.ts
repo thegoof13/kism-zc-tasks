@@ -55,7 +55,7 @@ export interface HistoryEntry {
   timestamp: Date;
   taskTitle: string;
   profileName: string;
-  details?: string; // Additional context about the action
+  details?: string;
 }
 
 export interface AppSettings {
@@ -73,4 +73,5 @@ export interface AppState {
   history: HistoryEntry[];
   settings: AppSettings;
   activeProfileId: string;
+  loading?: boolean;
 }
