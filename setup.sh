@@ -103,12 +103,6 @@ get_user_input() {
             print_warning "Create one at: https://dash.cloudflare.com/profile/api-tokens"
             echo
             
-            read -p "Enter your Cloudflare email: " CLOUDFLARE_EMAIL
-            if [[ -z "$CLOUDFLARE_EMAIL" ]]; then
-                print_error "Cloudflare email is required for DNS SSL"
-                exit 1
-            fi
-            
             read -s -p "Enter your Cloudflare API token: " CLOUDFLARE_API_TOKEN
             echo
             if [[ -z "$CLOUDFLARE_API_TOKEN" ]]; then
@@ -125,8 +119,7 @@ get_user_input() {
     print_status "SSL: ${USE_SSL}"
     print_status "Container Environment: ${IS_LXC_CONTAINER}"
     if [[ "$USE_SSL" == true ]]; then
-        print_status "Cloudflare Email: $CLOUDFLARE_EMAIL"
-        print_status "SSL Method: Cloudflare DNS Challenge"
+        print_status "SSL Method: Cloudflare DNS Challenge (API Token)"
     fi
     echo
     
@@ -504,17 +497,18 @@ setup_cloudflare_credentials() {
         # Create SSL config directory
         sudo mkdir -p $SSL_CONFIG_DIR
         
-        # Create Cloudflare credentials file
+        # Create Cloudflare credentials file with API token only
+        # Note: When using API token, email is not needed and causes errors
         cat > /tmp/cloudflare.ini << EOF
-# Cloudflare API credentials for DNS challenge
-dns_cloudflare_email = $CLOUDFLARE_EMAIL
+# Cloudflare API token for DNS challenge
+# Note: When using API token, email is not required
 dns_cloudflare_api_token = $CLOUDFLARE_API_TOKEN
 EOF
         
         sudo mv /tmp/cloudflare.ini $SSL_CONFIG_DIR/
         sudo chmod 600 $SSL_CONFIG_DIR/cloudflare.ini
         
-        print_success "Cloudflare credentials configured"
+        print_success "Cloudflare credentials configured (API token only)"
     fi
 }
 
@@ -545,6 +539,8 @@ setup_ssl() {
         
         # Get SSL certificate using DNS challenge
         print_status "Requesting SSL certificate for $DOMAIN..."
+        print_status "Using Cloudflare API token for DNS validation..."
+        
         if sudo $CERTBOT_CMD certonly \
             --dns-cloudflare \
             --dns-cloudflare-credentials $SSL_CONFIG_DIR/cloudflare.ini \
@@ -563,6 +559,10 @@ setup_ssl() {
             setup_ssl_renewal_cron
         else
             print_error "Failed to obtain SSL certificate"
+            print_status "Check the logs for more details:"
+            print_status "  - Certbot logs: /var/log/letsencrypt/letsencrypt.log"
+            print_status "  - Verify your Cloudflare API token has correct permissions"
+            print_status "  - Ensure your domain is managed by Cloudflare"
             print_warning "Continuing without SSL..."
             USE_SSL=false
         fi
@@ -719,7 +719,7 @@ renew_certificate() {
         return 1
     fi
     
-    # Attempt renewal
+    # Attempt renewal using API token
     if \$CERTBOT_CMD renew \
         --dns-cloudflare \
         --dns-cloudflare-credentials "\$CLOUDFLARE_CREDS" \
@@ -892,10 +892,16 @@ display_final_info() {
         print_success "SSL certificate will be checked weekly on Mondays at 3 AM"
         print_success "Renewal will occur automatically if certificate expires within 21 days"
         echo
+        print_status "SSL Configuration Notes:"
+        echo "  - Using Cloudflare API token (no email required)"
+        echo "  - DNS challenge method for validation"
+        echo "  - 60-second DNS propagation wait time"
+        echo
     fi
     print_warning "Please ensure your domain DNS points to this server's IP address"
     if [[ "$USE_SSL" == true ]]; then
         print_warning "Make sure your domain is managed by Cloudflare for DNS challenges to work"
+        print_warning "Verify your API token has Zone:Read and DNS:Edit permissions"
     fi
     if [[ "$IS_LXC_CONTAINER" == true ]]; then
         print_warning "Running in LXC container - some system features may be limited"
@@ -912,6 +918,7 @@ main() {
     echo "║                    ZenTasks Deployment                      ║"
     echo "║         Ubuntu Setup Script (LXC Compatible)               ║"
     echo "║              PEP 668 Compliant (Ubuntu 24.04)              ║"
+    echo "║            Fixed Cloudflare API Token Support              ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     
