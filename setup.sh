@@ -20,6 +20,9 @@ NODE_VERSION="18"
 DOMAIN=""
 EMAIL=""
 USE_SSL=false
+CLOUDFLARE_EMAIL=""
+CLOUDFLARE_API_TOKEN=""
+SSL_CONFIG_DIR="/etc/letsencrypt/cloudflare"
 
 # Function to print colored output
 print_status() {
@@ -68,9 +71,28 @@ get_user_input() {
     read -p "Enter your email for SSL certificate (optional): " EMAIL
     
     if [[ -n "$EMAIL" ]]; then
-        read -p "Do you want to set up SSL with Let's Encrypt? (y/n): " ssl_choice
+        read -p "Do you want to set up SSL with Let's Encrypt using Cloudflare DNS? (y/n): " ssl_choice
         if [[ "$ssl_choice" =~ ^[Yy]$ ]]; then
             USE_SSL=true
+            
+            echo
+            print_status "Cloudflare DNS SSL Configuration"
+            print_warning "You need a Cloudflare API token with Zone:Read and DNS:Edit permissions"
+            print_warning "Create one at: https://dash.cloudflare.com/profile/api-tokens"
+            echo
+            
+            read -p "Enter your Cloudflare email: " CLOUDFLARE_EMAIL
+            if [[ -z "$CLOUDFLARE_EMAIL" ]]; then
+                print_error "Cloudflare email is required for DNS SSL"
+                exit 1
+            fi
+            
+            read -s -p "Enter your Cloudflare API token: " CLOUDFLARE_API_TOKEN
+            echo
+            if [[ -z "$CLOUDFLARE_API_TOKEN" ]]; then
+                print_error "Cloudflare API token is required for DNS SSL"
+                exit 1
+            fi
         fi
     fi
     
@@ -79,6 +101,10 @@ get_user_input() {
     print_status "Domain: $DOMAIN"
     print_status "Email: ${EMAIL:-'Not provided'}"
     print_status "SSL: ${USE_SSL}"
+    if [[ "$USE_SSL" == true ]]; then
+        print_status "Cloudflare Email: $CLOUDFLARE_EMAIL"
+        print_status "SSL Method: Cloudflare DNS Challenge"
+    fi
     echo
     
     read -p "Continue with deployment? (y/n): " confirm
@@ -132,12 +158,25 @@ install_pm2() {
     print_success "PM2 installed"
 }
 
-# Function to install Certbot (for SSL)
+# Function to install Certbot with Cloudflare plugin
 install_certbot() {
     if [[ "$USE_SSL" == true ]]; then
-        print_status "Installing Certbot for SSL certificates..."
-        sudo apt install -y certbot python3-certbot-nginx
-        print_success "Certbot installed"
+        print_status "Installing Certbot with Cloudflare DNS plugin..."
+        
+        # Install snapd if not present
+        sudo apt install -y snapd
+        
+        # Install certbot via snap
+        sudo snap install core; sudo snap refresh core
+        sudo snap install --classic certbot
+        
+        # Install Cloudflare plugin
+        sudo snap install certbot-dns-cloudflare
+        
+        # Create symlink
+        sudo ln -sf /snap/bin/certbot /usr/bin/certbot
+        
+        print_success "Certbot with Cloudflare plugin installed"
     fi
 }
 
@@ -336,19 +375,262 @@ EOF
     print_success "Nginx configured"
 }
 
-# Function to setup SSL with Let's Encrypt
+# Function to setup Cloudflare credentials
+setup_cloudflare_credentials() {
+    if [[ "$USE_SSL" == true ]]; then
+        print_status "Setting up Cloudflare credentials..."
+        
+        # Create SSL config directory
+        sudo mkdir -p $SSL_CONFIG_DIR
+        
+        # Create Cloudflare credentials file
+        cat > /tmp/cloudflare.ini << EOF
+# Cloudflare API credentials for DNS challenge
+dns_cloudflare_email = $CLOUDFLARE_EMAIL
+dns_cloudflare_api_token = $CLOUDFLARE_API_TOKEN
+EOF
+        
+        sudo mv /tmp/cloudflare.ini $SSL_CONFIG_DIR/
+        sudo chmod 600 $SSL_CONFIG_DIR/cloudflare.ini
+        
+        print_success "Cloudflare credentials configured"
+    fi
+}
+
+# Function to setup SSL with Let's Encrypt using Cloudflare DNS
 setup_ssl() {
     if [[ "$USE_SSL" == true ]]; then
-        print_status "Setting up SSL certificate with Let's Encrypt..."
+        print_status "Setting up SSL certificate with Let's Encrypt using Cloudflare DNS..."
         
-        # Get SSL certificate
-        sudo certbot --nginx -d $DOMAIN --email $EMAIL --agree-tos --non-interactive --redirect
+        # Get SSL certificate using DNS challenge
+        sudo certbot certonly \
+            --dns-cloudflare \
+            --dns-cloudflare-credentials $SSL_CONFIG_DIR/cloudflare.ini \
+            --dns-cloudflare-propagation-seconds 60 \
+            -d $DOMAIN \
+            --email $EMAIL \
+            --agree-tos \
+            --non-interactive
         
-        # Setup auto-renewal
-        sudo systemctl enable certbot.timer
-        
-        print_success "SSL certificate installed and auto-renewal configured"
+        if [[ $? -eq 0 ]]; then
+            print_success "SSL certificate obtained successfully"
+            
+            # Update Nginx configuration for SSL
+            update_nginx_ssl_config
+            
+            # Setup weekly SSL renewal check
+            setup_ssl_renewal_cron
+        else
+            print_error "Failed to obtain SSL certificate"
+            print_warning "Continuing without SSL..."
+            USE_SSL=false
+        fi
     fi
+}
+
+# Function to update Nginx configuration for SSL
+update_nginx_ssl_config() {
+    print_status "Updating Nginx configuration for SSL..."
+    
+    cat > /tmp/zentasks-ssl.nginx << EOF
+server {
+    listen 80;
+    server_name $DOMAIN;
+    return 301 https://\$server_name\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name $DOMAIN;
+    
+    # SSL configuration
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:MozTLS:10m;
+    ssl_session_tickets off;
+    
+    # Modern SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    
+    # HSTS
+    add_header Strict-Transport-Security "max-age=63072000" always;
+    
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+    
+    # API routes - proxy to Node.js backend
+    location /api/ {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_read_timeout 86400;
+    }
+    
+    # Static files - serve from built frontend
+    location / {
+        root $APP_DIR/dist;
+        try_files \$uri \$uri/ /index.html;
+        
+        # Cache static assets
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+        
+        # Don't cache HTML files
+        location ~* \.html$ {
+            expires -1;
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+        }
+    }
+    
+    # Security: deny access to sensitive files
+    location ~ /\. {
+        deny all;
+    }
+    
+    location ~ /(package\.json|server/|src/|node_modules/) {
+        deny all;
+    }
+}
+EOF
+    
+    # Replace Nginx configuration
+    sudo mv /tmp/zentasks-ssl.nginx /etc/nginx/sites-available/zentasks
+    
+    # Test and reload Nginx
+    sudo nginx -t && sudo systemctl reload nginx
+    
+    print_success "Nginx SSL configuration updated"
+}
+
+# Function to create SSL renewal script
+setup_ssl_renewal_cron() {
+    print_status "Setting up SSL certificate renewal..."
+    
+    # Create renewal script
+    cat > /tmp/ssl-renewal.sh << EOF
+#!/bin/bash
+
+# ZenTasks SSL Certificate Renewal Script
+# Checks if certificate expires within 21 days and renews if needed
+
+DOMAIN="$DOMAIN"
+LOG_FILE="/var/log/zentasks/ssl-renewal.log"
+CLOUDFLARE_CREDS="$SSL_CONFIG_DIR/cloudflare.ini"
+
+# Function to log messages
+log_message() {
+    echo "\$(date '+%Y-%m-%d %H:%M:%S') - \$1" >> \$LOG_FILE
+}
+
+# Function to check certificate expiry
+check_cert_expiry() {
+    local cert_file="/etc/letsencrypt/live/\$DOMAIN/cert.pem"
+    
+    if [[ ! -f "\$cert_file" ]]; then
+        log_message "ERROR: Certificate file not found: \$cert_file"
+        return 1
+    fi
+    
+    # Get certificate expiry date
+    local expiry_date=\$(openssl x509 -enddate -noout -in "\$cert_file" | cut -d= -f2)
+    local expiry_epoch=\$(date -d "\$expiry_date" +%s)
+    local current_epoch=\$(date +%s)
+    local days_until_expiry=\$(( (expiry_epoch - current_epoch) / 86400 ))
+    
+    log_message "Certificate expires in \$days_until_expiry days"
+    
+    # Return 0 if renewal needed (expires within 21 days), 1 otherwise
+    if [[ \$days_until_expiry -le 21 ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Function to renew certificate
+renew_certificate() {
+    log_message "Starting certificate renewal for \$DOMAIN"
+    
+    # Attempt renewal
+    if certbot renew \
+        --dns-cloudflare \
+        --dns-cloudflare-credentials "\$CLOUDFLARE_CREDS" \
+        --dns-cloudflare-propagation-seconds 60 \
+        --cert-name "\$DOMAIN" \
+        --quiet; then
+        
+        log_message "Certificate renewed successfully"
+        
+        # Reload Nginx to use new certificate
+        if systemctl reload nginx; then
+            log_message "Nginx reloaded successfully"
+        else
+            log_message "ERROR: Failed to reload Nginx"
+            return 1
+        fi
+        
+        return 0
+    else
+        log_message "ERROR: Certificate renewal failed"
+        return 1
+    fi
+}
+
+# Main execution
+main() {
+    log_message "Starting SSL renewal check"
+    
+    if check_cert_expiry; then
+        log_message "Certificate renewal needed"
+        
+        if renew_certificate; then
+            log_message "Certificate renewal completed successfully"
+        else
+            log_message "Certificate renewal failed"
+            exit 1
+        fi
+    else
+        log_message "Certificate renewal not needed"
+    fi
+    
+    log_message "SSL renewal check completed"
+}
+
+# Create log directory if it doesn't exist
+mkdir -p \$(dirname "\$LOG_FILE")
+
+# Run main function
+main
+EOF
+    
+    # Install renewal script
+    sudo mv /tmp/ssl-renewal.sh /usr/local/bin/zentasks-ssl-renewal.sh
+    sudo chmod +x /usr/local/bin/zentasks-ssl-renewal.sh
+    
+    # Add to crontab for weekly renewal check (Monday at 3 AM)
+    (sudo crontab -l 2>/dev/null | grep -v "zentasks-ssl-renewal"; echo "0 3 * * 1 /usr/local/bin/zentasks-ssl-renewal.sh") | sudo crontab -
+    
+    print_success "SSL renewal script created and scheduled for weekly checks"
 }
 
 # Function to configure firewall
@@ -424,7 +706,7 @@ EOF
     sudo chmod +x /usr/local/bin/backup-zentasks.sh
     
     # Add to crontab for daily backups
-    (sudo crontab -l 2>/dev/null; echo "0 2 * * * /usr/local/bin/backup-zentasks.sh") | sudo crontab -
+    (sudo crontab -l 2>/dev/null | grep -v "backup-zentasks"; echo "0 2 * * * /usr/local/bin/backup-zentasks.sh") | sudo crontab -
     
     print_success "Backup script created and scheduled"
 }
@@ -448,11 +730,20 @@ display_final_info() {
     echo "  Manual backup: sudo /usr/local/bin/backup-zentasks.sh"
     echo
     if [[ "$USE_SSL" == true ]]; then
-        print_status "SSL certificate will auto-renew. Test renewal with:"
-        echo "  sudo certbot renew --dry-run"
+        print_status "SSL certificate management:"
+        echo "  Manual renewal check: sudo /usr/local/bin/zentasks-ssl-renewal.sh"
+        echo "  View SSL renewal logs: sudo tail -f /var/log/zentasks/ssl-renewal.log"
+        echo "  Certificate location: /etc/letsencrypt/live/$DOMAIN/"
+        echo "  Cloudflare credentials: $SSL_CONFIG_DIR/cloudflare.ini"
+        echo
+        print_success "SSL certificate will be checked weekly on Mondays at 3 AM"
+        print_success "Renewal will occur automatically if certificate expires within 21 days"
         echo
     fi
     print_warning "Please ensure your domain DNS points to this server's IP address"
+    if [[ "$USE_SSL" == true ]]; then
+        print_warning "Make sure your domain is managed by Cloudflare for DNS challenges to work"
+    fi
     echo
 }
 
@@ -461,7 +752,7 @@ main() {
     echo -e "${BLUE}"
     echo "╔══════════════════════════════════════════════════════════════╗"
     echo "║                    ZenTasks Deployment                      ║"
-    echo "║                  Ubuntu Setup Script                        ║"
+    echo "║              Ubuntu Setup Script with SSL                   ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     
@@ -484,6 +775,7 @@ main() {
     create_pm2_config
     start_application
     configure_nginx
+    setup_cloudflare_credentials
     setup_ssl
     configure_firewall
     create_systemd_service
