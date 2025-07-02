@@ -13,8 +13,27 @@ const DATA_DIR = path.join(__dirname, 'data');
 const AI_LOG_FILE = path.join(DATA_DIR, 'ai_queries.log');
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['http://localhost', 'http://127.0.0.1', process.env.FRONTEND_URL].filter(Boolean)
+    : ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
+
+// Serve static files in production
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(__dirname, '..', 'dist');
+  app.use(express.static(distPath));
+  
+  // Serve index.html for all non-API routes (SPA support)
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 // Ensure data directory exists
 async function ensureDataDir() {
@@ -122,9 +141,7 @@ function getDefaultUserData() {
         title: 'Exercise routine',
         groupId: 'health',
         recurrence: 'daily',
-        isCompleted: true,
-        completedBy: 'default',
-        completedAt: now,
+        isCompleted: false,
         createdAt: now,
         profiles: ['default'],
         order: 1,
@@ -302,7 +319,8 @@ app.get('/api/health', (req, res) => {
     status: 'ok', 
     timestamp: new Date().toISOString(),
     dataDir: DATA_DIR,
-    features: ['tasks', 'ai-logging']
+    features: ['tasks', 'ai-logging'],
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 
@@ -316,11 +334,16 @@ app.use((error, req, res, next) => {
 async function startServer() {
   try {
     await ensureDataDir();
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 ZenTasks server running on port ${PORT}`);
       console.log(`📁 Data directory: ${DATA_DIR}`);
       console.log(`🤖 AI logging enabled: ${AI_LOG_FILE}`);
       console.log(`🌐 API available at: http://localhost:${PORT}/api`);
+      console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+      
+      if (process.env.NODE_ENV === 'production') {
+        console.log(`📦 Serving static files from: ${path.join(__dirname, '..', 'dist')}`);
+      }
     });
   } catch (error) {
     console.error('Failed to start server:', error);
