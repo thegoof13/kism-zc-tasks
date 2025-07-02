@@ -303,7 +303,10 @@ install_app_dependencies() {
     print_status "Installing application dependencies..."
     
     cd $APP_DIR
-    sudo -u $APP_USER npm install --production
+    
+    # Install all dependencies (including dev dependencies for build)
+    print_status "Installing all dependencies (including dev dependencies for build)..."
+    sudo -u $APP_USER npm install
     
     print_success "Dependencies installed"
 }
@@ -313,9 +316,46 @@ build_application() {
     print_status "Building application..."
     
     cd $APP_DIR
-    sudo -u $APP_USER npm run build
     
-    print_success "Application built"
+    # Ensure we're in the right directory and have the right permissions
+    print_status "Current directory: $(pwd)"
+    print_status "Checking package.json..."
+    if [[ ! -f package.json ]]; then
+        print_error "package.json not found in $APP_DIR"
+        exit 1
+    fi
+    
+    # Check if vite is available
+    print_status "Checking for Vite..."
+    if [[ -f node_modules/.bin/vite ]]; then
+        print_status "Vite found in node_modules/.bin/"
+    else
+        print_warning "Vite not found in node_modules/.bin/, checking global installation..."
+        if ! command -v vite >/dev/null 2>&1; then
+            print_status "Installing Vite globally as fallback..."
+            sudo npm install -g vite
+        fi
+    fi
+    
+    # Build the application using npx to ensure we use the local version
+    print_status "Building frontend with Vite..."
+    sudo -u $APP_USER npx vite build
+    
+    # Verify build output
+    if [[ -d dist ]]; then
+        print_success "Build completed successfully"
+        print_status "Build output directory contents:"
+        ls -la dist/
+    else
+        print_error "Build failed - dist directory not created"
+        exit 1
+    fi
+    
+    # Clean up dev dependencies to save space (optional)
+    print_status "Cleaning up dev dependencies..."
+    sudo -u $APP_USER npm prune --production
+    
+    print_success "Application built and optimized"
 }
 
 # Function to create environment file
