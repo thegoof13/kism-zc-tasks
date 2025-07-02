@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# ZenTasks Ubuntu Deployment Setup Script
+# ZenTasks Ubuntu Deployment Setup Script (LXC Compatible)
 # This script automates the deployment of ZenTasks on Ubuntu with Nginx
+# Compatible with LXC containers and traditional Ubuntu installations
 
 set -e
 
@@ -23,6 +24,7 @@ USE_SSL=false
 CLOUDFLARE_EMAIL=""
 CLOUDFLARE_API_TOKEN=""
 SSL_CONFIG_DIR="/etc/letsencrypt/cloudflare"
+IS_LXC_CONTAINER=false
 
 # Function to print colored output
 print_status() {
@@ -39,6 +41,26 @@ print_warning() {
 
 print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Function to detect if running in LXC container
+detect_container_environment() {
+    print_status "Detecting container environment..."
+    
+    if [[ -f /proc/1/environ ]] && grep -q "container=lxc" /proc/1/environ; then
+        IS_LXC_CONTAINER=true
+        print_warning "LXC container detected - using container-compatible installation methods"
+    elif [[ -f /.dockerenv ]]; then
+        print_warning "Docker container detected - some features may not work as expected"
+    elif systemd-detect-virt -c >/dev/null 2>&1; then
+        container_type=$(systemd-detect-virt -c)
+        print_warning "Container detected: $container_type - adapting installation"
+        if [[ "$container_type" == "lxc" ]]; then
+            IS_LXC_CONTAINER=true
+        fi
+    else
+        print_status "Running on bare metal or VM - full feature support available"
+    fi
 }
 
 # Function to check if running as root
@@ -101,6 +123,7 @@ get_user_input() {
     print_status "Domain: $DOMAIN"
     print_status "Email: ${EMAIL:-'Not provided'}"
     print_status "SSL: ${USE_SSL}"
+    print_status "Container Environment: ${IS_LXC_CONTAINER}"
     if [[ "$USE_SSL" == true ]]; then
         print_status "Cloudflare Email: $CLOUDFLARE_EMAIL"
         print_status "SSL Method: Cloudflare DNS Challenge"
@@ -119,6 +142,10 @@ update_system() {
     print_status "Updating system packages..."
     sudo apt update
     sudo apt upgrade -y
+    
+    # Install essential packages
+    sudo apt install -y curl wget gnupg2 software-properties-common apt-transport-https ca-certificates
+    
     print_success "System updated"
 }
 
@@ -158,25 +185,52 @@ install_pm2() {
     print_success "PM2 installed"
 }
 
-# Function to install Certbot with Cloudflare plugin
+# Function to install Certbot with Cloudflare plugin (LXC compatible)
 install_certbot() {
     if [[ "$USE_SSL" == true ]]; then
         print_status "Installing Certbot with Cloudflare DNS plugin..."
         
-        # Install snapd if not present
-        sudo apt install -y snapd
-        
-        # Install certbot via snap
-        sudo snap install core; sudo snap refresh core
-        sudo snap install --classic certbot
-        
-        # Install Cloudflare plugin
-        sudo snap install certbot-dns-cloudflare
-        
-        # Create symlink
-        sudo ln -sf /snap/bin/certbot /usr/bin/certbot
-        
-        print_success "Certbot with Cloudflare plugin installed"
+        if [[ "$IS_LXC_CONTAINER" == true ]]; then
+            print_status "Using apt-based installation for LXC container compatibility..."
+            
+            # Install certbot via apt (works in LXC)
+            sudo apt update
+            sudo apt install -y certbot python3-certbot-nginx python3-pip
+            
+            # Install Cloudflare plugin via pip
+            sudo pip3 install certbot-dns-cloudflare
+            
+            print_success "Certbot with Cloudflare plugin installed via apt/pip"
+        else
+            print_status "Using snap-based installation for full system..."
+            
+            # Try snap installation first
+            if command -v snap >/dev/null 2>&1; then
+                # Install snapd if not present
+                sudo apt install -y snapd
+                
+                # Install certbot via snap
+                sudo snap install core; sudo snap refresh core
+                sudo snap install --classic certbot
+                
+                # Install Cloudflare plugin
+                sudo snap install certbot-dns-cloudflare
+                
+                # Create symlink
+                sudo ln -sf /snap/bin/certbot /usr/bin/certbot
+                
+                print_success "Certbot with Cloudflare plugin installed via snap"
+            else
+                print_warning "Snap not available, falling back to apt installation..."
+                
+                # Fallback to apt installation
+                sudo apt update
+                sudo apt install -y certbot python3-certbot-nginx python3-pip
+                sudo pip3 install certbot-dns-cloudflare
+                
+                print_success "Certbot with Cloudflare plugin installed via apt/pip"
+            fi
+        fi
     fi
 }
 
@@ -637,14 +691,15 @@ EOF
 configure_firewall() {
     print_status "Configuring firewall..."
     
-    # Check if UFW is installed
-    if command -v ufw >/dev/null 2>&1; then
+    # Check if UFW is available and not in container
+    if command -v ufw >/dev/null 2>&1 && [[ "$IS_LXC_CONTAINER" == false ]]; then
         sudo ufw --force enable
         sudo ufw allow ssh
         sudo ufw allow 'Nginx Full'
         print_success "Firewall configured"
     else
-        print_warning "UFW not installed, skipping firewall configuration"
+        print_warning "UFW not available or running in container - skipping firewall configuration"
+        print_warning "Please configure firewall rules on the host system if needed"
     fi
 }
 
@@ -720,6 +775,7 @@ display_final_info() {
     print_success "Application directory: $APP_DIR"
     print_success "Application user: $APP_USER"
     print_success "Logs: /var/log/zentasks/"
+    print_success "Container Environment: ${IS_LXC_CONTAINER}"
     echo
     print_status "Useful commands:"
     echo "  View application status: sudo -u $APP_USER pm2 list"
@@ -744,6 +800,10 @@ display_final_info() {
     if [[ "$USE_SSL" == true ]]; then
         print_warning "Make sure your domain is managed by Cloudflare for DNS challenges to work"
     fi
+    if [[ "$IS_LXC_CONTAINER" == true ]]; then
+        print_warning "Running in LXC container - some system features may be limited"
+        print_warning "Firewall configuration should be handled on the host system"
+    fi
     echo
 }
 
@@ -752,12 +812,13 @@ main() {
     echo -e "${BLUE}"
     echo "╔══════════════════════════════════════════════════════════════╗"
     echo "║                    ZenTasks Deployment                      ║"
-    echo "║              Ubuntu Setup Script with SSL                   ║"
+    echo "║         Ubuntu Setup Script (LXC Compatible)               ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     
     check_root
     check_sudo
+    detect_container_environment
     get_user_input
     
     print_status "Starting deployment process..."
