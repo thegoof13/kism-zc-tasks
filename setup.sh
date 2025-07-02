@@ -378,7 +378,8 @@ EOF
 create_pm2_config() {
     print_status "Creating PM2 configuration..."
     
-    cat > /tmp/ecosystem.config.js << 'EOF'
+    # Create ecosystem.config.cjs (CommonJS) to avoid ES module conflicts
+    cat > /tmp/ecosystem.config.cjs << 'EOF'
 module.exports = {
   apps: [{
     name: 'zentasks',
@@ -399,14 +400,14 @@ module.exports = {
 }
 EOF
     
-    sudo mv /tmp/ecosystem.config.js $APP_DIR/
-    sudo chown $APP_USER:$APP_USER $APP_DIR/ecosystem.config.js
+    sudo mv /tmp/ecosystem.config.cjs $APP_DIR/
+    sudo chown $APP_USER:$APP_USER $APP_DIR/ecosystem.config.cjs
     
     # Create log directory
     sudo mkdir -p /var/log/zentasks
     sudo chown $APP_USER:$APP_USER /var/log/zentasks
     
-    print_success "PM2 configuration created"
+    print_success "PM2 configuration created (ecosystem.config.cjs)"
 }
 
 # Function to start application with PM2
@@ -414,7 +415,7 @@ start_application() {
     print_status "Starting application with PM2..."
     
     cd $APP_DIR
-    sudo -u $APP_USER pm2 start ecosystem.config.js
+    sudo -u $APP_USER pm2 start ecosystem.config.cjs
     sudo -u $APP_USER pm2 save
     
     # Setup PM2 startup script
@@ -811,9 +812,9 @@ After=network.target
 Type=forking
 User=$APP_USER
 WorkingDirectory=$APP_DIR
-ExecStart=/usr/bin/pm2 start ecosystem.config.js
-ExecReload=/usr/bin/pm2 reload ecosystem.config.js
-ExecStop=/usr/bin/pm2 stop ecosystem.config.js
+ExecStart=/usr/bin/pm2 start ecosystem.config.cjs
+ExecReload=/usr/bin/pm2 reload ecosystem.config.cjs
+ExecStop=/usr/bin/pm2 stop ecosystem.config.cjs
 Restart=always
 RestartSec=10
 
@@ -871,6 +872,7 @@ display_final_info() {
     print_success "Application user: $APP_USER"
     print_success "Logs: /var/log/zentasks/"
     print_success "Container Environment: ${IS_LXC_CONTAINER}"
+    print_success "PM2 Config: ecosystem.config.cjs (CommonJS format)"
     echo
     print_status "Useful commands:"
     echo "  View application status: sudo -u $APP_USER pm2 list"
