@@ -194,78 +194,69 @@ install_certbot() {
         ubuntu_version=$(lsb_release -rs)
         print_status "Detected Ubuntu version: $ubuntu_version"
         
-        if [[ "$IS_LXC_CONTAINER" == true ]] || ! command -v snap >/dev/null 2>&1; then
-            print_status "Using apt-based installation (container or no snap available)..."
-            
-            # Install certbot and dependencies via apt
-            sudo apt update
-            sudo apt install -y certbot python3-certbot-nginx python3-venv python3-pip
-            
-            # Create virtual environment for certbot-dns-cloudflare
-            print_status "Creating Python virtual environment for Cloudflare plugin..."
-            sudo python3 -m venv /opt/certbot-cloudflare
-            
-            # Install cloudflare plugin in virtual environment
-            sudo /opt/certbot-cloudflare/bin/pip install certbot-dns-cloudflare
-            
-            # Create wrapper script for certbot with cloudflare plugin
-            cat > /tmp/certbot-cloudflare << 'EOF'
+        # Always use apt-based installation for better compatibility
+        print_status "Using apt-based installation with virtual environment..."
+        
+        # Install system dependencies
+        sudo apt update
+        sudo apt install -y python3-venv python3-pip python3-dev libffi-dev libssl-dev
+        
+        # Create dedicated virtual environment for certbot
+        print_status "Creating dedicated virtual environment for Certbot..."
+        sudo rm -rf /opt/certbot-venv
+        sudo python3 -m venv /opt/certbot-venv
+        
+        # Upgrade pip in virtual environment
+        sudo /opt/certbot-venv/bin/pip install --upgrade pip setuptools wheel
+        
+        # Install certbot and cloudflare plugin in virtual environment
+        print_status "Installing Certbot and Cloudflare plugin..."
+        sudo /opt/certbot-venv/bin/pip install certbot certbot-dns-cloudflare
+        
+        # Create wrapper script for certbot
+        print_status "Creating Certbot wrapper script..."
+        cat > /tmp/certbot-wrapper << 'EOF'
 #!/bin/bash
-# Wrapper script for certbot with cloudflare plugin
+# Certbot wrapper script for virtual environment
 
-# Use system certbot with cloudflare plugin from virtual environment
-export PYTHONPATH="/opt/certbot-cloudflare/lib/python3.*/site-packages:$PYTHONPATH"
-/opt/certbot-cloudflare/bin/python -m certbot "$@"
+VENV_PATH="/opt/certbot-venv"
+CERTBOT_BIN="$VENV_PATH/bin/certbot"
+
+# Check if virtual environment exists
+if [[ ! -f "$CERTBOT_BIN" ]]; then
+    echo "Error: Certbot virtual environment not found at $VENV_PATH"
+    exit 1
+fi
+
+# Execute certbot with all arguments
+exec "$CERTBOT_BIN" "$@"
 EOF
-            
-            sudo mv /tmp/certbot-cloudflare /usr/local/bin/
-            sudo chmod +x /usr/local/bin/certbot-cloudflare
-            
-            print_success "Certbot with Cloudflare plugin installed via apt + venv"
-            
+        
+        sudo mv /tmp/certbot-wrapper /usr/local/bin/certbot-cloudflare
+        sudo chmod +x /usr/local/bin/certbot-cloudflare
+        
+        # Create symlink for standard certbot command
+        sudo ln -sf /usr/local/bin/certbot-cloudflare /usr/local/bin/certbot
+        
+        # Verify installation
+        print_status "Verifying Certbot installation..."
+        if /usr/local/bin/certbot-cloudflare --version >/dev/null 2>&1; then
+            certbot_version=$(/usr/local/bin/certbot-cloudflare --version 2>&1 | head -n1)
+            print_success "Certbot installed successfully: $certbot_version"
         else
-            print_status "Using snap-based installation..."
-            
-            # Try snap installation
-            if sudo snap install core 2>/dev/null && sudo snap refresh core 2>/dev/null; then
-                # Install certbot via snap
-                sudo snap install --classic certbot
-                
-                # Install Cloudflare plugin
-                sudo snap install certbot-dns-cloudflare
-                
-                # Create symlink
-                sudo ln -sf /snap/bin/certbot /usr/bin/certbot
-                
-                print_success "Certbot with Cloudflare plugin installed via snap"
-            else
-                print_warning "Snap installation failed, falling back to apt + venv method..."
-                
-                # Fallback to apt installation
-                sudo apt update
-                sudo apt install -y certbot python3-certbot-nginx python3-venv python3-pip
-                
-                # Create virtual environment for certbot-dns-cloudflare
-                print_status "Creating Python virtual environment for Cloudflare plugin..."
-                sudo python3 -m venv /opt/certbot-cloudflare
-                
-                # Install cloudflare plugin in virtual environment
-                sudo /opt/certbot-cloudflare/bin/pip install certbot-dns-cloudflare
-                
-                # Create wrapper script
-                cat > /tmp/certbot-cloudflare << 'EOF'
-#!/bin/bash
-# Wrapper script for certbot with cloudflare plugin
-export PYTHONPATH="/opt/certbot-cloudflare/lib/python3.*/site-packages:$PYTHONPATH"
-/opt/certbot-cloudflare/bin/python -m certbot "$@"
-EOF
-                
-                sudo mv /tmp/certbot-cloudflare /usr/local/bin/
-                sudo chmod +x /usr/local/bin/certbot-cloudflare
-                
-                print_success "Certbot with Cloudflare plugin installed via apt + venv (fallback)"
-            fi
+            print_error "Certbot installation verification failed"
+            exit 1
         fi
+        
+        # Test cloudflare plugin
+        if /usr/local/bin/certbot-cloudflare plugins | grep -q "dns-cloudflare"; then
+            print_success "Cloudflare DNS plugin available"
+        else
+            print_error "Cloudflare DNS plugin not found"
+            exit 1
+        fi
+        
+        print_success "Certbot with Cloudflare plugin installed successfully"
     fi
 }
 
@@ -532,29 +523,37 @@ setup_ssl() {
     if [[ "$USE_SSL" == true ]]; then
         print_status "Setting up SSL certificate with Let's Encrypt using Cloudflare DNS..."
         
-        # Determine which certbot command to use
-        if [[ -f /usr/local/bin/certbot-cloudflare ]]; then
-            CERTBOT_CMD="/usr/local/bin/certbot-cloudflare"
-            print_status "Using custom certbot wrapper with virtual environment"
-        elif command -v certbot >/dev/null 2>&1; then
-            CERTBOT_CMD="certbot"
-            print_status "Using system certbot"
-        else
-            print_error "Certbot not found"
+        # Use our custom certbot wrapper
+        CERTBOT_CMD="/usr/local/bin/certbot-cloudflare"
+        print_status "Using Certbot wrapper: $CERTBOT_CMD"
+        
+        # Verify certbot is working
+        if ! $CERTBOT_CMD --version >/dev/null 2>&1; then
+            print_error "Certbot is not working properly"
+            print_status "Attempting to diagnose the issue..."
+            
+            # Check virtual environment
+            if [[ -f /opt/certbot-venv/bin/certbot ]]; then
+                print_status "Virtual environment exists, testing directly..."
+                /opt/certbot-venv/bin/certbot --version || true
+            fi
+            
+            print_error "SSL setup failed - continuing without SSL"
+            USE_SSL=false
             return 1
         fi
         
         # Get SSL certificate using DNS challenge
-        sudo $CERTBOT_CMD certonly \
+        print_status "Requesting SSL certificate for $DOMAIN..."
+        if sudo $CERTBOT_CMD certonly \
             --dns-cloudflare \
             --dns-cloudflare-credentials $SSL_CONFIG_DIR/cloudflare.ini \
             --dns-cloudflare-propagation-seconds 60 \
             -d $DOMAIN \
             --email $EMAIL \
             --agree-tos \
-            --non-interactive
-        
-        if [[ $? -eq 0 ]]; then
+            --non-interactive; then
+            
             print_success "SSL certificate obtained successfully"
             
             # Update Nginx configuration for SSL
@@ -668,13 +667,6 @@ EOF
 setup_ssl_renewal_cron() {
     print_status "Setting up SSL certificate renewal..."
     
-    # Determine which certbot command to use in renewal script
-    if [[ -f /usr/local/bin/certbot-cloudflare ]]; then
-        RENEWAL_CERTBOT_CMD="/usr/local/bin/certbot-cloudflare"
-    else
-        RENEWAL_CERTBOT_CMD="certbot"
-    fi
-    
     # Create renewal script
     cat > /tmp/ssl-renewal.sh << EOF
 #!/bin/bash
@@ -685,7 +677,7 @@ setup_ssl_renewal_cron() {
 DOMAIN="$DOMAIN"
 LOG_FILE="/var/log/zentasks/ssl-renewal.log"
 CLOUDFLARE_CREDS="$SSL_CONFIG_DIR/cloudflare.ini"
-CERTBOT_CMD="$RENEWAL_CERTBOT_CMD"
+CERTBOT_CMD="/usr/local/bin/certbot-cloudflare"
 
 # Function to log messages
 log_message() {
@@ -720,6 +712,12 @@ check_cert_expiry() {
 # Function to renew certificate
 renew_certificate() {
     log_message "Starting certificate renewal for \$DOMAIN"
+    
+    # Verify certbot is working
+    if ! \$CERTBOT_CMD --version >/dev/null 2>&1; then
+        log_message "ERROR: Certbot command not working: \$CERTBOT_CMD"
+        return 1
+    fi
     
     # Attempt renewal
     if \$CERTBOT_CMD renew \
@@ -888,11 +886,8 @@ display_final_info() {
         echo "  View SSL renewal logs: sudo tail -f /var/log/zentasks/ssl-renewal.log"
         echo "  Certificate location: /etc/letsencrypt/live/$DOMAIN/"
         echo "  Cloudflare credentials: $SSL_CONFIG_DIR/cloudflare.ini"
-        if [[ -f /usr/local/bin/certbot-cloudflare ]]; then
-            echo "  Certbot command: /usr/local/bin/certbot-cloudflare (custom wrapper)"
-        else
-            echo "  Certbot command: certbot (system)"
-        fi
+        echo "  Certbot command: /usr/local/bin/certbot-cloudflare (virtual environment wrapper)"
+        echo "  Test certbot: /usr/local/bin/certbot-cloudflare --version"
         echo
         print_success "SSL certificate will be checked weekly on Mondays at 3 AM"
         print_success "Renewal will occur automatically if certificate expires within 21 days"
@@ -905,7 +900,7 @@ display_final_info() {
     if [[ "$IS_LXC_CONTAINER" == true ]]; then
         print_warning "Running in LXC container - some system features may be limited"
         print_warning "Firewall configuration should be handled on the host system"
-        print_warning "Python packages installed in virtual environment to comply with PEP 668"
+        print_warning "Certbot installed in isolated virtual environment for PEP 668 compliance"
     fi
     echo
 }
