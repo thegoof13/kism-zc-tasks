@@ -130,9 +130,9 @@
   "profiles": [
     {
       "id": "default",
-      "name": "Me",
-      "color": "#6366F1",
-      "avatar": "👤",
+      "name": "Mum",
+      "color": "#ad00a8",
+      "avatar": "SK",
       "isActive": true,
       "createdAt": "2025-07-01T12:24:37.489Z"
     },
