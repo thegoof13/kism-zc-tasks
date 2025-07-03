@@ -366,7 +366,7 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
         <div className="card p-6">
           <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
             <Trophy className="w-5 h-5 mr-2 text-orange-500" />
-            Top Completer (Last 14 Days)
+            Top Competitor (Last 14 Days)
           </h4>
           <div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 rounded-lg p-4 mb-4">
             <p className="text-sm text-orange-700 dark:text-orange-300 flex items-center">
@@ -471,7 +471,7 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
         <div className="card p-6">
           <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
             <Trophy className="w-5 h-5 mr-2 text-neutral-400" />
-            Top Completer (Last 14 Days)
+            Top Competitor (Last 14 Days)
           </h4>
           <div className="text-center py-8">
             <Trophy className="w-16 h-16 mx-auto mb-4 text-neutral-300 dark:text-neutral-600" />
