@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, Users, Calendar, Target, Award, Clock, Crown } from 'lucide-react';
+import { TrendingUp, Users, Calendar, Target, Award, Clock, Crown, RefreshCw } from 'lucide-react';
 import { HistoryEntry, Task, UserProfile } from '../types';
 
 interface HistoryAnalyticsProps {
@@ -17,11 +17,34 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
     new Date(entry.timestamp) >= fourteenDaysAgo
   );
 
+  // Filter history for last 2 months for reset tasks
+  const twoMonthsAgo = new Date();
+  twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+  
+  const twoMonthHistory = history.filter(entry => 
+    new Date(entry.timestamp) >= twoMonthsAgo
+  );
+
   // Calculate completion stats
   const completedActions = recentHistory.filter(entry => entry.action === 'completed');
   const uncheckedActions = recentHistory.filter(entry => entry.action === 'unchecked');
   const resetActions = recentHistory.filter(entry => entry.action === 'reset');
   const restoredActions = recentHistory.filter(entry => entry.action === 'restored');
+
+  // Calculate reset tasks in last 2 months (manual resets before due date)
+  const resetTasksCount = twoMonthHistory.filter(entry => {
+    if (entry.action !== 'reset') return false;
+    
+    // Find the task to check if it had a due date
+    const task = tasks.find(t => t.id === entry.taskId);
+    if (!task || !task.dueDate) return false;
+    
+    // Check if reset was done before the due date
+    const resetDate = new Date(entry.timestamp);
+    const dueDate = new Date(task.dueDate);
+    
+    return resetDate < dueDate;
+  }).length;
 
   // Calculate productivity by day of week
   const dayStats = Array.from({ length: 7 }, (_, i) => {
@@ -50,11 +73,11 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
       completions: profileCompletions,
       unchecked: profileUnchecked,
       accuracy: profileCompletions > 0 ? 
-        ((profileCompletions - profileUnchecked) / profileCompletions * 100) : 0
+        Math.max(0, ((profileCompletions - profileUnchecked) / profileCompletions * 100)) : 0
     };
   }).sort((a, b) => b.completions - a.completions);
 
-  const mostActiveProfile = profileStats[0];
+  const topCollaborator = profileStats.find(stat => stat.completions > 0);
 
   // Calculate task completion patterns
   const taskCompletionStats = tasks.map(task => {
@@ -70,7 +93,7 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
       completions: taskCompletions,
       unchecked: taskUnchecked,
       consistency: taskCompletions > 0 ? 
-        ((taskCompletions - taskUnchecked) / taskCompletions * 100) : 0
+        Math.max(0, ((taskCompletions - taskUnchecked) / taskCompletions * 100)) : 0
     };
   }).sort((a, b) => b.completions - a.completions);
 
@@ -108,14 +131,14 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
         </div>
 
         <div className="card p-4 text-center">
-          <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/20 rounded-full flex items-center justify-center mx-auto mb-2">
-            <Users className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+          <div className="w-12 h-12 bg-error-100 dark:bg-error-900/20 rounded-full flex items-center justify-center mx-auto mb-2">
+            <RefreshCw className="w-6 h-6 text-error-600 dark:text-error-400" />
           </div>
           <p className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-            {profiles.length}
+            {resetTasksCount}
           </p>
           <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            Active Profiles
+            Reset Tasks
           </p>
         </div>
 
@@ -172,8 +195,8 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
         </div>
       </div>
 
-      {/* Top Collaborator (only show if more than 1 profile) */}
-      {profiles.length > 1 && mostActiveProfile && mostActiveProfile.completions > 0 && (
+      {/* Top Collaborator (show if more than 1 profile AND there's activity) */}
+      {profiles.length > 1 && topCollaborator && (
         <div className="card p-6">
           <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
             <Crown className="w-5 h-5 mr-2 text-yellow-500" />
@@ -182,39 +205,39 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="relative">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center text-2xl">
-                  {mostActiveProfile.profile.avatar}
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center text-2xl shadow-lg">
+                  {topCollaborator.profile.avatar}
                 </div>
-                <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
+                <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center shadow-md">
                   <Crown className="w-3 h-3 text-white" />
                 </div>
               </div>
               <div>
                 <h5 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">
-                  {mostActiveProfile.profile.name}
+                  {topCollaborator.profile.name}
                 </h5>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                  Most active team member
+                <p className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">
+                  🏆 Champion Collaborator
                 </p>
                 <div className="flex items-center space-x-4 mt-2">
                   <div className="flex items-center space-x-1">
                     <Target className="w-4 h-4 text-success-500" />
                     <span className="text-sm font-medium text-success-600 dark:text-success-400">
-                      {mostActiveProfile.completions} completed
+                      {topCollaborator.completions} completed
                     </span>
                   </div>
                   <div className="flex items-center space-x-1">
                     <Award className="w-4 h-4 text-accent-500" />
                     <span className="text-sm font-medium text-accent-600 dark:text-accent-400">
-                      {Math.round(mostActiveProfile.accuracy)}% accuracy
+                      {Math.round(topCollaborator.accuracy)}% accuracy
                     </span>
                   </div>
                 </div>
               </div>
             </div>
             <div className="text-right">
-              <div className="text-3xl font-bold text-yellow-500 mb-1">
-                #{1}
+              <div className="text-4xl font-bold text-yellow-500 mb-1">
+                #1
               </div>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
                 Rank
@@ -223,16 +246,16 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
           </div>
           
           {/* Other top performers */}
-          {profileStats.length > 1 && (
+          {profileStats.length > 1 && profileStats.filter(stat => stat.completions > 0).length > 1 && (
             <div className="mt-6 pt-4 border-t border-neutral-200 dark:border-neutral-700">
               <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">
                 Other Contributors
               </p>
               <div className="space-y-2">
-                {profileStats.slice(1, 3).map((stat, index) => (
+                {profileStats.filter(stat => stat.completions > 0).slice(1, 3).map((stat, index) => (
                   <div key={stat.profile.id} className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center text-sm">
+                      <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center text-lg">
                         {stat.profile.avatar}
                       </div>
                       <div>
@@ -240,12 +263,12 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
                           {stat.profile.name}
                         </p>
                         <p className="text-xs text-neutral-600 dark:text-neutral-400">
-                          {stat.completions} completed
+                          {stat.completions} completed • {Math.round(stat.accuracy)}% accuracy
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold text-neutral-600 dark:text-neutral-400">
+                      <p className="text-xl font-bold text-neutral-600 dark:text-neutral-400">
                         #{index + 2}
                       </p>
                     </div>
@@ -265,7 +288,7 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
             Profile Performance (Last 14 Days)
           </h4>
           <div className="space-y-4">
-            {profileStats.slice(0, 3).map((stat, index) => (
+            {profileStats.filter(stat => stat.completions > 0).slice(0, 3).map((stat, index) => (
               <div key={stat.profile.id} className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-2">
@@ -371,6 +394,19 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
             <p className="text-sm text-neutral-600 dark:text-neutral-400">Restored</p>
           </div>
         </div>
+        
+        {/* Reset Tasks Warning */}
+        {resetTasksCount > 0 && (
+          <div className="mt-4 p-3 bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <RefreshCw className="w-4 h-4 text-warning-600 dark:text-warning-400" />
+              <p className="text-sm text-warning-700 dark:text-warning-400">
+                <strong>{resetTasksCount}</strong> tasks were reset before their due date in the last 2 months. 
+                This may indicate incorrect recurrence scheduling.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
