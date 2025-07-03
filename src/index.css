@@ -59,6 +59,19 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Prevent text selection during swipe gestures */
+  .no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+
+  /* Smooth swipe animations */
+  .swipe-container {
+    touch-action: pan-y;
+  }
 }
 
 /* Custom scrollbar */
@@ -83,5 +96,17 @@
   button, .clickable {
     min-height: 44px;
     min-width: 44px;
+  }
+}
+
+/* Swipe gesture improvements */
+@media (max-width: 768px) {
+  .task-item {
+    touch-action: pan-y;
+  }
+  
+  /* Hide desktop menu button on mobile */
+  .desktop-menu {
+    display: none;
   }
 }
