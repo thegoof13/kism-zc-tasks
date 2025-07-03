@@ -172,10 +172,10 @@ export function PasswordModal({
             </div>
           )}
 
-          {/* Security Notice - FIXED FOR DARK MODE */}
+          {/* Security Notice - PROPERLY FIXED FOR DARK MODE */}
           {isSettingPassword && (
-            <div className="p-4 bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-lg">
-              <p className="text-warning-700 dark:text-warning-300 text-xs">
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 rounded-lg">
+              <p className="text-amber-800 dark:text-amber-200 text-xs">
                 <strong>Security Notice:</strong> Passwords are stored in plain text on the server for simplicity. 
                 Do not use passwords that you use for other important accounts.
               </p>
