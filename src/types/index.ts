@@ -48,7 +48,8 @@ export interface UserProfile {
   avatar: string;
   isActive: boolean;
   createdAt: Date;
-  isTaskCompetitor?: boolean; // New field for competition opt-in
+  isTaskCompetitor?: boolean;
+  pin?: string; // New field for profile PIN protection
 }
 
 export interface HistoryEntry {
@@ -84,6 +85,7 @@ export interface AppSettings {
   autoArchiveCompleted: boolean;
   archiveDays: number;
   ai: AISettings;
+  settingsPassword?: string; // New field for settings password protection
 }
 
 export interface AppState {

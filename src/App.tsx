@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { AppProvider, useApp } from './contexts/AppContext';
 import { Header } from './components/Header';
@@ -6,6 +6,8 @@ import { TaskGroup } from './components/TaskGroup';
 import { AddTaskModal } from './components/AddTaskModal';
 import { EditTaskModal } from './components/EditTaskModal';
 import { SettingsModal } from './components/SettingsModal';
+import { ProfileSelectionModal } from './components/ProfileSelectionModal';
+import { PasswordModal } from './components/PasswordModal';
 import { Task } from './types';
 import { useNotifications } from './hooks/useNotifications';
 
@@ -21,12 +23,15 @@ function LoadingSpinner() {
 }
 
 function AppContent() {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const [showAddTask, setShowAddTask] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showEditTask, setShowEditTask] = useState(false);
+  const [showProfileSelection, setShowProfileSelection] = useState(false);
+  const [showSettingsPassword, setShowSettingsPassword] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isSettingsPasswordSet, setIsSettingsPasswordSet] = useState(false);
 
   // Initialize notifications
   useNotifications({
@@ -35,8 +40,55 @@ function AppContent() {
     enableNotifications: state.settings.enableNotifications,
   });
 
+  // Check if user needs to select a profile on app load
+  useEffect(() => {
+    if (!state.loading && state.profiles.length > 0) {
+      const savedProfileId = localStorage.getItem('zentasks_active_profile');
+      const hasValidSavedProfile = savedProfileId && state.profiles.some(p => p.id === savedProfileId);
+      
+      // If no valid saved profile or no active profile set, show profile selection
+      if (!hasValidSavedProfile || !state.activeProfileId) {
+        setShowProfileSelection(true);
+      }
+    }
+  }, [state.loading, state.profiles, state.activeProfileId]);
+
+  // Check if settings password is set
+  useEffect(() => {
+    setIsSettingsPasswordSet(!!state.settings.settingsPassword);
+  }, [state.settings.settingsPassword]);
+
   if (state.loading) {
     return <LoadingSpinner />;
+  }
+
+  // Show profile selection if no active profile
+  if (!state.activeProfileId && state.profiles.length > 0) {
+    return (
+      <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Plus className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
+            Welcome to ZenTasks
+          </h2>
+          <p className="text-neutral-600 dark:text-neutral-400 mb-6 max-w-md mx-auto">
+            Please select a profile to continue
+          </p>
+        </div>
+        
+        <ProfileSelectionModal
+          isOpen={true}
+          onClose={() => {}} // Don't allow closing without selection
+          profiles={state.profiles}
+          onSelectProfile={(profileId) => {
+            dispatch({ type: 'SET_ACTIVE_PROFILE', profileId });
+            setShowProfileSelection(false);
+          }}
+        />
+      </div>
+    );
   }
 
   // Sort groups by order
@@ -62,9 +114,37 @@ function AppContent() {
     setShowEditTask(true);
   };
 
+  const handleOpenSettings = () => {
+    if (isSettingsPasswordSet) {
+      setShowSettingsPassword(true);
+    } else {
+      setShowSettings(true);
+    }
+  };
+
+  const handleSettingsPasswordSuccess = () => {
+    setShowSettingsPassword(false);
+    setShowSettings(true);
+  };
+
+  const handleSetSettingsPassword = (password: string) => {
+    dispatch({
+      type: 'UPDATE_SETTINGS',
+      updates: { settingsPassword: password }
+    });
+  };
+
+  const handleProfileSelect = (profileId: string) => {
+    dispatch({ type: 'SET_ACTIVE_PROFILE', profileId });
+    setShowProfileSelection(false);
+  };
+
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      <Header onOpenSettings={() => setShowSettings(true)} />
+      <Header 
+        onOpenSettings={handleOpenSettings}
+        onOpenProfileSelection={() => setShowProfileSelection(true)}
+      />
       
       <main className="max-w-4xl mx-auto px-4 py-6">
         {/* Welcome Message */}
@@ -161,6 +241,26 @@ function AppContent() {
       <SettingsModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
+        onSetSettingsPassword={handleSetSettingsPassword}
+        isSettingsPasswordSet={isSettingsPasswordSet}
+      />
+
+      <ProfileSelectionModal
+        isOpen={showProfileSelection}
+        onClose={() => setShowProfileSelection(false)}
+        profiles={state.profiles}
+        onSelectProfile={handleProfileSelect}
+      />
+
+      {/* Settings Password Modal */}
+      <PasswordModal
+        isOpen={showSettingsPassword}
+        onClose={() => setShowSettingsPassword(false)}
+        onSuccess={handleSettingsPasswordSuccess}
+        title="Settings Access"
+        description="Enter the settings password to access configuration options."
+        placeholder="Enter settings password..."
+        expectedPassword={state.settings.settingsPassword}
       />
     </div>
   );

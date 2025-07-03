@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
-import { X, Settings, Users, FolderOpen, History, Brain, Palette, Bell, Archive, Plus, Edit, Trash2, Save, Calendar, Type, Trophy } from 'lucide-react';
+import { X, Settings, Users, FolderOpen, History, Brain, Palette, Bell, Archive, Plus, Edit, Trash2, Save, Calendar, Type, Trophy, Lock, Shield } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { getIconComponent, getAvailableIcons } from '../utils/icons';
 import { AIQueryModal } from './AIQueryModal';
 import { HistoryAnalytics } from './HistoryAnalytics';
+import { PasswordModal } from './PasswordModal';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSetSettingsPassword: (password: string) => void;
+  isSettingsPasswordSet: boolean;
 }
 
-type SettingsTab = 'general' | 'groups' | 'profiles' | 'history' | 'ai';
+type SettingsTab = 'general' | 'groups' | 'profiles' | 'history' | 'ai' | 'security';
 
 const tabs = [
   { id: 'general' as const, icon: Settings, label: 'General' },
@@ -18,17 +21,173 @@ const tabs = [
   { id: 'profiles' as const, icon: Users, label: 'Profiles' },
   { id: 'history' as const, icon: History, label: 'History' },
   { id: 'ai' as const, icon: Brain, label: 'AI Assistant' },
+  { id: 'security' as const, icon: Shield, label: 'Security' },
 ];
 
-export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettingsPasswordSet }: SettingsModalProps) {
   const { state, dispatch } = useApp();
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [showAIModal, setShowAIModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState<string | null>(null);
   const [editingProfile, setEditingProfile] = useState<string | null>(null);
   const [showDetailedHistory, setShowDetailedHistory] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordModalType, setPasswordModalType] = useState<'set' | 'remove'>('set');
 
   if (!isOpen) return null;
+
+  const renderSecuritySettings = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
+          <Shield className="w-5 h-5 mr-2 text-primary-500" />
+          Security Settings
+        </h3>
+        <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
+          Configure password protection for settings access and profile PINs.
+        </p>
+      </div>
+
+      {/* Settings Password */}
+      <div className="card p-6">
+        <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
+          <Lock className="w-5 h-5 mr-2 text-warning-500" />
+          Settings Password Protection
+        </h4>
+        
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                Password Protection Status
+              </label>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                {isSettingsPasswordSet 
+                  ? 'Settings are protected with a password' 
+                  : 'Settings are not password protected'
+                }
+              </p>
+            </div>
+            <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+              isSettingsPasswordSet 
+                ? 'bg-success-100 dark:bg-success-900/20 text-success-700 dark:text-success-400'
+                : 'bg-warning-100 dark:bg-warning-900/20 text-warning-700 dark:text-warning-400'
+            }`}>
+              {isSettingsPasswordSet ? 'Protected' : 'Unprotected'}
+            </div>
+          </div>
+
+          <div className="flex space-x-3">
+            {!isSettingsPasswordSet ? (
+              <button
+                onClick={() => {
+                  setPasswordModalType('set');
+                  setShowPasswordModal(true);
+                }}
+                className="btn-primary"
+              >
+                <Lock className="w-4 h-4 mr-2" />
+                Set Password
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    setPasswordModalType('set');
+                    setShowPasswordModal(true);
+                  }}
+                  className="btn-secondary"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Change Password
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to remove password protection from settings?')) {
+                      dispatch({
+                        type: 'UPDATE_SETTINGS',
+                        updates: { settingsPassword: undefined }
+                      });
+                    }
+                  }}
+                  className="btn-secondary text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Remove Password
+                </button>
+              </>
+            )}
+          </div>
+
+          <div className="p-4 bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-lg">
+            <div className="flex items-start space-x-3">
+              <Shield className="w-5 h-5 text-warning-600 dark:text-warning-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <h5 className="text-sm font-medium text-warning-800 dark:text-warning-200 mb-1">
+                  Security Notice
+                </h5>
+                <p className="text-xs text-warning-700 dark:text-warning-300">
+                  Passwords are stored in plain text on the server for simplicity. 
+                  Do not use passwords that you use for other important accounts.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Profile PIN Information */}
+      <div className="card p-6">
+        <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
+          <Users className="w-5 h-5 mr-2 text-primary-500" />
+          Profile PIN Protection
+        </h4>
+        
+        <div className="space-y-4">
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+            Individual profiles can be protected with PINs. Configure PINs in the Profiles tab.
+          </p>
+
+          <div className="space-y-3">
+            {state.profiles.map(profile => (
+              <div key={profile.id} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-600 flex items-center justify-center text-sm">
+                    {profile.avatar}
+                  </div>
+                  <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                    {profile.name}
+                  </span>
+                </div>
+                <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  profile.pin 
+                    ? 'bg-success-100 dark:bg-success-900/20 text-success-700 dark:text-success-400'
+                    : 'bg-neutral-200 dark:bg-neutral-600 text-neutral-700 dark:text-neutral-300'
+                }`}>
+                  {profile.pin ? 'PIN Protected' : 'No PIN'}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="flex items-start space-x-3">
+              <Users className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <h5 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
+                  Profile Access Control
+                </h5>
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  When a profile has a PIN set, users must enter the correct PIN to access that profile. 
+                  The browser remembers the selected profile, bypassing PIN requirements for subsequent visits.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   const renderGeneralSettings = () => (
     <div className="space-y-6">
@@ -301,10 +460,17 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                           <span>Competitor</span>
                         </div>
                       )}
+                      {profile.pin && (
+                        <div className="flex items-center space-x-1 px-2 py-1 bg-warning-100 dark:bg-warning-900/20 text-warning-700 dark:text-warning-400 text-xs rounded-full">
+                          <Lock className="w-3 h-3" />
+                          <span>PIN</span>
+                        </div>
+                      )}
                     </div>
                     <p className="text-xs text-neutral-500 dark:text-neutral-400">
                       {profile.id === state.activeProfileId ? 'Active' : 'Inactive'}
                       {profile.isTaskCompetitor && ' • Participating in task competition'}
+                      {profile.pin && ' • PIN protected'}
                     </p>
                   </div>
                 </div>
@@ -563,10 +729,27 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               {activeTab === 'profiles' && renderProfileSettings()}
               {activeTab === 'history' && renderHistorySettings()}
               {activeTab === 'ai' && renderAISettings()}
+              {activeTab === 'security' && renderSecuritySettings()}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Password Modal */}
+      <PasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        onSuccess={() => {
+          setShowPasswordModal(false);
+        }}
+        onPasswordSet={onSetSettingsPassword}
+        title={passwordModalType === 'set' ? 'Set Settings Password' : 'Remove Settings Password'}
+        description={passwordModalType === 'set' 
+          ? 'Set a password to protect access to settings. This password will be required to open settings in the future.'
+          : 'Enter the current password to remove protection from settings.'
+        }
+        isSettingPassword={passwordModalType === 'set'}
+      />
 
       {/* AI Query Modal */}
       <AIQueryModal
@@ -743,6 +926,7 @@ function ProfileEditForm({
   const [color, setColor] = useState(profile.color);
   const [avatar, setAvatar] = useState(profile.avatar);
   const [isTaskCompetitor, setIsTaskCompetitor] = useState(profile.isTaskCompetitor || false);
+  const [pin, setPin] = useState(profile.pin || '');
   const [avatarType, setAvatarType] = useState<'emoji' | 'text'>(
     // Detect if current avatar is likely an emoji or text
     /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(profile.avatar) ? 'emoji' : 'text'
@@ -750,7 +934,13 @@ function ProfileEditForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({ name, color, avatar, isTaskCompetitor });
+    onSave({ 
+      name, 
+      color, 
+      avatar, 
+      isTaskCompetitor,
+      pin: pin.trim() || undefined // Only save PIN if it's not empty
+    });
   };
 
   const commonEmojis = ['👤', '👨', '👩', '🧑', '👶', '👴', '👵', '🙋‍♂️', '🙋‍♀️', '💼', '👨‍💻', '👩‍💻', '🎓', '👨‍🎓', '👩‍🎓'];
@@ -885,6 +1075,33 @@ function ProfileEditForm({
               {name}
             </span>
           </div>
+        </div>
+      </div>
+
+      {/* PIN Protection */}
+      <div className="space-y-3">
+        <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center space-x-2 mb-2">
+            <Lock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <label className="text-sm font-medium text-blue-800 dark:text-blue-200">
+              PIN Protection
+            </label>
+          </div>
+          <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+            Set a PIN to protect this profile. Users will need to enter the PIN to access this profile's tasks.
+          </p>
+          <input
+            type="text"
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="Enter 4-6 digit PIN (optional)"
+            className="input-primary"
+            maxLength={6}
+            pattern="[0-9]*"
+          />
+          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+            Leave empty to remove PIN protection. PIN must be 4-6 digits.
+          </p>
         </div>
       </div>
 

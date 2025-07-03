@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Menu, Moon, Sun, Settings, User, ChevronDown } from 'lucide-react';
+import { Menu, Moon, Sun, Settings, User, ChevronDown, Users } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useTheme } from '../hooks/useTheme';
 
 interface HeaderProps {
   onOpenSettings: () => void;
+  onOpenProfileSelection: () => void;
 }
 
-export function Header({ onOpenSettings }: HeaderProps) {
+export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) {
   const { state, dispatch } = useApp();
   const { isDark, toggleTheme } = useTheme();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -51,17 +52,30 @@ export function Header({ onOpenSettings }: HeaderProps) {
               </button>
 
               {showProfileMenu && (
-                <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-neutral-800 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-700 py-1 animate-slide-down">
-                  {state.profiles.map(profile => (
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-neutral-800 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-700 py-1 animate-slide-down">
+                  {/* Current Profile Section */}
+                  <div className="px-3 py-2 border-b border-neutral-200 dark:border-neutral-700">
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1">Current Profile</p>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-lg">{activeProfile?.avatar}</span>
+                      <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                        {activeProfile?.name}
+                      </span>
+                      {activeProfile?.pin && (
+                        <div className="w-2 h-2 bg-warning-500 rounded-full" title="PIN Protected" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Quick Switch Profiles (non-PIN protected) */}
+                  {state.profiles.filter(p => p.id !== state.activeProfileId && !p.pin).map(profile => (
                     <button
                       key={profile.id}
                       onClick={() => {
                         dispatch({ type: 'SET_ACTIVE_PROFILE', profileId: profile.id });
                         setShowProfileMenu(false);
                       }}
-                      className={`w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200 ${
-                        profile.id === state.activeProfileId ? 'bg-primary-50 dark:bg-primary-900/20' : ''
-                      }`}
+                      className="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
                     >
                       <span className="text-lg">{profile.avatar}</span>
                       <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
@@ -69,6 +83,22 @@ export function Header({ onOpenSettings }: HeaderProps) {
                       </span>
                     </button>
                   ))}
+
+                  {/* Switch Profile Button */}
+                  <div className="border-t border-neutral-200 dark:border-neutral-700 mt-1 pt-1">
+                    <button
+                      onClick={() => {
+                        onOpenProfileSelection();
+                        setShowProfileMenu(false);
+                      }}
+                      className="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+                    >
+                      <Users className="w-4 h-4 text-primary-500" />
+                      <span className="text-sm font-medium text-primary-600 dark:text-primary-400">
+                        Switch Profile
+                      </span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
