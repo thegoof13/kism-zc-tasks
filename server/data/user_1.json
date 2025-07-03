@@ -113,6 +113,18 @@
       "id": "1751501941004",
       "createdAt": "2025-07-03T00:19:01.004Z",
       "order": 4
+    },
+    {
+      "name": "New Group",
+      "color": "#6366F1",
+      "icon": "FolderOpen",
+      "completedDisplayMode": "grey-out",
+      "isCollapsed": false,
+      "enableDueDates": false,
+      "sortByDueDate": false,
+      "id": "1751504956828",
+      "createdAt": "2025-07-03T01:09:16.828Z",
+      "order": 5
     }
   ],
   "profiles": [
