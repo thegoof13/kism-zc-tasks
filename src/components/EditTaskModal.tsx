@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Save } from 'lucide-react';
+import { X, Save, Calendar } from 'lucide-react';
 import { Task, RecurrenceType } from '../types';
 import { useApp } from '../contexts/AppContext';
 import { getRecurrenceLabel } from '../utils/recurrence';
@@ -31,21 +31,37 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
   const [groupId, setGroupId] = useState(task.groupId);
   const [recurrence, setRecurrence] = useState<RecurrenceType>(task.recurrence);
   const [selectedProfiles, setSelectedProfiles] = useState<string[]>(task.profiles);
+  const [dueDate, setDueDate] = useState(
+    task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : ''
+  );
+
+  const selectedGroup = state.groups.find(g => g.id === groupId);
+  const showDueDate = selectedGroup?.enableDueDates;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!title.trim() || !groupId) return;
 
+    const updates: any = {
+      title: title.trim(),
+      groupId,
+      recurrence,
+      profiles: selectedProfiles,
+    };
+
+    // Handle due date
+    if (showDueDate && dueDate) {
+      updates.dueDate = new Date(dueDate);
+    } else if (!showDueDate) {
+      // Remove due date if group doesn't support it
+      updates.dueDate = undefined;
+    }
+
     dispatch({
       type: 'UPDATE_TASK',
       taskId: task.id,
-      updates: {
-        title: title.trim(),
-        groupId,
-        recurrence,
-        profiles: selectedProfiles,
-      },
+      updates,
     });
 
     onClose();
@@ -108,11 +124,33 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
             >
               {state.groups.map(group => (
                 <option key={group.id} value={group.id}>
-                  {group.name}
+                  {group.name} {group.enableDueDates ? '(Due dates enabled)' : ''}
                 </option>
               ))}
             </select>
           </div>
+
+          {/* Due Date (conditional) */}
+          {showDueDate && (
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="w-4 h-4" />
+                  <span>Due Date</span>
+                </div>
+              </label>
+              <input
+                type="datetime-local"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="input-primary"
+                min={new Date().toISOString().slice(0, 16)}
+              />
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                You'll receive notifications at 25% time remaining and on the due date
+              </p>
+            </div>
+          )}
 
           {/* Recurrence */}
           <div>

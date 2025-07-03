@@ -25,6 +25,7 @@ export interface Task {
   createdAt: Date;
   profiles: string[];
   order: number;
+  dueDate?: Date;
 }
 
 export interface TaskGroup {
@@ -36,6 +37,8 @@ export interface TaskGroup {
   isCollapsed: boolean;
   order: number;
   createdAt: Date;
+  enableDueDates: boolean;
+  sortByDueDate: boolean;
 }
 
 export interface UserProfile {

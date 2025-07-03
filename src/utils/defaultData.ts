@@ -10,6 +10,8 @@ export const defaultGroups: TaskGroup[] = [
     isCollapsed: false,
     order: 0,
     createdAt: new Date(),
+    enableDueDates: false,
+    sortByDueDate: false,
   },
   {
     id: 'work',
@@ -20,6 +22,8 @@ export const defaultGroups: TaskGroup[] = [
     isCollapsed: false,
     order: 1,
     createdAt: new Date(),
+    enableDueDates: true,
+    sortByDueDate: true,
   },
   {
     id: 'health',
@@ -30,6 +34,8 @@ export const defaultGroups: TaskGroup[] = [
     isCollapsed: false,
     order: 2,
     createdAt: new Date(),
+    enableDueDates: false,
+    sortByDueDate: false,
   },
   {
     id: 'household',
@@ -40,6 +46,8 @@ export const defaultGroups: TaskGroup[] = [
     isCollapsed: false,
     order: 3,
     createdAt: new Date(),
+    enableDueDates: true,
+    sortByDueDate: true,
   },
 ];
 
@@ -57,7 +65,7 @@ export const defaultProfiles: UserProfile[] = [
 export const defaultSettings: AppSettings = {
   theme: 'system',
   showCompletedCount: true,
-  enableNotifications: false,
+  enableNotifications: true,
   autoArchiveCompleted: false,
   archiveDays: 30,
   ai: {

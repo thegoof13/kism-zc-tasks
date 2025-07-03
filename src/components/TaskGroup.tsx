@@ -1,9 +1,10 @@
 import React from 'react';
-import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, Calendar } from 'lucide-react';
 import { TaskGroup as TaskGroupType, Task } from '../types';
 import { useApp } from '../contexts/AppContext';
 import { TaskItem } from './TaskItem';
 import { getIconComponent } from '../utils/icons';
+import { NotificationService } from '../utils/notifications';
 
 interface TaskGroupProps {
   group: TaskGroupType;
@@ -23,8 +24,24 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
     task.profiles.includes(state.activeProfileId)
   );
   
-  // Sort and filter tasks based on completion status and display mode
-  const sortedTasks = [...profileTasks].sort((a, b) => a.order - b.order);
+  // Sort tasks based on group settings
+  const sortedTasks = [...profileTasks].sort((a, b) => {
+    // If group has due date sorting enabled, sort by due date first
+    if (group.sortByDueDate && group.enableDueDates) {
+      // Tasks with due dates come first
+      if (a.dueDate && !b.dueDate) return -1;
+      if (!a.dueDate && b.dueDate) return 1;
+      
+      // Both have due dates, sort by due date
+      if (a.dueDate && b.dueDate) {
+        const dueDateDiff = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        if (dueDateDiff !== 0) return dueDateDiff;
+      }
+    }
+    
+    // Fall back to order sorting
+    return a.order - b.order;
+  });
   
   let displayedTasks: Task[];
   let completedTasks: Task[] = [];
@@ -51,6 +68,9 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
 
   const completedCount = profileTasks.filter(t => t.isCompleted).length;
   const totalCount = profileTasks.length;
+  const overdueTasks = profileTasks.filter(t => 
+    !t.isCompleted && t.dueDate && NotificationService.isOverdue(new Date(t.dueDate))
+  ).length;
 
   // Don't render group if no tasks are visible for current profile
   if (profileTasks.length === 0) {
@@ -76,13 +96,24 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
               style={{ backgroundColor: group.color }}
             />
             <IconComponent className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
+            {group.enableDueDates && (
+              <Calendar className="w-4 h-4 text-primary-500" title="Due dates enabled" />
+            )}
           </div>
           <div className="flex-1">
-            <h3 className="font-medium text-neutral-900 dark:text-neutral-100 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors duration-200">
-              {group.name}
-            </h3>
+            <div className="flex items-center space-x-2">
+              <h3 className="font-medium text-neutral-900 dark:text-neutral-100 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors duration-200">
+                {group.name}
+              </h3>
+              {overdueTasks > 0 && (
+                <span className="px-2 py-1 bg-error-100 dark:bg-error-900/20 text-error-700 dark:text-error-400 text-xs rounded-full font-medium">
+                  {overdueTasks} overdue
+                </span>
+              )}
+            </div>
             <p className="text-xs text-neutral-500 dark:text-neutral-400">
               {completedCount} of {totalCount} completed
+              {group.sortByDueDate && group.enableDueDates && ' • Sorted by due date'}
             </p>
           </div>
         </button>
@@ -118,6 +149,7 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
                 task={task} 
                 displayMode={group.completedDisplayMode}
                 onEdit={onEditTask}
+                showDueDate={group.enableDueDates}
               />
             ))
           )}
@@ -135,6 +167,7 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
                     task={task}
                     displayMode="grey-out"
                     onEdit={onEditTask}
+                    showDueDate={group.enableDueDates}
                   />
                 ))}
               </div>

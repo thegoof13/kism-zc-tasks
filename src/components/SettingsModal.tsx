@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Edit, Trash2, Download, Upload, History, BarChart3, Brain, MessageSquare, Key, Zap } from 'lucide-react';
+import { X, Plus, Edit, Trash2, Download, Upload, History, BarChart3, Brain, MessageSquare, Key, Zap, Calendar, Bell } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { TaskGroup, UserProfile, CompletedDisplayMode, AISettings } from '../types';
 import { getAvailableIcons } from '../utils/icons';
@@ -650,6 +650,8 @@ function GroupsSettings({ groups, editingGroup, setEditingGroup, dispatch }: any
     color: '#6366F1',
     icon: 'User',
     completedDisplayMode: 'grey-out' as CompletedDisplayMode,
+    enableDueDates: false,
+    sortByDueDate: false,
   });
 
   const availableIcons = getAvailableIcons();
@@ -671,6 +673,8 @@ function GroupsSettings({ groups, editingGroup, setEditingGroup, dispatch }: any
       color: '#6366F1',
       icon: 'User',
       completedDisplayMode: 'grey-out',
+      enableDueDates: false,
+      sortByDueDate: false,
     });
     setShowAddForm(false);
   };
@@ -760,6 +764,50 @@ function GroupsSettings({ groups, editingGroup, setEditingGroup, dispatch }: any
               <option value="separate-completed">Move to completed section</option>
             </select>
           </div>
+
+          {/* Due Date Settings */}
+          <div className="space-y-3 p-3 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+            <h4 className="font-medium text-neutral-900 dark:text-neutral-100 flex items-center space-x-2">
+              <Calendar className="w-4 h-4" />
+              <span>Due Date Settings</span>
+            </h4>
+            
+            <label className="flex items-center justify-between">
+              <div>
+                <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                  Enable Due Dates
+                </span>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  Allow tasks in this group to have due dates
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={newGroup.enableDueDates}
+                onChange={(e) => setNewGroup({ ...newGroup, enableDueDates: e.target.checked })}
+                className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+              />
+            </label>
+
+            {newGroup.enableDueDates && (
+              <label className="flex items-center justify-between">
+                <div>
+                  <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                    Sort by Due Date
+                  </span>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                    Automatically sort tasks by their due dates
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={newGroup.sortByDueDate}
+                  onChange={(e) => setNewGroup({ ...newGroup, sortByDueDate: e.target.checked })}
+                  className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                />
+              </label>
+            )}
+          </div>
           
           <div className="flex space-x-2">
             <button type="submit" className="btn-primary text-sm">
@@ -832,6 +880,50 @@ function GroupsSettings({ groups, editingGroup, setEditingGroup, dispatch }: any
               <option value="separate-completed">Move to completed section</option>
             </select>
           </div>
+
+          {/* Due Date Settings */}
+          <div className="space-y-3 p-3 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+            <h4 className="font-medium text-neutral-900 dark:text-neutral-100 flex items-center space-x-2">
+              <Calendar className="w-4 h-4" />
+              <span>Due Date Settings</span>
+            </h4>
+            
+            <label className="flex items-center justify-between">
+              <div>
+                <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                  Enable Due Dates
+                </span>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  Allow tasks in this group to have due dates
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={editingGroup.enableDueDates}
+                onChange={(e) => setEditingGroup({ ...editingGroup, enableDueDates: e.target.checked })}
+                className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+              />
+            </label>
+
+            {editingGroup.enableDueDates && (
+              <label className="flex items-center justify-between">
+                <div>
+                  <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                    Sort by Due Date
+                  </span>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                    Automatically sort tasks by their due dates
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={editingGroup.sortByDueDate}
+                  onChange={(e) => setEditingGroup({ ...editingGroup, sortByDueDate: e.target.checked })}
+                  className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                />
+              </label>
+            )}
+          </div>
           
           <div className="flex space-x-2">
             <button type="submit" className="btn-primary text-sm">
@@ -860,9 +952,26 @@ function GroupsSettings({ groups, editingGroup, setEditingGroup, dispatch }: any
               <span className="font-medium text-neutral-900 dark:text-neutral-100">
                 {group.name}
               </span>
-              <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                ({group.completedDisplayMode})
-              </span>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-neutral-500 dark:text-neutral-400">
+                  ({group.completedDisplayMode})
+                </span>
+                {group.enableDueDates && (
+                  <div className="flex items-center space-x-1 px-2 py-1 bg-primary-100 dark:bg-primary-900/20 rounded-full">
+                    <Calendar className="w-3 h-3 text-primary-600 dark:text-primary-400" />
+                    <span className="text-xs text-primary-700 dark:text-primary-300 font-medium">
+                      Due dates
+                    </span>
+                  </div>
+                )}
+                {group.sortByDueDate && (
+                  <div className="flex items-center space-x-1 px-2 py-1 bg-secondary-100 dark:bg-secondary-900/20 rounded-full">
+                    <span className="text-xs text-secondary-700 dark:text-secondary-300 font-medium">
+                      Sorted
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
             
             <div className="flex items-center space-x-2">
@@ -1204,13 +1313,16 @@ function PreferencesSettings({ settings, dispatch }: any) {
 
         <div className="card p-4">
           <label className="flex items-center justify-between">
-            <div>
-              <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                Enable Notifications
-              </span>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                Get notified about recurring tasks
-              </p>
+            <div className="flex items-center space-x-2">
+              <Bell className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
+              <div>
+                <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                  Enable Notifications
+                </span>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  Get notified about due dates and overdue tasks
+                </p>
+              </div>
             </div>
             <input
               type="checkbox"

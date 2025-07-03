@@ -7,6 +7,7 @@ import { AddTaskModal } from './components/AddTaskModal';
 import { EditTaskModal } from './components/EditTaskModal';
 import { SettingsModal } from './components/SettingsModal';
 import { Task } from './types';
+import { useNotifications } from './hooks/useNotifications';
 
 function LoadingSpinner() {
   return (
@@ -26,6 +27,13 @@ function AppContent() {
   const [showEditTask, setShowEditTask] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  // Initialize notifications
+  useNotifications({
+    tasks: state.tasks,
+    groups: state.groups,
+    enableNotifications: state.settings.enableNotifications,
+  });
 
   if (state.loading) {
     return <LoadingSpinner />;

@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { Check, Clock, MoreVertical, Edit, Trash2, RefreshCw, X } from 'lucide-react';
+import { Check, Clock, MoreVertical, Edit, Trash2, RefreshCw, X, Calendar, AlertTriangle } from 'lucide-react';
 import { Task, CompletedDisplayMode } from '../types';
 import { useApp } from '../contexts/AppContext';
 import { getRecurrenceLabel } from '../utils/recurrence';
+import { NotificationService } from '../utils/notifications';
 
 interface TaskItemProps {
   task: Task;
   displayMode: CompletedDisplayMode;
   onEdit?: (task: Task) => void;
   onRestore?: (task: Task) => void;
+  showDueDate?: boolean;
 }
 
-export function TaskItem({ task, displayMode, onEdit }: TaskItemProps) {
+export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemProps) {
   const { state, dispatch } = useApp();
   const [showMenu, setShowMenu] = useState(false);
   
@@ -76,8 +78,33 @@ export function TaskItem({ task, displayMode, onEdit }: TaskItemProps) {
       }
     }
     
+    // Add overdue styling
+    if (task.dueDate && NotificationService.isOverdue(new Date(task.dueDate))) {
+      return `${baseClasses} border-error-200 dark:border-error-800 bg-error-50 dark:bg-error-900/10`;
+    }
+    
     return baseClasses;
   };
+
+  const getDueDateInfo = () => {
+    if (!task.dueDate || !showDueDate) return null;
+    
+    const dueDate = new Date(task.dueDate);
+    const isOverdue = NotificationService.isOverdue(dueDate);
+    const isDueToday = NotificationService.shouldNotifyDueToday(dueDate);
+    const formattedDate = NotificationService.formatDueDate(dueDate);
+    const colorClass = NotificationService.getDueDateColor(dueDate);
+    
+    return {
+      dueDate,
+      isOverdue,
+      isDueToday,
+      formattedDate,
+      colorClass,
+    };
+  };
+
+  const dueDateInfo = getDueDateInfo();
 
   return (
     <div className={getItemClasses()}>
@@ -100,13 +127,31 @@ export function TaskItem({ task, displayMode, onEdit }: TaskItemProps) {
       {/* Task Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <h4 className={`font-medium truncate ${
-            task.isCompleted 
-              ? 'line-through text-neutral-500 dark:text-neutral-400' 
-              : 'text-neutral-900 dark:text-neutral-100'
-          }`}>
-            {task.title}
-          </h4>
+          <div className="flex-1 min-w-0">
+            <h4 className={`font-medium truncate ${
+              task.isCompleted 
+                ? 'line-through text-neutral-500 dark:text-neutral-400' 
+                : 'text-neutral-900 dark:text-neutral-100'
+            }`}>
+              {task.title}
+            </h4>
+            
+            {/* Due Date Display */}
+            {dueDateInfo && (
+              <div className="flex items-center space-x-2 mt-1">
+                <div className={`flex items-center space-x-1 ${dueDateInfo.colorClass}`}>
+                  {dueDateInfo.isOverdue ? (
+                    <AlertTriangle className="w-3 h-3" />
+                  ) : (
+                    <Calendar className="w-3 h-3" />
+                  )}
+                  <span className="text-xs font-medium">
+                    {dueDateInfo.formattedDate}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
           
           <div className="flex items-center space-x-2 ml-2">
             {/* Recurrence Badge */}
