@@ -36,6 +36,73 @@ const initialState: AppState = {
   loading: true,
 };
 
+// Helper function to calculate top competitor
+function calculateTopCompetitor(history: HistoryEntry[], profiles: UserProfile[]): UserProfile | null {
+  const fourteenDaysAgo = new Date();
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+  
+  const recentHistory = history.filter(entry => 
+    new Date(entry.timestamp) >= fourteenDaysAgo
+  );
+
+  const completedActions = recentHistory.filter(entry => entry.action === 'completed');
+  const uncheckedActions = recentHistory.filter(entry => entry.action === 'unchecked');
+
+  const taskCompetitors = profiles.filter(profile => profile.isTaskCompetitor);
+  
+  const competitorStats = taskCompetitors.map(profile => {
+    const profileCompletions = completedActions.filter(entry => 
+      entry.profileId === profile.id
+    ).length;
+    
+    const profileUnchecked = uncheckedActions.filter(entry => 
+      entry.profileId === profile.id
+    ).length;
+    
+    return {
+      profile,
+      completions: profileCompletions,
+      unchecked: profileUnchecked,
+      accuracy: profileCompletions > 0 ? 
+        Math.max(0, ((profileCompletions - profileUnchecked) / profileCompletions * 100)) : 0
+    };
+  }).sort((a, b) => {
+    if (b.completions !== a.completions) {
+      return b.completions - a.completions;
+    }
+    return b.accuracy - a.accuracy;
+  });
+
+  return competitorStats.find(stat => stat.completions > 0)?.profile || null;
+}
+
+// Helper function to log top competitor changes
+function logTopCompetitorChange(
+  newWinner: UserProfile | null, 
+  previousWinner: UserProfile | null,
+  history: HistoryEntry[]
+): HistoryEntry[] {
+  // Only log if there's actually a change and we have a new winner
+  if (!newWinner || (previousWinner && newWinner.id === previousWinner.id)) {
+    return history;
+  }
+
+  const logEntry: HistoryEntry = {
+    id: `winner-${Date.now()}`,
+    taskId: 'system',
+    profileId: newWinner.id,
+    action: 'completed' as const,
+    timestamp: new Date(),
+    taskTitle: 'Top Competitor Championship',
+    profileName: newWinner.name,
+    details: previousWinner 
+      ? `${newWinner.name} overtook ${previousWinner.name} as Top Competitor`
+      : `${newWinner.name} became the first Top Competitor`,
+  };
+
+  return [logEntry, ...history];
+}
+
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SET_LOADING':
@@ -104,10 +171,18 @@ function appReducer(state: AppState, action: AppAction): AppState {
           : 'Task unchecked via toggle',
       };
 
+      const newHistory = [historyEntry, ...state.history];
+      const updatedTasks = state.tasks.map(t => t.id === action.taskId ? updatedTask : t);
+
+      // Check for top competitor changes
+      const previousWinner = calculateTopCompetitor(state.history, state.profiles);
+      const newWinner = calculateTopCompetitor(newHistory, state.profiles);
+      const finalHistory = logTopCompetitorChange(newWinner, previousWinner, newHistory);
+
       return {
         ...state,
-        tasks: state.tasks.map(t => t.id === action.taskId ? updatedTask : t),
-        history: [historyEntry, ...state.history],
+        tasks: updatedTasks,
+        history: finalHistory,
       };
     }
 
@@ -135,10 +210,18 @@ function appReducer(state: AppState, action: AppAction): AppState {
         details: 'Task unchecked via menu - completion history preserved',
       };
 
+      const newHistory = [historyEntry, ...state.history];
+      const updatedTasks = state.tasks.map(t => t.id === action.taskId ? updatedTask : t);
+
+      // Check for top competitor changes
+      const previousWinner = calculateTopCompetitor(state.history, state.profiles);
+      const newWinner = calculateTopCompetitor(newHistory, state.profiles);
+      const finalHistory = logTopCompetitorChange(newWinner, previousWinner, newHistory);
+
       return {
         ...state,
-        tasks: state.tasks.map(t => t.id === action.taskId ? updatedTask : t),
-        history: [historyEntry, ...state.history],
+        tasks: updatedTasks,
+        history: finalHistory,
       };
     }
 
