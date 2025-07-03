@@ -67,25 +67,35 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
     day.completions > max.completions ? day : max
   );
 
-  // Calculate profile stats (only if more than 1 profile)
-  const profileStats = profiles.map(profile => {
-    const profileCompletions = completedActions.filter(entry => 
+  // Get collaborative tasks (tasks with more than 1 profile assigned)
+  const collaborativeTasks = tasks.filter(task => task.profiles.length > 1);
+  const collaborativeTaskIds = new Set(collaborativeTasks.map(task => task.id));
+
+  // Filter completed actions to only include collaborative tasks
+  const collaborativeCompletedActions = completedActions.filter(entry => 
+    collaborativeTaskIds.has(entry.taskId)
+  );
+
+  // Calculate profile stats for collaborative tasks only
+  const collaborativeProfileStats = profiles.map(profile => {
+    const profileCollaborativeCompletions = collaborativeCompletedActions.filter(entry => 
       entry.profileId === profile.id
     ).length;
-    const profileUnchecked = uncheckedActions.filter(entry => 
-      entry.profileId === profile.id
+    
+    const profileCollaborativeUnchecked = uncheckedActions.filter(entry => 
+      entry.profileId === profile.id && collaborativeTaskIds.has(entry.taskId)
     ).length;
     
     return {
       profile,
-      completions: profileCompletions,
-      unchecked: profileUnchecked,
-      accuracy: profileCompletions > 0 ? 
-        Math.max(0, ((profileCompletions - profileUnchecked) / profileCompletions * 100)) : 0
+      completions: profileCollaborativeCompletions,
+      unchecked: profileCollaborativeUnchecked,
+      accuracy: profileCollaborativeCompletions > 0 ? 
+        Math.max(0, ((profileCollaborativeCompletions - profileCollaborativeUnchecked) / profileCollaborativeCompletions * 100)) : 0
     };
   }).sort((a, b) => b.completions - a.completions);
 
-  const topCollaborator = profileStats.find(stat => stat.completions > 0);
+  const topCollaborator = collaborativeProfileStats.find(stat => stat.completions > 0);
 
   // Calculate task completion patterns
   const taskCompletionStats = tasks.map(task => {
@@ -206,13 +216,24 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
         </div>
       </div>
 
-      {/* Top Collaborator (show if more than 1 profile AND there's activity) */}
-      {profiles.length > 1 && topCollaborator && (
+      {/* Top Collaborator - Only show if there are collaborative tasks AND activity */}
+      {collaborativeTasks.length > 0 && topCollaborator && (
         <div className="card p-6">
           <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
             <Crown className="w-5 h-5 mr-2 text-yellow-500" />
             Top Collaborator (Last 14 Days)
           </h4>
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-4 mb-4">
+            <p className="text-sm text-blue-700 dark:text-blue-300 flex items-center">
+              <Users className="w-4 h-4 mr-2" />
+              Based on completion of collaborative tasks only (tasks assigned to multiple people)
+            </p>
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+              {collaborativeTasks.length} collaborative task{collaborativeTasks.length !== 1 ? 's' : ''} • 
+              {collaborativeCompletedActions.length} collaborative completion{collaborativeCompletedActions.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="relative">
@@ -234,7 +255,7 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
                   <div className="flex items-center space-x-1">
                     <Target className="w-4 h-4 text-success-500" />
                     <span className="text-sm font-medium text-success-600 dark:text-success-400">
-                      {topCollaborator.completions} completed
+                      {topCollaborator.completions} collaborative tasks
                     </span>
                   </div>
                   <div className="flex items-center space-x-1">
@@ -256,14 +277,14 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
             </div>
           </div>
           
-          {/* Other top performers */}
-          {profileStats.length > 1 && profileStats.filter(stat => stat.completions > 0).length > 1 && (
+          {/* Other top collaborative performers */}
+          {collaborativeProfileStats.length > 1 && collaborativeProfileStats.filter(stat => stat.completions > 0).length > 1 && (
             <div className="mt-6 pt-4 border-t border-neutral-200 dark:border-neutral-700">
               <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">
-                Other Contributors
+                Other Collaborative Contributors
               </p>
               <div className="space-y-2">
-                {profileStats.filter(stat => stat.completions > 0).slice(1, 3).map((stat, index) => (
+                {collaborativeProfileStats.filter(stat => stat.completions > 0).slice(1, 3).map((stat, index) => (
                   <div key={stat.profile.id} className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center text-lg">
@@ -274,7 +295,7 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
                           {stat.profile.name}
                         </p>
                         <p className="text-xs text-neutral-600 dark:text-neutral-400">
-                          {stat.completions} completed • {Math.round(stat.accuracy)}% accuracy
+                          {stat.completions} collaborative tasks • {Math.round(stat.accuracy)}% accuracy
                         </p>
                       </div>
                     </div>
@@ -288,6 +309,26 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* No Collaborative Tasks Message */}
+      {collaborativeTasks.length === 0 && profiles.length > 1 && (
+        <div className="card p-6">
+          <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
+            <Crown className="w-5 h-5 mr-2 text-neutral-400" />
+            Top Collaborator (Last 14 Days)
+          </h4>
+          <div className="text-center py-8">
+            <Users className="w-16 h-16 mx-auto mb-4 text-neutral-300 dark:text-neutral-600" />
+            <h5 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">
+              No Collaborative Tasks Yet
+            </h5>
+            <p className="text-neutral-600 dark:text-neutral-400 max-w-md mx-auto">
+              Create tasks assigned to multiple people to see collaboration statistics. 
+              Tasks assigned to only one person don't count toward collaboration metrics.
+            </p>
+          </div>
         </div>
       )}
 
@@ -315,6 +356,11 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
                     </p>
                     <p className="text-sm text-neutral-600 dark:text-neutral-400">
                       {stat.completions} completions • {stat.unchecked} unchecked
+                      {stat.task.profiles.length > 1 && (
+                        <span className="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs rounded-full">
+                          Collaborative
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
