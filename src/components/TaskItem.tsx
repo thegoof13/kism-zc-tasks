@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Check, Clock, MoreVertical, Edit, Trash2, RefreshCw, X, Calendar, AlertTriangle, ChevronLeft } from 'lucide-react';
+import { Check, Clock, Edit, Trash2, RefreshCw, X, Calendar, AlertTriangle, ChevronLeft } from 'lucide-react';
 import { Task, CompletedDisplayMode } from '../types';
 import { useApp } from '../contexts/AppContext';
 import { getRecurrenceLabel } from '../utils/recurrence';
@@ -15,7 +15,6 @@ interface TaskItemProps {
 
 export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemProps) {
   const { state, dispatch } = useApp();
-  const [showMenu, setShowMenu] = useState(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [showSwipeActions, setShowSwipeActions] = useState(false);
@@ -50,9 +49,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
         profileId: activeProfile.id 
       });
     }
-    setShowMenu(false);
-    setShowSwipeActions(false);
-    setSwipeOffset(0);
+    closeActions();
   };
 
   const handleDelete = () => {
@@ -61,9 +58,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
     if (window.confirm(`Are you sure you want to delete "${task.title}"?`)) {
       dispatch({ type: 'DELETE_TASK', taskId: task.id });
     }
-    setShowMenu(false);
-    setShowSwipeActions(false);
-    setSwipeOffset(0);
+    closeActions();
   };
 
   const handleEdit = () => {
@@ -72,9 +67,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
     if (onEdit) {
       onEdit(task);
     }
-    setShowMenu(false);
-    setShowSwipeActions(false);
-    setSwipeOffset(0);
+    closeActions();
   };
 
   const handleReset = () => {
@@ -82,9 +75,28 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
       type: 'RESET_TASK',
       taskId: task.id,
     });
-    setShowMenu(false);
+    closeActions();
+  };
+
+  // Function to close actions and reset position
+  const closeActions = () => {
     setShowSwipeActions(false);
     setSwipeOffset(0);
+  };
+
+  // Function to show actions (triggered by desktop menu button or mobile swipe)
+  const showActions = () => {
+    setSwipeOffset(-120);
+    setShowSwipeActions(true);
+  };
+
+  // Desktop menu button click handler
+  const handleMenuClick = () => {
+    if (showSwipeActions) {
+      closeActions();
+    } else {
+      showActions();
+    }
   };
 
   // Touch event handlers for swipe gestures (MOBILE ONLY - below md breakpoint)
@@ -118,12 +130,10 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
     
     // If swiped more than 60px, show actions
     if (deltaX < -60) {
-      setSwipeOffset(-120);
-      setShowSwipeActions(true);
+      showActions();
     } else {
       // Snap back
-      setSwipeOffset(0);
-      setShowSwipeActions(false);
+      closeActions();
     }
   };
 
@@ -131,8 +141,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (taskRef.current && !taskRef.current.contains(event.target as Node)) {
-        setShowSwipeActions(false);
-        setSwipeOffset(0);
+        closeActions();
       }
     };
 
@@ -194,9 +203,9 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
       ref={taskRef}
       className="relative"
     >
-      {/* Swipe Actions Background - MOBILE ONLY (below md breakpoint) */}
+      {/* Swipe Actions Background - Shows on both mobile and desktop when triggered */}
       {(showSwipeActions || swipeOffset < 0) && (
-        <div className="absolute right-0 top-0 h-full flex items-center bg-neutral-100 dark:bg-neutral-700 rounded-lg md:hidden">
+        <div className="absolute right-0 top-0 h-full flex items-center bg-neutral-100 dark:bg-neutral-700 rounded-lg">
           <div className="flex items-center space-x-2 px-4">
             {canEdit && (
               <button
@@ -318,62 +327,21 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
             </div>
             
             <div className="flex items-center space-x-2 ml-2">
-              {/* Desktop Menu Button - ONLY on desktop (md and up) */}
-              <div className="relative hidden md:block">
+              {/* Desktop Menu Button - Shows slide indicator when actions are visible */}
+              <div className="hidden md:block">
                 <button
-                  onClick={() => setShowMenu(!showMenu)}
-                  className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200 opacity-0 group-hover:opacity-100"
-                  aria-label="Task options"
+                  onClick={handleMenuClick}
+                  className={`p-2 rounded-lg transition-all duration-200 ${
+                    showSwipeActions 
+                      ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400' 
+                      : 'hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-500 dark:text-neutral-400'
+                  }`}
+                  aria-label={showSwipeActions ? 'Hide task actions' : 'Show task actions'}
                 >
-                  <MoreVertical className="w-4 h-4 text-neutral-500 dark:text-neutral-400" />
+                  <ChevronLeft className={`w-4 h-4 transition-transform duration-200 ${
+                    showSwipeActions ? 'rotate-180' : ''
+                  }`} />
                 </button>
-
-                {showMenu && (
-                  <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-neutral-800 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-700 py-1 z-[9999] animate-slide-down">
-                    {/* Edit option - only if allowed */}
-                    {canEdit && (
-                      <button
-                        onClick={handleEdit}
-                        className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
-                      >
-                        <Edit className="w-4 h-4 text-neutral-500" />
-                        <span className="text-sm text-neutral-700 dark:text-neutral-300">Edit</span>
-                      </button>
-                    )}
-                    
-                    {/* Completed task options */}
-                    {task.isCompleted && (
-                      <>
-                        <button
-                          onClick={handleUncheck}
-                          className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
-                        >
-                          <X className="w-4 h-4 text-neutral-500" />
-                          <span className="text-sm text-neutral-700 dark:text-neutral-300">Uncheck</span>
-                        </button>
-                        
-                        <button
-                          onClick={handleReset}
-                          className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
-                        >
-                          <RefreshCw className="w-4 h-4 text-warning-500" />
-                          <span className="text-sm text-neutral-700 dark:text-neutral-300">Reset</span>
-                        </button>
-                      </>
-                    )}
-                    
-                    {/* Delete option - only if allowed */}
-                    {canDelete && (
-                      <button
-                        onClick={handleDelete}
-                        className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-error-50 dark:hover:bg-error-900/20 transition-colors duration-200"
-                      >
-                        <Trash2 className="w-4 h-4 text-error-500" />
-                        <span className="text-sm text-error-600 dark:text-error-400">Delete</span>
-                      </button>
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* Mobile Swipe Indicator - ONLY on mobile (below md) */}
@@ -394,14 +362,6 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
             </p>
           )}
         </div>
-
-        {/* Close menu when clicking outside - HIGHEST Z-INDEX */}
-        {showMenu && (
-          <div
-            className="fixed inset-0 z-[9998]"
-            onClick={() => setShowMenu(false)}
-          />
-        )}
       </div>
     </div>
   );
