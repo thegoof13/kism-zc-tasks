@@ -120,7 +120,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                       });
                     }
                   }}
-                  className="btn-secondary text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20"
+                  className="px-4 py-2 bg-error-100 hover:bg-error-200 dark:bg-error-900/20 dark:hover:bg-error-900/30 text-error-700 dark:text-error-400 font-medium rounded-lg transition-colors duration-200"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
                   Remove Password
