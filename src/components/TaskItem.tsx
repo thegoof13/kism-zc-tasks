@@ -93,9 +93,10 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
     setSwipeOffset(0);
   };
 
-  // Touch event handlers for swipe gestures
+  // Touch event handlers for swipe gestures (MOBILE ONLY)
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (!isMobile.current) return;
+    // Only enable swipe on mobile screens (md and below)
+    if (window.innerWidth >= 768) return;
     
     startX.current = e.touches[0].clientX;
     currentX.current = startX.current;
@@ -103,7 +104,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || !isMobile.current) return;
+    if (!isDragging || window.innerWidth >= 768) return;
     
     currentX.current = e.touches[0].clientX;
     const deltaX = currentX.current - startX.current;
@@ -116,7 +117,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   };
 
   const handleTouchEnd = () => {
-    if (!isDragging || !isMobile.current) return;
+    if (!isDragging || window.innerWidth >= 768) return;
     
     setIsDragging(false);
     const deltaX = currentX.current - startX.current;
@@ -132,44 +133,10 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
     }
   };
 
-  // Mouse event handlers for desktop drag (optional)
+  // Mouse event handlers for desktop drag (DISABLED - we want menu on desktop)
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (isMobile.current) return;
-    
-    startX.current = e.clientX;
-    currentX.current = startX.current;
-    setIsDragging(true);
-    
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging) return;
-      
-      currentX.current = e.clientX;
-      const deltaX = currentX.current - startX.current;
-      
-      if (deltaX < 0) {
-        const offset = Math.max(deltaX, -120);
-        setSwipeOffset(offset);
-      }
-    };
-    
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      const deltaX = currentX.current - startX.current;
-      
-      if (deltaX < -60) {
-        setSwipeOffset(-120);
-        setShowSwipeActions(true);
-      } else {
-        setSwipeOffset(0);
-        setShowSwipeActions(false);
-      }
-      
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    // Disable mouse drag on desktop - we want the menu instead
+    return;
   };
 
   // Close swipe actions when clicking elsewhere
@@ -239,8 +206,8 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
       ref={taskRef}
       className="relative"
     >
-      {/* Swipe Actions Background */}
-      {(showSwipeActions || swipeOffset < 0) && (
+      {/* Swipe Actions Background - MOBILE ONLY */}
+      {(showSwipeActions || swipeOffset < 0) && window.innerWidth < 768 && (
         <div className="absolute right-0 top-0 h-full flex items-center bg-neutral-100 dark:bg-neutral-700 rounded-lg">
           <div className="flex items-center space-x-2 px-4">
             {canEdit && (
@@ -364,7 +331,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
             </div>
             
             <div className="flex items-center space-x-2 ml-2">
-              {/* Desktop Menu Button - Hidden on mobile */}
+              {/* Desktop Menu Button - ONLY on desktop (md and up) */}
               <div className="relative hidden md:block">
                 <button
                   onClick={() => setShowMenu(!showMenu)}
@@ -422,7 +389,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
                 )}
               </div>
 
-              {/* Mobile Swipe Indicator - Only on mobile */}
+              {/* Mobile Swipe Indicator - ONLY on mobile (below md) */}
               <div className="md:hidden">
                 {!showSwipeActions && (
                   <div className="flex space-x-1">
