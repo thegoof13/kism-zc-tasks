@@ -279,7 +279,8 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
 
         {/* Task Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between">
+          {/* Desktop Layout (md and up) - Everything in one row */}
+          <div className="hidden md:flex items-center justify-between">
             <div className="flex-1 min-w-0">
               <h4 className={`font-medium truncate ${
                 task.isCompleted 
@@ -289,7 +290,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
                 {task.title}
               </h4>
               
-              {/* Due Date Display */}
+              {/* Due Date Display - Desktop */}
               {dueDateInfo && (
                 <div className="flex items-center space-x-2 mt-1">
                   <div className={`flex items-center space-x-1 ${dueDateInfo.colorClass}`}>
@@ -304,48 +305,60 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
                   </div>
                 </div>
               )}
-
-              {/* Recurrence Badge - Mobile responsive */}
-              <div className="flex items-center space-x-2 mt-1">
-                <div className="flex items-center space-x-1 px-2 py-1 bg-neutral-100 dark:bg-neutral-700 rounded-full">
-                  <Clock className="w-3 h-3 text-neutral-500 dark:text-neutral-400 sm:block hidden" />
-                  <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
-                    {getRecurrenceLabel(task.recurrence)}
-                  </span>
-                </div>
-
-                {/* Completed By Indicator */}
-                {task.isCompleted && completedByProfile && (
-                  <div className="flex items-center space-x-1 px-2 py-1 bg-success-100 dark:bg-success-900/20 rounded-full">
-                    <span className="text-xs">{completedByProfile.avatar}</span>
-                    <span className="text-xs text-success-700 dark:text-success-400 font-medium hidden sm:inline">
-                      {completedByProfile.name}
-                    </span>
-                  </div>
-                )}
-              </div>
             </div>
             
-            <div className="flex items-center space-x-2 ml-2">
-              {/* Desktop Menu Button - Shows slide indicator when actions are visible */}
-              <div className="hidden md:block">
-                <button
-                  onClick={handleMenuClick}
-                  className={`p-2 rounded-lg transition-all duration-200 ${
-                    showSwipeActions 
-                      ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400' 
-                      : 'hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-500 dark:text-neutral-400'
-                  }`}
-                  aria-label={showSwipeActions ? 'Hide task actions' : 'Show task actions'}
-                >
-                  <ChevronLeft className={`w-4 h-4 transition-transform duration-200 ${
-                    showSwipeActions ? 'rotate-180' : ''
-                  }`} />
-                </button>
+            {/* Desktop Right Side - Recurrence + Completed By + Menu Button */}
+            <div className="flex items-center space-x-2 ml-4">
+              {/* Recurrence Badge - Desktop */}
+              <div className="flex items-center space-x-1 px-2 py-1 bg-neutral-100 dark:bg-neutral-700 rounded-full">
+                <Clock className="w-3 h-3 text-neutral-500 dark:text-neutral-400" />
+                <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
+                  {getRecurrenceLabel(task.recurrence)}
+                </span>
               </div>
 
-              {/* Mobile Swipe Indicator - ONLY on mobile (below md) */}
-              <div className="md:hidden">
+              {/* Completed By Indicator - Desktop */}
+              {task.isCompleted && completedByProfile && (
+                <div className="flex items-center space-x-1 px-2 py-1 bg-success-100 dark:bg-success-900/20 rounded-full">
+                  <span className="text-xs">{completedByProfile.avatar}</span>
+                  <span className="text-xs text-success-700 dark:text-success-400 font-medium">
+                    {completedByProfile.name}
+                  </span>
+                </div>
+              )}
+
+              {/* Desktop Menu Button - Always visible */}
+              <button
+                onClick={handleMenuClick}
+                className={`p-2 rounded-lg transition-all duration-200 ${
+                  showSwipeActions 
+                    ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400' 
+                    : 'hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-500 dark:text-neutral-400'
+                }`}
+                aria-label={showSwipeActions ? 'Hide task actions' : 'Show task actions'}
+              >
+                <ChevronLeft className={`w-4 h-4 transition-transform duration-200 ${
+                  showSwipeActions ? 'rotate-180' : ''
+                }`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Layout (below md) - Stacked layout */}
+          <div className="md:hidden">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <h4 className={`font-medium truncate ${
+                  task.isCompleted 
+                    ? 'line-through text-neutral-500 dark:text-neutral-400' 
+                    : 'text-neutral-900 dark:text-neutral-100'
+                }`}>
+                  {task.title}
+                </h4>
+              </div>
+              
+              {/* Mobile Swipe Indicator */}
+              <div className="ml-2">
                 {!showSwipeActions && (
                   <div className="flex items-center justify-center w-6 h-6">
                     <ChevronLeft className="w-4 h-4 text-neutral-400 dark:text-neutral-500 animate-pulse" />
@@ -353,9 +366,46 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
                 )}
               </div>
             </div>
+
+            {/* Mobile Second Row - Due Date */}
+            {dueDateInfo && (
+              <div className="flex items-center space-x-2 mt-1">
+                <div className={`flex items-center space-x-1 ${dueDateInfo.colorClass}`}>
+                  {dueDateInfo.isOverdue ? (
+                    <AlertTriangle className="w-3 h-3" />
+                  ) : (
+                    <Calendar className="w-3 h-3" />
+                  )}
+                  <span className="text-xs font-medium">
+                    {dueDateInfo.formattedDate}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Mobile Third Row - Recurrence + Completed By */}
+            <div className="flex items-center space-x-2 mt-1">
+              {/* Recurrence Badge - Mobile */}
+              <div className="flex items-center space-x-1 px-2 py-1 bg-neutral-100 dark:bg-neutral-700 rounded-full">
+                <Clock className="w-3 h-3 text-neutral-500 dark:text-neutral-400" />
+                <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
+                  {getRecurrenceLabel(task.recurrence)}
+                </span>
+              </div>
+
+              {/* Completed By Indicator - Mobile */}
+              {task.isCompleted && completedByProfile && (
+                <div className="flex items-center space-x-1 px-2 py-1 bg-success-100 dark:bg-success-900/20 rounded-full">
+                  <span className="text-xs">{completedByProfile.avatar}</span>
+                  <span className="text-xs text-success-700 dark:text-success-400 font-medium">
+                    {completedByProfile.name}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Completion Time */}
+          {/* Completion Time - Both layouts */}
           {task.isCompleted && task.completedAt && (
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
               Completed {new Date(task.completedAt).toLocaleString()}
