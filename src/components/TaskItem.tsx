@@ -23,7 +23,6 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   const taskRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
   const currentX = useRef(0);
-  const isMobile = useRef(false);
   
   const activeProfile = state.profiles.find(p => p.id === state.activeProfileId);
   const completedByProfile = task.completedBy ? state.profiles.find(p => p.id === task.completedBy) : null;
@@ -31,11 +30,6 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   // Check profile permissions
   const canEdit = activeProfile?.permissions?.canEditTasks ?? true;
   const canDelete = activeProfile?.permissions?.canDeleteTasks ?? true;
-
-  // Check if device is mobile/touch
-  useEffect(() => {
-    isMobile.current = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  }, []);
 
   const handleToggle = () => {
     // Only allow checking (completing) tasks, not unchecking
@@ -93,9 +87,9 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
     setSwipeOffset(0);
   };
 
-  // Touch event handlers for swipe gestures (MOBILE ONLY)
+  // Touch event handlers for swipe gestures (MOBILE ONLY - below md breakpoint)
   const handleTouchStart = (e: React.TouchEvent) => {
-    // Only enable swipe on mobile screens (md and below)
+    // Only enable swipe on mobile screens (below 768px)
     if (window.innerWidth >= 768) return;
     
     startX.current = e.touches[0].clientX;
@@ -131,12 +125,6 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
       setSwipeOffset(0);
       setShowSwipeActions(false);
     }
-  };
-
-  // Mouse event handlers for desktop drag (DISABLED - we want menu on desktop)
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // Disable mouse drag on desktop - we want the menu instead
-    return;
   };
 
   // Close swipe actions when clicking elsewhere
@@ -206,9 +194,9 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
       ref={taskRef}
       className="relative"
     >
-      {/* Swipe Actions Background - MOBILE ONLY */}
-      {(showSwipeActions || swipeOffset < 0) && window.innerWidth < 768 && (
-        <div className="absolute right-0 top-0 h-full flex items-center bg-neutral-100 dark:bg-neutral-700 rounded-lg">
+      {/* Swipe Actions Background - MOBILE ONLY (below md breakpoint) */}
+      {(showSwipeActions || swipeOffset < 0) && (
+        <div className="absolute right-0 top-0 h-full flex items-center bg-neutral-100 dark:bg-neutral-700 rounded-lg md:hidden">
           <div className="flex items-center space-x-2 px-4">
             {canEdit && (
               <button
@@ -263,7 +251,6 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onMouseDown={handleMouseDown}
       >
         {/* Checkbox */}
         <button
