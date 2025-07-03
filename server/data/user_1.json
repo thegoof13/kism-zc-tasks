@@ -122,7 +122,8 @@
       "color": "#ad00a8",
       "avatar": "SK",
       "isActive": true,
-      "createdAt": "2025-07-01T12:24:37.489Z"
+      "createdAt": "2025-07-01T12:24:37.489Z",
+      "isTaskCompetitor": true
     },
     {
       "name": "Dad",
