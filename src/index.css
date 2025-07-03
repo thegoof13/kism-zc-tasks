@@ -72,6 +72,46 @@
   .swipe-container {
     touch-action: pan-y;
   }
+
+  /* Mobile optimizations for very small screens */
+  @media (max-width: 480px) {
+    /* Zoom out content on very small screens */
+    html {
+      font-size: 14px;
+    }
+    
+    /* Reduce padding on cards */
+    .card {
+      @apply p-3;
+    }
+    
+    /* Smaller task items */
+    .task-item {
+      @apply p-2;
+    }
+    
+    /* Hide recurrence clock icon on very small screens */
+    .recurrence-clock {
+      display: none;
+    }
+    
+    /* Smaller badges */
+    .badge-small {
+      @apply px-1 py-0.5 text-xs;
+    }
+  }
+
+  @media (max-width: 360px) {
+    /* Even more aggressive scaling for very small screens */
+    html {
+      font-size: 13px;
+    }
+    
+    /* Reduce spacing further */
+    .space-compact {
+      @apply space-x-1 space-y-1;
+    }
+  }
 }
 
 /* Custom scrollbar */

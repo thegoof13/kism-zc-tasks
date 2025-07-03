@@ -341,28 +341,30 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
                   </div>
                 </div>
               )}
+
+              {/* Recurrence Badge - Mobile responsive */}
+              <div className="flex items-center space-x-2 mt-1">
+                <div className="flex items-center space-x-1 px-2 py-1 bg-neutral-100 dark:bg-neutral-700 rounded-full">
+                  <Clock className="w-3 h-3 text-neutral-500 dark:text-neutral-400 sm:block hidden" />
+                  <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
+                    {getRecurrenceLabel(task.recurrence)}
+                  </span>
+                </div>
+
+                {/* Completed By Indicator */}
+                {task.isCompleted && completedByProfile && (
+                  <div className="flex items-center space-x-1 px-2 py-1 bg-success-100 dark:bg-success-900/20 rounded-full">
+                    <span className="text-xs">{completedByProfile.avatar}</span>
+                    <span className="text-xs text-success-700 dark:text-success-400 font-medium hidden sm:inline">
+                      {completedByProfile.name}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
             
             <div className="flex items-center space-x-2 ml-2">
-              {/* Recurrence Badge */}
-              <div className="flex items-center space-x-1 px-2 py-1 bg-neutral-100 dark:bg-neutral-700 rounded-full">
-                <Clock className="w-3 h-3 text-neutral-500 dark:text-neutral-400" />
-                <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
-                  {getRecurrenceLabel(task.recurrence)}
-                </span>
-              </div>
-
-              {/* Completed By Indicator */}
-              {task.isCompleted && completedByProfile && (
-                <div className="flex items-center space-x-1 px-2 py-1 bg-success-100 dark:bg-success-900/20 rounded-full">
-                  <span className="text-xs">{completedByProfile.avatar}</span>
-                  <span className="text-xs text-success-700 dark:text-success-400 font-medium">
-                    {completedByProfile.name}
-                  </span>
-                </div>
-              )}
-
-              {/* Desktop Menu Button */}
+              {/* Desktop Menu Button - Hidden on mobile */}
               <div className="relative hidden md:block">
                 <button
                   onClick={() => setShowMenu(!showMenu)}
@@ -420,7 +422,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
                 )}
               </div>
 
-              {/* Mobile Swipe Indicator */}
+              {/* Mobile Swipe Indicator - Only on mobile */}
               <div className="md:hidden">
                 {!showSwipeActions && (
                   <div className="flex space-x-1">
