@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, Users, FolderOpen, History, Brain, Palette, Bell, Archive, Plus, Edit, Trash2, Save, Calendar, Type, Trophy, Lock, Shield, ExternalLink, UserCheck, UserX, Edit3, Trash, PlusCircle } from 'lucide-react';
+import { X, Settings, Users, FolderOpen, History, Brain, Palette, Bell, Archive, Plus, Edit, Trash2, Save, Calendar, Type, Trophy, Lock, Shield, ExternalLink } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { getIconComponent, getAvailableIcons } from '../utils/icons';
 import { AIQueryModal } from './AIQueryModal';
@@ -129,15 +129,14 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
             )}
           </div>
 
-          {/* FIXED SECURITY WARNING BOX */}
-          <div className="p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg">
+          <div className="p-4 bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-lg">
             <div className="flex items-start space-x-3">
-              <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+              <Shield className="w-5 h-5 text-warning-600 dark:text-warning-400 flex-shrink-0 mt-0.5" />
               <div>
-                <h5 className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
+                <h5 className="text-sm font-medium text-warning-800 dark:text-warning-200 mb-1">
                   Security Notice
                 </h5>
-                <p className="text-xs text-amber-700 dark:text-amber-300">
+                <p className="text-xs text-warning-700 dark:text-warning-300">
                   Passwords are stored in plain text on the server for simplicity. 
                   Do not use passwords that you use for other important accounts.
                 </p>
@@ -261,21 +260,14 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
               className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
             />
           </div>
-        </div>
-      </div>
 
-      <div>
-        <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
-          Competition & Collaboration
-        </h3>
-        <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                Show Top Collaborator in Trophy
+                Show Top Collaborator
               </label>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                Display collaboration statistics in the trophy popup
+                Display Top Collaborator section in Trophy popup
               </p>
             </div>
             <input
@@ -421,7 +413,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                       {group.name}
                     </h4>
                     <div className="flex items-center space-x-4 text-xs text-neutral-500 dark:text-neutral-400">
-                      <span>{group.completedDisplayMode.replace('-', ' ')}</span>
+                      <span>{getCompletedDisplayModeLabel(group.completedDisplayMode)}</span>
                       {group.enableDueDates && (
                         <div className="flex items-center space-x-1">
                           <Calendar className="w-3 h-3" />
@@ -522,23 +514,24 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center space-x-4 text-xs text-neutral-500 dark:text-neutral-400">
-                      <span>{profile.id === state.activeProfileId ? 'Active' : 'Inactive'}</span>
-                      {profile.isTaskCompetitor && <span>• Competitor</span>}
-                      {profile.pin && <span>• PIN protected</span>}
-                      
-                      {/* Permission indicators */}
-                      <div className="flex items-center space-x-1">
-                        {profile.permissions?.canCreateTasks && (
-                          <PlusCircle className="w-3 h-3 text-success-500" title="Can create tasks" />
-                        )}
-                        {profile.permissions?.canEditTasks && (
-                          <Edit3 className="w-3 h-3 text-primary-500" title="Can edit tasks" />
-                        )}
-                        {profile.permissions?.canDeleteTasks && (
-                          <Trash className="w-3 h-3 text-error-500" title="Can delete tasks" />
-                        )}
-                      </div>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                      {profile.id === state.activeProfileId ? 'Active' : 'Inactive'}
+                      {profile.isTaskCompetitor && ' • Participating in task competition'}
+                      {profile.pin && ' • PIN protected'}
+                    </p>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                        Permissions:
+                      </span>
+                      {profile.permissions?.canCreateTasks && (
+                        <span className="text-xs bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 px-1 rounded">Create</span>
+                      )}
+                      {profile.permissions?.canEditTasks && (
+                        <span className="text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-1 rounded">Edit</span>
+                      )}
+                      {profile.permissions?.canDeleteTasks && (
+                        <span className="text-xs bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 px-1 rounded">Delete</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -842,6 +835,20 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
   );
 }
 
+// Helper function to get display mode labels
+function getCompletedDisplayModeLabel(mode: string): string {
+  switch (mode) {
+    case 'grey-out':
+      return 'Grey out only';
+    case 'grey-drop':
+      return 'Grey out and drop to bottom of group';
+    case 'separate-completed':
+      return 'Grey out and put in completed section';
+    default:
+      return mode;
+  }
+}
+
 // Group Edit Form Component
 function GroupEditForm({ 
   group, 
@@ -932,9 +939,9 @@ function GroupEditForm({
           onChange={(e) => setCompletedDisplayMode(e.target.value)}
           className="input-primary"
         >
-          <option value="grey-out">Grey Out</option>
-          <option value="grey-drop">Grey and Drop</option>
-          <option value="separate-completed">Separate Section</option>
+          <option value="grey-out">Grey out only</option>
+          <option value="grey-drop">Grey out and drop to bottom of group</option>
+          <option value="separate-completed">Grey out and put in completed section</option>
         </select>
       </div>
 
@@ -1004,15 +1011,15 @@ function ProfileEditForm({
   const [avatar, setAvatar] = useState(profile.avatar);
   const [isTaskCompetitor, setIsTaskCompetitor] = useState(profile.isTaskCompetitor || false);
   const [pin, setPin] = useState(profile.pin || '');
+  const [permissions, setPermissions] = useState({
+    canEditTasks: profile.permissions?.canEditTasks ?? true,
+    canCreateTasks: profile.permissions?.canCreateTasks ?? true,
+    canDeleteTasks: profile.permissions?.canDeleteTasks ?? true,
+  });
   const [avatarType, setAvatarType] = useState<'emoji' | 'text'>(
     // Detect if current avatar is likely an emoji or text
     /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(profile.avatar) ? 'emoji' : 'text'
   );
-
-  // Profile permissions
-  const [canEditTasks, setCanEditTasks] = useState(profile.permissions?.canEditTasks ?? true);
-  const [canCreateTasks, setCanCreateTasks] = useState(profile.permissions?.canCreateTasks ?? true);
-  const [canDeleteTasks, setCanDeleteTasks] = useState(profile.permissions?.canDeleteTasks ?? true);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1022,11 +1029,7 @@ function ProfileEditForm({
       avatar, 
       isTaskCompetitor,
       pin: pin.trim() || undefined, // Only save PIN if it's not empty
-      permissions: {
-        canEditTasks,
-        canCreateTasks,
-        canDeleteTasks,
-      },
+      permissions,
     });
   };
 
@@ -1169,75 +1172,45 @@ function ProfileEditForm({
       <div className="space-y-3">
         <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-lg border border-green-200 dark:border-green-800">
           <div className="flex items-center space-x-2 mb-3">
-            <UserCheck className="w-5 h-5 text-green-600 dark:text-green-400" />
+            <Settings className="w-4 h-4 text-green-600 dark:text-green-400" />
             <label className="text-sm font-medium text-green-800 dark:text-green-200">
               Task Permissions
             </label>
           </div>
-          <p className="text-xs text-green-700 dark:text-green-300 mb-4">
-            Control what this profile can do with tasks. Unchecked permissions will hide or disable related features.
+          <p className="text-xs text-green-700 dark:text-green-300 mb-3">
+            Control what this profile can do with tasks. Unchecked permissions will hide related buttons and actions.
           </p>
           
-          <div className="grid grid-cols-1 gap-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <PlusCircle className="w-4 h-4 text-success-500" />
-                <div>
-                  <label className="text-sm font-medium text-green-800 dark:text-green-200">
-                    Can Create Tasks
-                  </label>
-                  <p className="text-xs text-green-600 dark:text-green-400">
-                    Allow adding new tasks and using the "Add Task" button
-                  </p>
-                </div>
-              </div>
+          <div className="grid grid-cols-3 gap-4">
+            <label className="flex items-center space-x-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={canCreateTasks}
-                onChange={(e) => setCanCreateTasks(e.target.checked)}
+                checked={permissions.canCreateTasks}
+                onChange={(e) => setPermissions(prev => ({ ...prev, canCreateTasks: e.target.checked }))}
                 className="w-4 h-4 text-green-500 bg-green-100 border-green-300 rounded focus:ring-green-500"
               />
-            </div>
+              <span className="text-sm text-green-700 dark:text-green-300">Can Create Tasks</span>
+            </label>
             
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Edit3 className="w-4 h-4 text-primary-500" />
-                <div>
-                  <label className="text-sm font-medium text-green-800 dark:text-green-200">
-                    Can Edit Tasks
-                  </label>
-                  <p className="text-xs text-green-600 dark:text-green-400">
-                    Allow modifying existing tasks (title, group, recurrence, etc.)
-                  </p>
-                </div>
-              </div>
+            <label className="flex items-center space-x-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={canEditTasks}
-                onChange={(e) => setCanEditTasks(e.target.checked)}
-                className="w-4 h-4 text-green-500 bg-green-100 border-green-300 rounded focus:ring-green-500"
+                checked={permissions.canEditTasks}
+                onChange={(e) => setPermissions(prev => ({ ...prev, canEditTasks: e.target.checked }))}
+                className="w-4 h-4 text-blue-500 bg-blue-100 border-blue-300 rounded focus:ring-blue-500"
               />
-            </div>
+              <span className="text-sm text-blue-700 dark:text-blue-300">Can Edit Tasks</span>
+            </label>
             
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Trash className="w-4 h-4 text-error-500" />
-                <div>
-                  <label className="text-sm font-medium text-green-800 dark:text-green-200">
-                    Can Delete Tasks
-                  </label>
-                  <p className="text-xs text-green-600 dark:text-green-400">
-                    Allow permanently removing tasks from the system
-                  </p>
-                </div>
-              </div>
+            <label className="flex items-center space-x-2 cursor-pointer">
               <input
                 type="checkbox"
-                checked={canDeleteTasks}
-                onChange={(e) => setCanDeleteTasks(e.target.checked)}
-                className="w-4 h-4 text-green-500 bg-green-100 border-green-300 rounded focus:ring-green-500"
+                checked={permissions.canDeleteTasks}
+                onChange={(e) => setPermissions(prev => ({ ...prev, canDeleteTasks: e.target.checked }))}
+                className="w-4 h-4 text-red-500 bg-red-100 border-red-300 rounded focus:ring-red-500"
               />
-            </div>
+              <span className="text-sm text-red-700 dark:text-red-300">Can Delete Tasks</span>
+            </label>
           </div>
         </div>
       </div>
