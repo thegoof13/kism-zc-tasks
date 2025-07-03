@@ -135,6 +135,14 @@
       "avatar": "👤",
       "isActive": true,
       "createdAt": "2025-07-01T12:24:37.489Z"
+    },
+    {
+      "name": "New Profile",
+      "color": "#6366F1",
+      "avatar": "👤",
+      "isActive": false,
+      "id": "1751506770607",
+      "createdAt": "2025-07-03T01:39:30.607Z"
     }
   ],
   "history": [
