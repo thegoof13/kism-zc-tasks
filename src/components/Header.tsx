@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Moon, Sun, Settings, User, ChevronDown, Users, Trophy, X, Crown } from 'lucide-react';
+import { Moon, Sun, Settings, User, ChevronDown, Users, Trophy, X, Crown, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useTheme } from '../hooks/useTheme';
 
@@ -17,6 +17,7 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
   const activeProfile = state.profiles.find(p => p.id === state.activeProfileId);
   const completedTasksCount = state.tasks.filter(t => t.isCompleted).length;
   const totalTasksCount = state.tasks.length;
+  const isViewOnlyMode = state.settings.viewOnlyMode;
 
   // Calculate Top Competitor (same logic as in HistoryAnalytics)
   const fourteenDaysAgo = new Date();
@@ -90,6 +91,13 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
   const hasCollaborativeFeature = state.settings.showTopCollaborator && collaborativeTasks.length > 0;
   const showTrophy = hasCompetitors || hasCollaborativeFeature;
 
+  const handleToggleViewOnlyMode = () => {
+    dispatch({
+      type: 'UPDATE_SETTINGS',
+      updates: { viewOnlyMode: !isViewOnlyMode }
+    });
+  };
+
   return (
     <>
       <header className="sticky top-0 z-40 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md border-b border-neutral-200 dark:border-neutral-800">
@@ -108,9 +116,18 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
               
               {/* Title and Progress - Always visible */}
               <div>
-                <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                  ZenTasks
-                </h1>
+                <div className="flex items-center space-x-2">
+                  <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                    ZenTasks
+                  </h1>
+                  {/* View Only Mode Indicator */}
+                  {isViewOnlyMode && (
+                    <div className="flex items-center space-x-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 text-xs rounded-full">
+                      <Eye className="w-3 h-3" />
+                      <span className="hidden sm:inline">View Only</span>
+                    </div>
+                  )}
+                </div>
                 {/* Progress text - Always visible, responsive sizing */}
                 <p className="text-xs text-neutral-500 dark:text-neutral-400">
                   {completedTasksCount} of {totalTasksCount} completed
@@ -163,8 +180,32 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
                         {activeProfile?.pin && (
                           <div className="w-2 h-2 bg-warning-500 rounded-full" title="PIN Protected" />
                         )}
+                        {isViewOnlyMode && (
+                          <div className="flex items-center space-x-1 px-1 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 text-xs rounded">
+                            <Eye className="w-2 h-2" />
+                            <span>View Only</span>
+                          </div>
+                        )}
                       </div>
                     </div>
+
+                    {/* View Only Mode Toggle - Only show if current profile has view only mode enabled */}
+                    {isViewOnlyMode && (
+                      <div className="border-b border-neutral-200 dark:border-neutral-700">
+                        <button
+                          onClick={() => {
+                            handleToggleViewOnlyMode();
+                            setShowProfileMenu(false);
+                          }}
+                          className="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+                        >
+                          <EyeOff className="w-4 h-4 text-blue-500" />
+                          <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                            Disable View Only Mode
+                          </span>
+                        </button>
+                      </div>
+                    )}
 
                     {/* Quick Switch Profiles (non-PIN protected) */}
                     {state.profiles.filter(p => p.id !== state.activeProfileId && !p.pin).map(profile => (
@@ -172,6 +213,7 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
                         key={profile.id}
                         onClick={() => {
                           dispatch({ type: 'SET_ACTIVE_PROFILE', profileId: profile.id });
+                          dispatch({ type: 'UPDATE_SETTINGS', updates: { viewOnlyMode: false } });
                           setShowProfileMenu(false);
                         }}
                         className="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"

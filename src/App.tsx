@@ -33,10 +33,14 @@ function AppContent() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isSettingsPasswordSet, setIsSettingsPasswordSet] = useState(false);
 
+  const isViewOnlyMode = state.settings.viewOnlyMode;
+
   // Initialize notifications
   useNotifications({
     tasks: state.tasks,
     groups: state.groups,
+    profiles: state.profiles,
+    activeProfileId: state.activeProfileId,
     enableNotifications: state.settings.enableNotifications,
   });
 
@@ -121,9 +125,9 @@ function AppContent() {
     task.profiles.includes(state.activeProfileId)
   );
 
-  // Check if active profile can create tasks
+  // Check if active profile can create tasks (disabled in view only mode)
   const activeProfile = state.profiles.find(p => p.id === state.activeProfileId);
-  const canCreateTasks = activeProfile?.permissions?.canCreateTasks ?? true;
+  const canCreateTasks = !isViewOnlyMode && (activeProfile?.permissions?.canCreateTasks ?? true);
 
   const handleAddTask = (groupId?: string) => {
     if (!canCreateTasks) return;
@@ -138,6 +142,8 @@ function AppContent() {
   };
 
   const handleEditTask = (task: Task) => {
+    if (isViewOnlyMode) return; // Prevent editing in view only mode
+    
     setEditingTask(task);
     setShowEditTask(true);
   };
@@ -185,7 +191,10 @@ function AppContent() {
               Welcome to ZenTasks
             </h2>
             <p className="text-neutral-600 dark:text-neutral-400 mb-6 max-w-md mx-auto">
-              Start organizing your life with smart recurring tasks. Create your first task to get started.
+              {isViewOnlyMode 
+                ? 'You are in view-only mode. You can see tasks but cannot modify them.'
+                : 'Start organizing your life with smart recurring tasks. Create your first task to get started.'
+              }
             </p>
             {canCreateTasks && (
               <button
@@ -241,7 +250,7 @@ function AppContent() {
         )}
       </main>
 
-      {/* Floating Action Button */}
+      {/* Floating Action Button - Only show if not in view only mode */}
       {activeProfileTasks.length > 0 && canCreateTasks && (
         <button
           onClick={() => handleAddTask()}
@@ -261,7 +270,7 @@ function AppContent() {
         />
       )}
       
-      {editingTask && (
+      {editingTask && !isViewOnlyMode && (
         <EditTaskModal
           isOpen={showEditTask}
           onClose={() => {

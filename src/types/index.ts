@@ -65,6 +65,7 @@ export interface UserProfile {
     dinner: string;
     nightcap: string;
   };
+  viewOnlyMode?: boolean; // NEW: View only mode setting
 }
 
 export interface HistoryEntry {
@@ -102,6 +103,7 @@ export interface AppSettings {
   ai: AISettings;
   settingsPassword?: string;
   showTopCollaborator: boolean;
+  viewOnlyMode?: boolean; // NEW: Global view only mode state
 }
 
 export interface AppState {

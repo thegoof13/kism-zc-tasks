@@ -18,6 +18,7 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
   const { state, dispatch } = useApp();
   
   const IconComponent = getIconComponent(group.icon);
+  const isViewOnlyMode = state.settings.viewOnlyMode;
   
   // Filter tasks based on active profile
   const profileTasks = tasks.filter(task => 
@@ -72,9 +73,9 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
     !t.isCompleted && t.dueDate && NotificationService.isOverdue(new Date(t.dueDate))
   ).length;
 
-  // Check if active profile can create tasks
+  // Check if active profile can create tasks (disabled in view only mode)
   const activeProfile = state.profiles.find(p => p.id === state.activeProfileId);
-  const canCreateTasks = activeProfile?.permissions?.canCreateTasks ?? true;
+  const canCreateTasks = !isViewOnlyMode && (activeProfile?.permissions?.canCreateTasks ?? true);
 
   // Don't render group if no tasks are visible for current profile
   if (profileTasks.length === 0) {
@@ -112,6 +113,12 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
               {overdueTasks > 0 && (
                 <span className="px-1.5 py-0.5 bg-error-100 dark:bg-error-900/20 text-error-700 dark:text-error-400 text-xs rounded-full font-medium">
                   {overdueTasks} overdue
+                </span>
+              )}
+              {/* View Only Mode Indicator */}
+              {isViewOnlyMode && (
+                <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 text-xs rounded-full font-medium">
+                  View Only
                 </span>
               )}
             </div>

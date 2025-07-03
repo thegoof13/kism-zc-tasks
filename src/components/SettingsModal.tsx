@@ -33,6 +33,7 @@ interface EditingProfile {
     dinner: string;
     nightcap: string;
   };
+  viewOnlyMode: boolean;
 }
 
 interface EditingGroup {
@@ -103,6 +104,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
         dinner: '18:00',
         nightcap: '21:00',
       },
+      viewOnlyMode: profile.viewOnlyMode || false,
     });
     setShowPinField(!!profile.pin);
   };
@@ -125,6 +127,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
         dinner: '18:00',
         nightcap: '21:00',
       },
+      viewOnlyMode: false,
     });
     setShowPinField(false);
   };
@@ -140,6 +143,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
       pin: showPinField && editingProfile.pin ? editingProfile.pin : undefined,
       permissions: editingProfile.permissions,
       mealTimes: editingProfile.mealTimes,
+      viewOnlyMode: editingProfile.viewOnlyMode,
       isActive: true,
     };
 
@@ -420,6 +424,11 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                                   {profile.pin && (
                                     <span className="px-2 py-1 bg-warning-100 dark:bg-warning-900/20 text-warning-700 dark:text-warning-400 rounded-full">
                                       PIN Protected
+                                    </span>
+                                  )}
+                                  {profile.viewOnlyMode && (
+                                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-full">
+                                      View Only Disabled
                                     </span>
                                   )}
                                 </div>
@@ -796,6 +805,24 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                     minLength={4}
                   />
                 )}
+              </div>
+
+              {/* View Only Mode Disabled */}
+              <div>
+                <label className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={editingProfile.viewOnlyMode}
+                    onChange={(e) => setEditingProfile(prev => prev ? { ...prev, viewOnlyMode: e.target.checked } : null)}
+                    className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                  />
+                  <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                    Disable View Only Mode
+                  </span>
+                </label>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 ml-7">
+                  When enabled, this profile cannot be accessed in view-only mode
+                </p>
               </div>
 
               {/* Permissions */}

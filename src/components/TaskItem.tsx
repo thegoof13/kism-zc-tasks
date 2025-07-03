@@ -26,18 +26,20 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   const activeProfile = state.profiles.find(p => p.id === state.activeProfileId);
   const completedByProfile = task.completedBy ? state.profiles.find(p => p.id === task.completedBy) : null;
   const taskGroup = state.groups.find(g => g.id === task.groupId);
+  const isViewOnlyMode = state.settings.viewOnlyMode;
 
-  // Check profile permissions
-  const canEdit = activeProfile?.permissions?.canEditTasks ?? true;
-  const canDelete = activeProfile?.permissions?.canDeleteTasks ?? true;
+  // Check profile permissions (disabled in view only mode)
+  const canEdit = !isViewOnlyMode && (activeProfile?.permissions?.canEditTasks ?? true);
+  const canDelete = !isViewOnlyMode && (activeProfile?.permissions?.canDeleteTasks ?? true);
+  const canToggle = !isViewOnlyMode; // Can't check/uncheck tasks in view only mode
 
   // Check if notifications are enabled for this task
   const hasNotifications = task.enableNotifications ?? taskGroup?.defaultNotifications ?? false;
   const showNotificationIndicator = hasNotifications && !task.dueDate; // Only show for non-due-date tasks
 
   const handleToggle = () => {
-    // Only allow checking (completing) tasks, not unchecking
-    if (!task.isCompleted && activeProfile) {
+    // Only allow checking (completing) tasks, not unchecking, and not in view only mode
+    if (!task.isCompleted && activeProfile && canToggle) {
       dispatch({ 
         type: 'TOGGLE_TASK', 
         taskId: task.id, 
@@ -47,7 +49,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   };
 
   const handleUncheck = () => {
-    if (activeProfile) {
+    if (activeProfile && !isViewOnlyMode) {
       dispatch({ 
         type: 'UNCHECK_TASK', 
         taskId: task.id, 
@@ -58,7 +60,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   };
 
   const handleDelete = () => {
-    if (!canDelete) return;
+    if (!canDelete || isViewOnlyMode) return;
     
     if (window.confirm(`Are you sure you want to delete "${task.title}"?`)) {
       dispatch({ type: 'DELETE_TASK', taskId: task.id });
@@ -67,7 +69,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   };
 
   const handleEdit = () => {
-    if (!canEdit) return;
+    if (!canEdit || isViewOnlyMode) return;
     
     if (onEdit) {
       onEdit(task);
@@ -76,6 +78,8 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   };
 
   const handleReset = () => {
+    if (isViewOnlyMode) return;
+    
     dispatch({
       type: 'RESET_TASK',
       taskId: task.id,
@@ -106,8 +110,8 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
 
   // Touch event handlers for swipe gestures (MOBILE ONLY - below md breakpoint)
   const handleTouchStart = (e: React.TouchEvent) => {
-    // Only enable swipe on mobile screens (below 768px)
-    if (window.innerWidth >= 768) return;
+    // Only enable swipe on mobile screens (below 768px) and not in view only mode
+    if (window.innerWidth >= 768 || isViewOnlyMode) return;
     
     startX.current = e.touches[0].clientX;
     currentX.current = startX.current;
@@ -115,7 +119,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || window.innerWidth >= 768) return;
+    if (!isDragging || window.innerWidth >= 768 || isViewOnlyMode) return;
     
     currentX.current = e.touches[0].clientX;
     const deltaX = currentX.current - startX.current;
@@ -128,7 +132,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   };
 
   const handleTouchEnd = () => {
-    if (!isDragging || window.innerWidth >= 768) return;
+    if (!isDragging || window.innerWidth >= 768 || isViewOnlyMode) return;
     
     setIsDragging(false);
     const deltaX = currentX.current - startX.current;
@@ -163,7 +167,12 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
 
   // Apply styling based on completion status and display mode
   const getItemClasses = () => {
-    const baseClasses = "group flex items-center space-x-2.5 p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:shadow-sm transition-all duration-200 relative overflow-hidden";
+    let baseClasses = "group flex items-center space-x-2.5 p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:shadow-sm transition-all duration-200 relative overflow-hidden";
+    
+    // Add view only mode styling
+    if (isViewOnlyMode) {
+      baseClasses += " opacity-75 cursor-default";
+    }
     
     if (task.isCompleted) {
       switch (displayMode) {
@@ -226,13 +235,16 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
     return getRecurrenceLabel(task.recurrence, task.recurrenceConfig);
   };
 
+  // Check if any actions are available (for showing menu button)
+  const hasActions = canEdit || canDelete || (task.isCompleted && !isViewOnlyMode);
+
   return (
     <div 
       ref={taskRef}
       className="relative"
     >
-      {/* Swipe Actions Background - Shows on both mobile and desktop when triggered */}
-      {(showSwipeActions || swipeOffset < 0) && (
+      {/* Swipe Actions Background - Shows on both mobile and desktop when triggered and not in view only mode */}
+      {(showSwipeActions || swipeOffset < 0) && !isViewOnlyMode && (
         <div className="absolute right-0 top-0 h-full flex items-center bg-neutral-100 dark:bg-neutral-700 rounded-lg">
           <div className="flex items-center space-x-1.5 px-3">
             {canEdit && (
@@ -295,10 +307,19 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
           className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
             task.isCompleted
               ? 'bg-success-500 border-success-500 scale-110 cursor-default'
-              : 'border-neutral-300 dark:border-neutral-600 hover:border-success-400 dark:hover:border-success-400 cursor-pointer'
+              : canToggle
+                ? 'border-neutral-300 dark:border-neutral-600 hover:border-success-400 dark:hover:border-success-400 cursor-pointer'
+                : 'border-neutral-300 dark:border-neutral-600 cursor-default opacity-50'
           }`}
-          aria-label={task.isCompleted ? 'Task completed - use menu to uncheck' : 'Mark as complete'}
-          disabled={task.isCompleted}
+          aria-label={
+            isViewOnlyMode 
+              ? 'View only mode - cannot modify tasks'
+              : task.isCompleted 
+                ? 'Task completed - use menu to uncheck' 
+                : 'Mark as complete'
+          }
+          disabled={task.isCompleted || !canToggle}
+          title={isViewOnlyMode ? 'View only mode - cannot modify tasks' : undefined}
         >
           {task.isCompleted && (
             <Check className="w-3 h-3 text-white animate-scale-in" />
@@ -362,20 +383,22 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
                 </div>
               )}
 
-              {/* Desktop Menu Button - Always visible */}
-              <button
-                onClick={handleMenuClick}
-                className={`p-1.5 rounded-lg transition-all duration-200 ${
-                  showSwipeActions 
-                    ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400' 
-                    : 'hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-500 dark:text-neutral-400'
-                }`}
-                aria-label={showSwipeActions ? 'Hide task actions' : 'Show task actions'}
-              >
-                <ChevronLeft className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                  showSwipeActions ? 'rotate-180' : ''
-                }`} />
-              </button>
+              {/* Desktop Menu Button - Only show if actions are available and not in view only mode */}
+              {hasActions && !isViewOnlyMode && (
+                <button
+                  onClick={handleMenuClick}
+                  className={`p-1.5 rounded-lg transition-all duration-200 ${
+                    showSwipeActions 
+                      ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400' 
+                      : 'hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-500 dark:text-neutral-400'
+                  }`}
+                  aria-label={showSwipeActions ? 'Hide task actions' : 'Show task actions'}
+                >
+                  <ChevronLeft className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                    showSwipeActions ? 'rotate-180' : ''
+                  }`} />
+                </button>
+              )}
             </div>
           </div>
 
@@ -399,9 +422,9 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
                 </div>
               </div>
               
-              {/* Mobile Swipe Indicator */}
+              {/* Mobile Swipe Indicator - Only show if not in view only mode */}
               <div className="ml-2">
-                {!showSwipeActions && (
+                {!showSwipeActions && !isViewOnlyMode && (
                   <div className="flex items-center justify-center w-5 h-5">
                     <ChevronLeft className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500 animate-pulse" />
                   </div>
