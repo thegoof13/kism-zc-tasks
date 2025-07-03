@@ -50,6 +50,10 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+print_debug() {
+    echo -e "${YELLOW}[DEBUG]${NC} $1"
+}
+
 # Function to detect if running in LXC container
 detect_container_environment() {
     print_status "Detecting container environment..."
@@ -91,43 +95,62 @@ generate_random_string() {
     openssl rand -hex 8
 }
 
-# Function to validate SSL certificate
+# Function to validate SSL certificate with enhanced debugging
 validate_ssl_certificate() {
     local domain="$1"
     local cert_path="$2"
     local key_path="$3"
     
     print_status "Validating SSL certificate for $domain..."
-    print_status "Certificate: $cert_path"
-    print_status "Private key: $key_path"
+    print_debug "Certificate: $cert_path"
+    print_debug "Private key: $key_path"
     
-    # Check if certificate files exist
-    if [[ ! -f "$cert_path" ]]; then
-        print_warning "Certificate file not found: $cert_path"
+    # Check if certificate files exist and are accessible
+    print_debug "Checking file existence and permissions..."
+    
+    if [[ ! -e "$cert_path" ]]; then
+        print_debug "Certificate file does not exist: $cert_path"
         return 1
     fi
     
-    if [[ ! -f "$key_path" ]]; then
-        print_warning "Private key file not found: $key_path"
+    if [[ ! -e "$key_path" ]]; then
+        print_debug "Private key file does not exist: $key_path"
         return 1
     fi
     
-    # Check if files are readable (try with sudo if needed)
+    print_debug "Files exist, checking readability..."
+    
+    # Check if files are readable (try with and without sudo)
     local cert_readable=false
     local key_readable=false
+    local use_sudo=false
     
     if [[ -r "$cert_path" ]]; then
         cert_readable=true
-    elif sudo test -r "$cert_path" 2>/dev/null; then
-        cert_readable=true
-        print_status "Certificate requires sudo access to read"
+        print_debug "Certificate is readable without sudo"
+    else
+        print_debug "Certificate not readable without sudo, trying with sudo..."
+        if sudo test -r "$cert_path" 2>/dev/null; then
+            cert_readable=true
+            use_sudo=true
+            print_debug "Certificate is readable with sudo"
+        else
+            print_debug "Certificate not readable even with sudo"
+        fi
     fi
     
     if [[ -r "$key_path" ]]; then
         key_readable=true
-    elif sudo test -r "$key_path" 2>/dev/null; then
-        key_readable=true
-        print_status "Private key requires sudo access to read"
+        print_debug "Private key is readable without sudo"
+    else
+        print_debug "Private key not readable without sudo, trying with sudo..."
+        if sudo test -r "$key_path" 2>/dev/null; then
+            key_readable=true
+            use_sudo=true
+            print_debug "Private key is readable with sudo"
+        else
+            print_debug "Private key not readable even with sudo"
+        fi
     fi
     
     if [[ "$cert_readable" == false ]]; then
@@ -140,13 +163,39 @@ validate_ssl_certificate() {
         return 1
     fi
     
+    # Determine openssl command prefix
+    local openssl_cmd="openssl"
+    if [[ "$use_sudo" == true ]]; then
+        openssl_cmd="sudo openssl"
+        print_debug "Using sudo for OpenSSL commands"
+    fi
+    
+    # Test if the certificate is valid SSL/TLS certificate
+    print_debug "Testing certificate format..."
+    if ! $openssl_cmd x509 -noout -in "$cert_path" 2>/dev/null; then
+        print_warning "File is not a valid X.509 certificate: $cert_path"
+        return 1
+    fi
+    
+    # Test if the private key is valid
+    print_debug "Testing private key format..."
+    if ! $openssl_cmd rsa -noout -in "$key_path" 2>/dev/null && ! $openssl_cmd ec -noout -in "$key_path" 2>/dev/null; then
+        print_warning "File is not a valid private key: $key_path"
+        return 1
+    fi
+    
     # Check certificate expiry
+    print_debug "Checking certificate expiry..."
     local expiry_date
-    if expiry_date=$(sudo openssl x509 -enddate -noout -in "$cert_path" 2>/dev/null | cut -d= -f2); then
+    if expiry_date=$($openssl_cmd x509 -enddate -noout -in "$cert_path" 2>/dev/null | cut -d= -f2); then
+        print_debug "Certificate expiry date: $expiry_date"
+        
         local expiry_epoch
         if expiry_epoch=$(date -d "$expiry_date" +%s 2>/dev/null); then
             local current_epoch=$(date +%s)
             local days_until_expiry=$(( (expiry_epoch - current_epoch) / 86400 ))
+            
+            print_debug "Days until expiry: $days_until_expiry"
             
             if [[ $days_until_expiry -le 0 ]]; then
                 print_warning "Certificate has expired ($days_until_expiry days ago)"
@@ -169,50 +218,82 @@ validate_ssl_certificate() {
     fi
     
     # Check if certificate matches domain
+    print_debug "Checking domain matching..."
     local cert_domains=""
     local domain_found=false
     
-    # Try to get Subject Alternative Names first
-    local san_output
-    if san_output=$(sudo openssl x509 -text -noout -in "$cert_path" 2>/dev/null | grep -A1 "Subject Alternative Name" 2>/dev/null); then
-        local san_line=$(echo "$san_output" | tail -1)
-        if [[ -n "$san_line" ]]; then
-            # Extract DNS names from SAN
-            local san_domains=$(echo "$san_line" | grep -o 'DNS:[^,]*' | sed 's/DNS://g' | tr ',' '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+    # Get certificate subject and SAN information
+    print_debug "Extracting certificate information..."
+    local cert_text
+    if cert_text=$($openssl_cmd x509 -text -noout -in "$cert_path" 2>/dev/null); then
+        print_debug "Successfully read certificate text"
+        
+        # Try to get Subject Alternative Names first
+        print_debug "Looking for Subject Alternative Names..."
+        local san_section=$(echo "$cert_text" | grep -A1 "Subject Alternative Name" 2>/dev/null || true)
+        
+        if [[ -n "$san_section" ]]; then
+            print_debug "Found SAN section: $san_section"
+            
+            # Extract DNS names from SAN - more robust parsing
+            local san_domains=$(echo "$san_section" | grep -o 'DNS:[^,]*' | sed 's/DNS://g' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//' | tr '\n' ' ')
+            
             if [[ -n "$san_domains" ]]; then
                 cert_domains="$san_domains"
-                print_status "Found SAN domains: $(echo "$san_domains" | tr '\n' ', ' | sed 's/, $//')"
+                print_debug "Found SAN domains: $san_domains"
+            else
+                print_debug "No DNS names found in SAN"
+            fi
+        else
+            print_debug "No Subject Alternative Name section found"
+        fi
+        
+        # If no SAN found, try to get CN from subject
+        if [[ -z "$cert_domains" ]]; then
+            print_debug "Looking for Common Name in subject..."
+            local subject_line=$(echo "$cert_text" | grep "Subject:" | head -1)
+            print_debug "Subject line: $subject_line"
+            
+            if [[ -n "$subject_line" ]]; then
+                # Extract CN more carefully
+                local cn_domain=$(echo "$subject_line" | sed -n 's/.*CN[[:space:]]*=[[:space:]]*\([^,/]*\).*/\1/p' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+                
+                if [[ -n "$cn_domain" ]]; then
+                    cert_domains="$cn_domain"
+                    print_debug "Found CN domain: $cn_domain"
+                else
+                    print_debug "No CN found in subject"
+                fi
             fi
         fi
-    fi
-    
-    # If no SAN found, try to get CN from subject
-    if [[ -z "$cert_domains" ]]; then
-        local cn_domain
-        if cn_domain=$(sudo openssl x509 -subject -noout -in "$cert_path" 2>/dev/null | sed -n 's/.*CN=\([^,/]*\).*/\1/p'); then
-            if [[ -n "$cn_domain" ]]; then
-                cert_domains="$cn_domain"
-                print_status "Found CN domain: $cn_domain"
-            fi
-        fi
+    else
+        print_warning "Failed to read certificate text from $cert_path"
+        return 1
     fi
     
     if [[ -z "$cert_domains" ]]; then
-        print_warning "Failed to extract domains from certificate"
+        print_warning "Failed to extract any domains from certificate"
         return 1
     fi
     
     # Check if our domain is in the certificate
-    while IFS= read -r cert_domain; do
+    print_debug "Checking domain '$domain' against certificate domains: $cert_domains"
+    
+    # Convert cert_domains to array for easier processing
+    local cert_domain_array=($cert_domains)
+    
+    for cert_domain in "${cert_domain_array[@]}"; do
         if [[ -n "$cert_domain" ]]; then
-            # Remove any whitespace
-            cert_domain=$(echo "$cert_domain" | tr -d '[:space:]')
+            # Remove any whitespace and quotes
+            cert_domain=$(echo "$cert_domain" | tr -d '[:space:]"'"'"'')
             
-            print_status "Checking certificate domain: '$cert_domain' against target: '$domain'"
+            print_debug "Comparing certificate domain: '$cert_domain' with target: '$domain'"
             
             # Handle wildcard certificates
             if [[ "$cert_domain" == "*."* ]]; then
                 local wildcard_base="${cert_domain#*.}"
+                print_debug "Wildcard certificate detected, base domain: $wildcard_base"
+                
                 if [[ "$domain" == *".$wildcard_base" ]] || [[ "$domain" == "$wildcard_base" ]]; then
                     domain_found=true
                     print_success "Domain matches wildcard certificate: $cert_domain"
@@ -224,19 +305,19 @@ validate_ssl_certificate() {
                 break
             fi
         fi
-    done <<< "$cert_domains"
+    done
     
     if [[ "$domain_found" == true ]]; then
         print_success "Certificate is valid for domain: $domain"
         return 0
     else
         print_warning "Certificate does not cover domain: $domain"
-        print_warning "Certificate covers: $(echo "$cert_domains" | tr '\n' ', ' | sed 's/, $//')"
+        print_warning "Certificate covers: $cert_domains"
         return 1
     fi
 }
 
-# Function to scan all Let's Encrypt certificates
+# Function to scan all Let's Encrypt certificates with enhanced debugging
 scan_letsencrypt_certificates() {
     local domain="$1"
     
@@ -245,64 +326,127 @@ scan_letsencrypt_certificates() {
     local letsencrypt_dir="/etc/letsencrypt/live"
     
     if [[ ! -d "$letsencrypt_dir" ]]; then
-        print_status "Let's Encrypt directory not found: $letsencrypt_dir"
+        print_debug "Let's Encrypt directory not found: $letsencrypt_dir"
         return 1
     fi
     
-    # List all certificate directories
-    local cert_dirs
-    if cert_dirs=$(sudo find "$letsencrypt_dir" -maxdepth 1 -type d -name "*" 2>/dev/null | grep -v "^$letsencrypt_dir$"); then
-        print_status "Found Let's Encrypt certificate directories:"
-        
-        while IFS= read -r cert_dir; do
-            if [[ -n "$cert_dir" ]]; then
-                local cert_name=$(basename "$cert_dir")
-                print_status "  - $cert_name"
+    print_debug "Let's Encrypt directory exists: $letsencrypt_dir"
+    
+    # List all certificate directories with better error handling
+    print_debug "Listing certificate directories..."
+    
+    local cert_dirs=""
+    if [[ -r "$letsencrypt_dir" ]]; then
+        cert_dirs=$(find "$letsencrypt_dir" -maxdepth 1 -type d 2>/dev/null | grep -v "^$letsencrypt_dir$" || true)
+    else
+        print_debug "Need sudo to access Let's Encrypt directory"
+        cert_dirs=$(sudo find "$letsencrypt_dir" -maxdepth 1 -type d 2>/dev/null | grep -v "^$letsencrypt_dir$" || true)
+    fi
+    
+    if [[ -z "$cert_dirs" ]]; then
+        print_debug "No certificate directories found in $letsencrypt_dir"
+        return 1
+    fi
+    
+    print_status "Found Let's Encrypt certificate directories:"
+    
+    while IFS= read -r cert_dir; do
+        if [[ -n "$cert_dir" ]]; then
+            local cert_name=$(basename "$cert_dir")
+            print_status "  - $cert_name"
+            
+            local fullchain_path="$cert_dir/fullchain.pem"
+            local privkey_path="$cert_dir/privkey.pem"
+            
+            print_debug "Checking paths:"
+            print_debug "  Certificate: $fullchain_path"
+            print_debug "  Private key: $privkey_path"
+            
+            # Check if files exist (with sudo if needed)
+            local cert_exists=false
+            local key_exists=false
+            
+            if [[ -f "$fullchain_path" ]] || sudo test -f "$fullchain_path" 2>/dev/null; then
+                cert_exists=true
+                print_debug "Certificate file exists"
+            else
+                print_debug "Certificate file does not exist"
+            fi
+            
+            if [[ -f "$privkey_path" ]] || sudo test -f "$privkey_path" 2>/dev/null; then
+                key_exists=true
+                print_debug "Private key file exists"
+            else
+                print_debug "Private key file does not exist"
+            fi
+            
+            if [[ "$cert_exists" == true ]] && [[ "$key_exists" == true ]]; then
+                print_status "Checking certificate: $cert_name"
                 
-                local fullchain_path="$cert_dir/fullchain.pem"
-                local privkey_path="$cert_dir/privkey.pem"
-                
-                if [[ -f "$fullchain_path" ]] && [[ -f "$privkey_path" ]]; then
-                    print_status "Checking certificate: $cert_name"
-                    
-                    if validate_ssl_certificate "$domain" "$fullchain_path" "$privkey_path"; then
-                        print_success "Valid certificate found: $cert_name"
-                        SSL_CERT_PATH="$fullchain_path"
-                        SSL_KEY_PATH="$privkey_path"
-                        return 0
-                    else
-                        print_status "Certificate $cert_name does not match domain $domain"
-                    fi
+                if validate_ssl_certificate "$domain" "$fullchain_path" "$privkey_path"; then
+                    print_success "Valid certificate found: $cert_name"
+                    SSL_CERT_PATH="$fullchain_path"
+                    SSL_KEY_PATH="$privkey_path"
+                    return 0
                 else
-                    print_warning "Missing certificate files in: $cert_dir"
+                    print_debug "Certificate $cert_name does not match domain $domain"
+                fi
+            else
+                print_warning "Missing certificate files in: $cert_dir"
+                if [[ "$cert_exists" == false ]]; then
+                    print_debug "Missing: $fullchain_path"
+                fi
+                if [[ "$key_exists" == false ]]; then
+                    print_debug "Missing: $privkey_path"
                 fi
             fi
-        done <<< "$cert_dirs"
-    else
-        print_status "No certificate directories found in $letsencrypt_dir"
-    fi
+        fi
+    done <<< "$cert_dirs"
     
     return 1
 }
 
-# Function to check for existing SSL certificates
+# Function to check for existing SSL certificates with comprehensive debugging
 check_existing_ssl() {
     local domain="$1"
     
     print_status "Checking for existing SSL certificates for $domain..."
+    print_debug "Target domain: $domain"
     
     # First, try the direct Let's Encrypt path for the domain
     local direct_cert="/etc/letsencrypt/live/$domain/fullchain.pem"
     local direct_key="/etc/letsencrypt/live/$domain/privkey.pem"
     
-    if [[ -f "$direct_cert" ]] && [[ -f "$direct_key" ]]; then
+    print_debug "Checking direct Let's Encrypt path:"
+    print_debug "  Certificate: $direct_cert"
+    print_debug "  Private key: $direct_key"
+    
+    # Check if direct path exists
+    local direct_cert_exists=false
+    local direct_key_exists=false
+    
+    if [[ -f "$direct_cert" ]] || sudo test -f "$direct_cert" 2>/dev/null; then
+        direct_cert_exists=true
+        print_debug "Direct certificate file exists"
+    fi
+    
+    if [[ -f "$direct_key" ]] || sudo test -f "$direct_key" 2>/dev/null; then
+        direct_key_exists=true
+        print_debug "Direct private key file exists"
+    fi
+    
+    if [[ "$direct_cert_exists" == true ]] && [[ "$direct_key_exists" == true ]]; then
         print_status "Found direct Let's Encrypt certificate for $domain"
         if validate_ssl_certificate "$domain" "$direct_cert" "$direct_key"; then
             SSL_CERT_PATH="$direct_cert"
             SSL_KEY_PATH="$direct_key"
             EXISTING_SSL=true
             return 0
+        else
+            print_debug "Direct certificate validation failed"
         fi
+    else
+        print_debug "Direct Let's Encrypt path not found or incomplete"
     fi
     
     # If direct path doesn't work, scan all Let's Encrypt certificates
@@ -335,11 +479,15 @@ check_existing_ssl() {
     
     # Check each certificate location
     for cert_path in "${cert_locations[@]}"; do
+        print_debug "Checking alternative certificate: $cert_path"
+        
         if [[ -f "$cert_path" ]]; then
             print_status "Found certificate at: $cert_path"
             
             # Find corresponding private key
             for key_path in "${key_locations[@]}"; do
+                print_debug "Checking for private key: $key_path"
+                
                 if [[ -f "$key_path" ]]; then
                     print_status "Found private key at: $key_path"
                     
@@ -351,7 +499,7 @@ check_existing_ssl() {
                         EXISTING_SSL=true
                         return 0
                     else
-                        print_warning "Certificate validation failed for $cert_path"
+                        print_debug "Certificate validation failed for $cert_path"
                     fi
                 fi
             done
