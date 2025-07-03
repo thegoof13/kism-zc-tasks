@@ -134,12 +134,13 @@
     },
     {
       "name": "New Profile",
-      "color": "#6366F1",
-      "avatar": "👤",
+      "color": "#c0f264",
+      "avatar": "👨‍💻",
       "isActive": false,
-      "isTaskCompetitor": false,
+      "isTaskCompetitor": true,
       "id": "1751508828805",
-      "createdAt": "2025-07-03T02:13:48.805Z"
+      "createdAt": "2025-07-03T02:13:48.805Z",
+      "pin": "1234"
     }
   ],
   "history": [
