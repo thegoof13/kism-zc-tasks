@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, Users, Calendar, Target, Award, Clock, Crown, RefreshCw, CheckCircle } from 'lucide-react';
+import { TrendingUp, Users, Calendar, Target, Award, Clock, Crown, RefreshCw, CheckCircle, Eye } from 'lucide-react';
 import { HistoryEntry, Task, UserProfile } from '../types';
 
 interface HistoryAnalyticsProps {
@@ -110,23 +110,8 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
     .sort((a, b) => b.consistency - a.consistency)
     .slice(0, 3);
 
-  // Recent Activity Summary - Last 2 days, completed items only
+  // Recent Activity - Last 2 days, completed items only
   const recentCompletedActions = lastTwoDaysHistory.filter(entry => entry.action === 'completed');
-  
-  // Group by day
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  
-  const todayCompletions = recentCompletedActions.filter(entry => {
-    const entryDate = new Date(entry.timestamp);
-    return entryDate.toDateString() === today.toDateString();
-  });
-  
-  const yesterdayCompletions = recentCompletedActions.filter(entry => {
-    const entryDate = new Date(entry.timestamp);
-    return entryDate.toDateString() === yesterday.toDateString();
-  });
 
   return (
     <div className="space-y-6">
@@ -306,48 +291,6 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
         </div>
       )}
 
-      {/* Profile Performance (only show if more than 1 profile) */}
-      {profiles.length > 1 && (
-        <div className="card p-6">
-          <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
-            <Users className="w-5 h-5 mr-2 text-primary-500" />
-            Profile Performance (Last 14 Days)
-          </h4>
-          <div className="space-y-4">
-            {profileStats.filter(stat => stat.completions > 0).slice(0, 3).map((stat, index) => (
-              <div key={stat.profile.id} className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-lg">{stat.profile.avatar}</span>
-                    <div>
-                      <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                        {stat.profile.name}
-                        {index === 0 && (
-                          <span className="ml-2 px-2 py-1 bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 text-xs rounded-full">
-                            Most Active
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                        {stat.completions} completed • {stat.unchecked} unchecked
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                    {Math.round(stat.accuracy)}%
-                  </p>
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                    Accuracy
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Most Consistent Tasks */}
       {mostConsistentTasks.length > 0 && (
         <div className="card p-6">
@@ -389,147 +332,159 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
         </div>
       )}
 
-      {/* Recent Activity Summary - Last 2 Days, Completed Items Only */}
+      {/* Recent Activity (Last 2 Days) - Simple List */}
+      <RecentActivitySection 
+        recentCompletedActions={recentCompletedActions}
+        profiles={profiles}
+        resetTasksCount={resetTasksCount}
+        allHistory={history}
+      />
+    </div>
+  );
+}
+
+// Separate component for Recent Activity with detailed log toggle
+function RecentActivitySection({ 
+  recentCompletedActions, 
+  profiles, 
+  resetTasksCount,
+  allHistory 
+}: {
+  recentCompletedActions: HistoryEntry[];
+  profiles: UserProfile[];
+  resetTasksCount: number;
+  allHistory: HistoryEntry[];
+}) {
+  const [showDetailedLog, setShowDetailedLog] = React.useState(false);
+
+  if (showDetailedLog) {
+    return (
       <div className="card p-6">
-        <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
-          <CheckCircle className="w-5 h-5 mr-2 text-success-500" />
-          Recent Activity Summary (Last 2 Days)
-        </h4>
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 flex items-center">
+            <Eye className="w-5 h-5 mr-2 text-primary-500" />
+            Detailed Activity Log
+          </h4>
+          <button
+            onClick={() => setShowDetailedLog(false)}
+            className="btn-secondary text-sm"
+          >
+            Show Recent Activity
+          </button>
+        </div>
         
-        {recentCompletedActions.length === 0 ? (
-          <div className="text-center py-8">
-            <CheckCircle className="w-12 h-12 mx-auto mb-3 text-neutral-300 dark:text-neutral-600" />
-            <p className="text-neutral-500 dark:text-neutral-400">
-              No tasks completed in the last 2 days
+        <div className="space-y-3 max-h-96 overflow-y-auto">
+          {allHistory.length === 0 ? (
+            <p className="text-neutral-500 dark:text-neutral-400 text-center py-8">
+              No activity history yet
+            </p>
+          ) : (
+            allHistory.slice(0, 50).map(entry => (
+              <div key={entry.id} className="card p-3 bg-neutral-50 dark:bg-neutral-800">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                      {entry.taskTitle}
+                    </p>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                      {entry.action} by {entry.profileName}
+                    </p>
+                    {entry.details && (
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                        {entry.details}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                    {entry.timestamp.toLocaleDateString()} {entry.timestamp.toLocaleTimeString('en-US', { 
+                      hour: 'numeric', 
+                      minute: '2-digit',
+                      hour12: true 
+                    })}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 flex items-center">
+          <CheckCircle className="w-5 h-5 mr-2 text-success-500" />
+          Recent Activity (Last 2 Days)
+        </h4>
+        <button
+          onClick={() => setShowDetailedLog(true)}
+          className="btn-secondary text-sm"
+        >
+          <Eye className="w-4 h-4 mr-2" />
+          Show Detailed Log
+        </button>
+      </div>
+      
+      {recentCompletedActions.length === 0 ? (
+        <div className="text-center py-8">
+          <CheckCircle className="w-12 h-12 mx-auto mb-3 text-neutral-300 dark:text-neutral-600" />
+          <p className="text-neutral-500 dark:text-neutral-400">
+            No tasks completed in the last 2 days
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {recentCompletedActions.slice(0, 10).map(entry => {
+            const profile = profiles.find(p => p.id === entry.profileId);
+            const entryDate = new Date(entry.timestamp);
+            const isToday = entryDate.toDateString() === new Date().toDateString();
+            
+            return (
+              <div key={entry.id} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                <div className="flex items-center space-x-3">
+                  <CheckCircle className={`w-4 h-4 ${isToday ? 'text-success-500' : 'text-neutral-400'}`} />
+                  <div>
+                    <p className="font-medium text-neutral-900 dark:text-neutral-100">
+                      {entry.taskTitle}
+                    </p>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                      Completed by {profile?.name || 'Unknown'} • {isToday ? 'Today' : 'Yesterday'}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                  {entryDate.toLocaleTimeString('en-US', { 
+                    hour: 'numeric', 
+                    minute: '2-digit',
+                    hour12: true 
+                  })}
+                </span>
+              </div>
+            );
+          })}
+          
+          {recentCompletedActions.length > 10 && (
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center pt-2">
+              +{recentCompletedActions.length - 10} more completed tasks
+            </p>
+          )}
+        </div>
+      )}
+      
+      {/* Reset Tasks Warning */}
+      {resetTasksCount > 0 && (
+        <div className="mt-4 p-3 bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-lg">
+          <div className="flex items-center space-x-2">
+            <RefreshCw className="w-4 h-4 text-warning-600 dark:text-warning-400" />
+            <p className="text-sm text-warning-700 dark:text-warning-400">
+              <strong>{resetTasksCount}</strong> tasks were reset before their due date in the last 2 months. 
+              This may indicate incorrect recurrence scheduling.
             </p>
           </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Today's Completions */}
-            {todayCompletions.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h5 className="font-medium text-neutral-900 dark:text-neutral-100">
-                    Today ({todayCompletions.length} completed)
-                  </h5>
-                  <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                    {today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {todayCompletions.slice(0, 5).map(entry => {
-                    const profile = profiles.find(p => p.id === entry.profileId);
-                    return (
-                      <div key={entry.id} className="flex items-center justify-between p-3 bg-success-50 dark:bg-success-900/10 rounded-lg border border-success-200 dark:border-success-800">
-                        <div className="flex items-center space-x-3">
-                          <CheckCircle className="w-4 h-4 text-success-500" />
-                          <div>
-                            <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                              {entry.taskTitle}
-                            </p>
-                            <p className="text-xs text-neutral-600 dark:text-neutral-400">
-                              Completed by {profile?.name || 'Unknown'}
-                            </p>
-                          </div>
-                        </div>
-                        <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                          {new Date(entry.timestamp).toLocaleTimeString('en-US', { 
-                            hour: 'numeric', 
-                            minute: '2-digit',
-                            hour12: true 
-                          })}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  {todayCompletions.length > 5 && (
-                    <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center">
-                      +{todayCompletions.length - 5} more completed today
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Yesterday's Completions */}
-            {yesterdayCompletions.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h5 className="font-medium text-neutral-900 dark:text-neutral-100">
-                    Yesterday ({yesterdayCompletions.length} completed)
-                  </h5>
-                  <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                    {yesterday.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {yesterdayCompletions.slice(0, 5).map(entry => {
-                    const profile = profiles.find(p => p.id === entry.profileId);
-                    return (
-                      <div key={entry.id} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700">
-                        <div className="flex items-center space-x-3">
-                          <CheckCircle className="w-4 h-4 text-neutral-400" />
-                          <div>
-                            <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                              {entry.taskTitle}
-                            </p>
-                            <p className="text-xs text-neutral-600 dark:text-neutral-400">
-                              Completed by {profile?.name || 'Unknown'}
-                            </p>
-                          </div>
-                        </div>
-                        <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                          {new Date(entry.timestamp).toLocaleTimeString('en-US', { 
-                            hour: 'numeric', 
-                            minute: '2-digit',
-                            hour12: true 
-                          })}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  {yesterdayCompletions.length > 5 && (
-                    <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center">
-                      +{yesterdayCompletions.length - 5} more completed yesterday
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Summary Stats */}
-            <div className="pt-4 border-t border-neutral-200 dark:border-neutral-700">
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div>
-                  <p className="text-2xl font-bold text-success-600 dark:text-success-400">
-                    {todayCompletions.length}
-                  </p>
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400">Today</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-neutral-600 dark:text-neutral-400">
-                    {yesterdayCompletions.length}
-                  </p>
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400">Yesterday</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Reset Tasks Warning */}
-        {resetTasksCount > 0 && (
-          <div className="mt-4 p-3 bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-lg">
-            <div className="flex items-center space-x-2">
-              <RefreshCw className="w-4 h-4 text-warning-600 dark:text-warning-400" />
-              <p className="text-sm text-warning-700 dark:text-warning-400">
-                <strong>{resetTasksCount}</strong> tasks were reset before their due date in the last 2 months. 
-                This may indicate incorrect recurrence scheduling.
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
