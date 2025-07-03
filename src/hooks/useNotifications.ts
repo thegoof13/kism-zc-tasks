@@ -1,14 +1,16 @@
 import { useEffect } from 'react';
-import { Task, TaskGroup } from '../types';
+import { Task, TaskGroup, UserProfile } from '../types';
 import { NotificationService } from '../utils/notifications';
 
 interface UseNotificationsProps {
   tasks: Task[];
   groups: TaskGroup[];
+  profiles: UserProfile[];
+  activeProfileId: string;
   enableNotifications: boolean;
 }
 
-export function useNotifications({ tasks, groups, enableNotifications }: UseNotificationsProps) {
+export function useNotifications({ tasks, groups, profiles, activeProfileId, enableNotifications }: UseNotificationsProps) {
   useEffect(() => {
     if (!enableNotifications) return;
 
@@ -79,8 +81,11 @@ export function useNotifications({ tasks, groups, enableNotifications }: UseNoti
       });
 
       notificationTasks.forEach(task => {
-        if (NotificationService.shouldNotifyTaskReset(task, task.recurrenceFromDate)) {
-          const timeRemaining = NotificationService.formatTimeUntilReset(task, task.recurrenceFromDate);
+        // Get the user profile for meal times (if needed)
+        const userProfile = profiles.find(p => p.id === activeProfileId);
+        
+        if (NotificationService.shouldNotifyTaskReset(task, task.recurrenceFromDate, userProfile)) {
+          const timeRemaining = NotificationService.formatTimeUntilReset(task, task.recurrenceFromDate, userProfile);
           const group = groups.find(g => g.id === task.groupId);
           
           NotificationService.showNotification(
@@ -104,5 +109,5 @@ export function useNotifications({ tasks, groups, enableNotifications }: UseNoti
     checkNotifications();
 
     return () => clearInterval(interval);
-  }, [tasks, groups, enableNotifications]);
+  }, [tasks, groups, profiles, activeProfileId, enableNotifications]);
 }

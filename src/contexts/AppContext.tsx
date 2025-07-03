@@ -362,6 +362,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...action.profile,
         id: Date.now().toString(),
         createdAt: new Date(),
+        // Add default meal times if not provided
+        mealTimes: action.profile.mealTimes || {
+          breakfast: '07:00',
+          lunch: '12:00',
+          dinner: '18:00',
+          nightcap: '21:00',
+        },
       };
       
       return {
@@ -409,13 +416,24 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'RESET_RECURRING_TASKS': {
       const updatedTasks = state.tasks.map(task => {
-        if (task.isCompleted && task.completedAt && shouldResetTask(task.completedAt, task.recurrence, task.recurrenceFromDate, task.recurrenceConfig)) {
-          return {
-            ...task,
-            isCompleted: false,
-            completedBy: undefined,
-            completedAt: undefined,
-          };
+        if (task.isCompleted && task.completedAt) {
+          // Find the profile that completed the task to get meal times for meal-based tasks
+          const completedByProfile = state.profiles.find(p => p.id === task.completedBy);
+          
+          if (shouldResetTask(
+            task.completedAt, 
+            task.recurrence, 
+            task.recurrenceFromDate, 
+            task.recurrenceConfig,
+            completedByProfile
+          )) {
+            return {
+              ...task,
+              isCompleted: false,
+              completedBy: undefined,
+              completedAt: undefined,
+            };
+          }
         }
         return task;
       });
@@ -477,6 +495,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           userData.profiles = userData.profiles.map((profile: any) => ({
             ...profile,
             createdAt: new Date(profile.createdAt),
+            // Ensure meal times exist with defaults
+            mealTimes: profile.mealTimes || {
+              breakfast: '07:00',
+              lunch: '12:00',
+              dinner: '18:00',
+              nightcap: '21:00',
+            },
           }));
         }
         

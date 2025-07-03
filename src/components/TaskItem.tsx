@@ -209,6 +209,16 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
       return getRecurrenceLabel(task.recurrence, task.recurrenceConfig);
     }
     
+    if (task.recurrence === 'meals') {
+      // For meal-based tasks, show the meal times from active profile
+      return getResetDateDescription(
+        task.recurrence, 
+        task.recurrenceFromDate ? new Date(task.recurrenceFromDate) : undefined,
+        activeProfile,
+        task.recurrenceConfig?.meals
+      );
+    }
+    
     if (task.recurrenceFromDate) {
       return getResetDateDescription(task.recurrence, new Date(task.recurrenceFromDate));
     }

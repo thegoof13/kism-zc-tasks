@@ -63,7 +63,7 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
 
   const selectedGroup = state.groups.find(g => g.id === groupId);
   const showDueDate = selectedGroup?.enableDueDates;
-  const showRecurrenceFromDate = recurrence !== 'daily';
+  const showRecurrenceFromDate = recurrence !== 'daily' && recurrence !== 'meals'; // No from date for meals
   const showMealConfig = recurrence === 'meals';
   const showDayConfig = recurrence === 'days';
   
@@ -72,6 +72,9 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
   
   // Get the effective notification setting (task-level or group default)
   const effectiveNotifications = enableNotifications ?? selectedGroup?.defaultNotifications ?? false;
+
+  // Get active profile for meal time display
+  const activeProfile = state.profiles.find(p => p.id === state.activeProfileId);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,11 +105,11 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
       updates.dueDate = undefined;
     }
 
-    // Handle recurrence from date
+    // Handle recurrence from date (not for meals)
     if (showRecurrenceFromDate && recurrenceFromDate) {
       updates.recurrenceFromDate = new Date(recurrenceFromDate);
     } else if (!showRecurrenceFromDate) {
-      // Remove recurrence from date if daily
+      // Remove recurrence from date if daily or meals
       updates.recurrenceFromDate = undefined;
     }
 
@@ -161,6 +164,14 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
 
   const selectAllDays = () => {
     setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
+  };
+
+  // Format meal time for display
+  const formatMealTime = (time: string) => {
+    const [hours, minutes] = time.split(':');
+    const hour12 = parseInt(hours) > 12 ? parseInt(hours) - 12 : parseInt(hours);
+    const ampm = parseInt(hours) >= 12 ? 'PM' : 'AM';
+    return `${hour12}:${minutes} ${ampm}`;
   };
 
   if (!isOpen) return null;
@@ -247,28 +258,51 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                   Select Meal Times
                 </label>
+                {activeProfile?.mealTimes && (
+                  <div className="mb-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <p className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">
+                      Your meal times:
+                    </p>
+                    <div className="text-xs text-blue-600 dark:text-blue-400 space-y-0.5">
+                      <div>🌅 Breakfast: {formatMealTime(activeProfile.mealTimes.breakfast)}</div>
+                      <div>☀️ Lunch: {formatMealTime(activeProfile.mealTimes.lunch)}</div>
+                      <div>🌆 Dinner: {formatMealTime(activeProfile.mealTimes.dinner)}</div>
+                      <div>🌙 Night Cap: {formatMealTime(activeProfile.mealTimes.nightcap)}</div>
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2">
-                  {mealOptions.map(meal => (
-                    <label
-                      key={meal.value}
-                      className={`flex items-center space-x-2 p-2.5 rounded-lg border cursor-pointer transition-all duration-200 ${
-                        selectedMeals.includes(meal.value)
-                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                          : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedMeals.includes(meal.value)}
-                        onChange={() => toggleMeal(meal.value)}
-                        className="w-3.5 h-3.5 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                      />
-                      <span className="text-sm">{meal.icon}</span>
-                      <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        {meal.label}
-                      </span>
-                    </label>
-                  ))}
+                  {mealOptions.map(meal => {
+                    const mealTime = activeProfile?.mealTimes?.[meal.value];
+                    return (
+                      <label
+                        key={meal.value}
+                        className={`flex flex-col space-y-1 p-2.5 rounded-lg border cursor-pointer transition-all duration-200 ${
+                          selectedMeals.includes(meal.value)
+                            ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                            : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+                        }`}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedMeals.includes(meal.value)}
+                            onChange={() => toggleMeal(meal.value)}
+                            className="w-3.5 h-3.5 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                          />
+                          <span className="text-sm">{meal.icon}</span>
+                          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                            {meal.label}
+                          </span>
+                        </div>
+                        {mealTime && (
+                          <span className="text-xs text-neutral-500 dark:text-neutral-400 ml-6">
+                            {formatMealTime(mealTime)}
+                          </span>
+                        )}
+                      </label>
+                    );
+                  })}
                 </div>
                 {selectedMeals.length === 0 && (
                   <p className="text-xs text-error-600 dark:text-error-400 mt-1">
@@ -341,7 +375,7 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
               </div>
             )}
 
-            {/* Recurrence From Date (conditional) */}
+            {/* Recurrence From Date (conditional - NOT for meals) */}
             {showRecurrenceFromDate && (
               <div>
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">

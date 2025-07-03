@@ -69,6 +69,12 @@ export const defaultProfiles: UserProfile[] = [
       canCreateTasks: true,
       canDeleteTasks: true,
     },
+    mealTimes: {
+      breakfast: '07:00', // 7:00 AM
+      lunch: '12:00',     // 12:00 PM
+      dinner: '18:00',    // 6:00 PM
+      nightcap: '21:00',  // 9:00 PM
+    },
   },
 ];
 

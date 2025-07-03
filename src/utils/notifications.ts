@@ -126,7 +126,7 @@ export class NotificationService {
   }
 
   // NEW: Task recurrence notification methods
-  static getTimeUntilReset(task: any, recurrenceFromDate?: Date): { totalHours: number; remainingHours: number; progress: number } {
+  static getTimeUntilReset(task: any, recurrenceFromDate?: Date, userProfile?: any): { totalHours: number; remainingHours: number; progress: number } {
     const now = new Date();
     const startDate = recurrenceFromDate || task.createdAt;
     
@@ -135,33 +135,40 @@ export class NotificationService {
     // Calculate next reset date based on recurrence type
     switch (task.recurrence) {
       case 'meals':
-        if (task.recurrenceConfig?.meals) {
-          // Find the next meal time
-          const currentHour = now.getHours();
-          const mealHours = {
-            breakfast: 6,
-            lunch: 11,
-            dinner: 17,
-            nightcap: 21
-          };
+        if (task.recurrenceConfig?.meals && userProfile?.mealTimes) {
+          // Find the next meal time based on user's meal schedule
+          const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
           
-          let nextMealHour = 24; // Default to next day
+          let nextMealTimeMinutes = 24 * 60; // Default to next day
           for (const meal of task.recurrenceConfig.meals) {
-            const mealHour = mealHours[meal];
-            if (mealHour > currentHour) {
-              nextMealHour = Math.min(nextMealHour, mealHour);
+            const mealTime = userProfile.mealTimes[meal];
+            if (mealTime) {
+              const [hours, minutes] = mealTime.split(':').map(Number);
+              const mealTimeMinutes = hours * 60 + minutes;
+              
+              if (mealTimeMinutes > currentTimeMinutes) {
+                nextMealTimeMinutes = Math.min(nextMealTimeMinutes, mealTimeMinutes);
+              }
             }
           }
           
-          if (nextMealHour === 24) {
+          if (nextMealTimeMinutes === 24 * 60) {
             // No more meals today, find first meal tomorrow
-            const firstMealTomorrow = Math.min(...task.recurrenceConfig.meals.map(m => mealHours[m]));
+            const firstMealTomorrow = Math.min(...task.recurrenceConfig.meals.map(meal => {
+              const mealTime = userProfile.mealTimes[meal];
+              if (mealTime) {
+                const [hours, minutes] = mealTime.split(':').map(Number);
+                return hours * 60 + minutes;
+              }
+              return 24 * 60;
+            }));
+            
             resetDate = new Date(now);
             resetDate.setDate(resetDate.getDate() + 1);
-            resetDate.setHours(firstMealTomorrow, 0, 0, 0);
+            resetDate.setHours(Math.floor(firstMealTomorrow / 60), firstMealTomorrow % 60, 0, 0);
           } else {
             resetDate = new Date(now);
-            resetDate.setHours(nextMealHour, 0, 0, 0);
+            resetDate.setHours(Math.floor(nextMealTimeMinutes / 60), nextMealTimeMinutes % 60, 0, 0);
           }
         }
         break;
@@ -233,17 +240,17 @@ export class NotificationService {
     return { totalHours, remainingHours, progress };
   }
 
-  static shouldNotifyTaskReset(task: any, recurrenceFromDate?: Date): boolean {
+  static shouldNotifyTaskReset(task: any, recurrenceFromDate?: Date, userProfile?: any): boolean {
     if (task.isCompleted) return false; // Don't notify for completed tasks
     
-    const { progress } = this.getTimeUntilReset(task, recurrenceFromDate);
+    const { progress } = this.getTimeUntilReset(task, recurrenceFromDate, userProfile);
     
     // Notify when 90% of time has passed (10% remaining)
     return progress >= 0.9 && progress < 0.95;
   }
 
-  static formatTimeUntilReset(task: any, recurrenceFromDate?: Date): string {
-    const { remainingHours } = this.getTimeUntilReset(task, recurrenceFromDate);
+  static formatTimeUntilReset(task: any, recurrenceFromDate?: Date, userProfile?: any): string {
+    const { remainingHours } = this.getTimeUntilReset(task, recurrenceFromDate, userProfile);
     
     if (remainingHours < 1) {
       const minutes = Math.ceil(remainingHours * 60);

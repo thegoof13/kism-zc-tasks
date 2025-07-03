@@ -1,6 +1,6 @@
 export type RecurrenceType = 
-  | 'meals'      // New: Multiple meal times
-  | 'days'       // New: Specific days of week
+  | 'meals'      // Multiple meal times
+  | 'days'       // Specific days of week
   | 'daily'
   | 'weekly'
   | 'fortnightly'
@@ -27,8 +27,8 @@ export interface Task {
   profiles: string[];
   order: number;
   dueDate?: Date;
-  recurrenceFromDate?: Date;
-  enableNotifications?: boolean; // New field for task-level notifications
+  recurrenceFromDate?: Date; // Not available for meal-based tasks
+  enableNotifications?: boolean;
 }
 
 export interface TaskGroup {
@@ -42,7 +42,7 @@ export interface TaskGroup {
   createdAt: Date;
   enableDueDates: boolean;
   sortByDueDate: boolean;
-  defaultNotifications?: boolean; // New field for group-level notification default
+  defaultNotifications?: boolean;
 }
 
 export interface UserProfile {
@@ -53,11 +53,17 @@ export interface UserProfile {
   isActive: boolean;
   createdAt: Date;
   isTaskCompetitor?: boolean;
-  pin?: string; // New field for profile PIN protection
+  pin?: string;
   permissions?: {
     canEditTasks: boolean;
     canCreateTasks: boolean;
     canDeleteTasks: boolean;
+  };
+  mealTimes?: {
+    breakfast: string; // Time in HH:MM format (24-hour)
+    lunch: string;
+    dinner: string;
+    nightcap: string;
   };
 }
 
@@ -94,8 +100,8 @@ export interface AppSettings {
   autoArchiveCompleted: boolean;
   archiveDays: number;
   ai: AISettings;
-  settingsPassword?: string; // New field for settings password protection
-  showTopCollaborator: boolean; // New field for showing Top Collaborator in Trophy popup
+  settingsPassword?: string;
+  showTopCollaborator: boolean;
 }
 
 export interface AppState {

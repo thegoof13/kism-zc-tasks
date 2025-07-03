@@ -1,4 +1,4 @@
-import { RecurrenceType, Task } from '../types';
+import { RecurrenceType, Task, UserProfile } from '../types';
 
 export function getRecurrenceLabel(recurrence: RecurrenceType, config?: Task['recurrenceConfig']): string {
   const labels: Record<RecurrenceType, string> = {
@@ -33,7 +33,23 @@ export function getRecurrenceLabel(recurrence: RecurrenceType, config?: Task['re
   return labels[recurrence];
 }
 
-export function shouldResetTask(lastCompleted: Date, recurrence: RecurrenceType, recurrenceFromDate?: Date, config?: Task['recurrenceConfig']): boolean {
+export function getMealTimeInMinutes(mealTime: string): number {
+  const [hours, minutes] = mealTime.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+export function getCurrentTimeInMinutes(): number {
+  const now = new Date();
+  return now.getHours() * 60 + now.getMinutes();
+}
+
+export function shouldResetTask(
+  lastCompleted: Date, 
+  recurrence: RecurrenceType, 
+  recurrenceFromDate?: Date, 
+  config?: Task['recurrenceConfig'],
+  userProfile?: UserProfile
+): boolean {
   const now = new Date();
   const lastCompletedDate = new Date(lastCompleted);
   
@@ -44,11 +60,11 @@ export function shouldResetTask(lastCompleted: Date, recurrence: RecurrenceType,
   
   switch (recurrence) {
     case 'meals':
-      if (!config?.meals) return false;
+      if (!config?.meals || !userProfile?.mealTimes) return false;
       
       // Check if any of the selected meal times have passed since last completion
-      const currentHour = now.getHours();
-      const lastCompletedHour = lastCompletedDate.getHours();
+      const currentTimeMinutes = getCurrentTimeInMinutes();
+      const lastCompletedTimeMinutes = lastCompletedDate.getHours() * 60 + lastCompletedDate.getMinutes();
       const isDifferentDay = now.getDate() !== lastCompletedDate.getDate() ||
                             now.getMonth() !== lastCompletedDate.getMonth() ||
                             now.getFullYear() !== lastCompletedDate.getFullYear();
@@ -56,16 +72,16 @@ export function shouldResetTask(lastCompleted: Date, recurrence: RecurrenceType,
       // If it's a different day, check if any meal time has passed
       if (isDifferentDay) {
         for (const meal of config.meals) {
-          const mealHour = getMealHour(meal);
-          if (currentHour >= mealHour) {
+          const mealTimeMinutes = getMealTimeInMinutes(userProfile.mealTimes[meal]);
+          if (currentTimeMinutes >= mealTimeMinutes) {
             return true;
           }
         }
       } else {
         // Same day - check if any new meal time has passed since completion
         for (const meal of config.meals) {
-          const mealHour = getMealHour(meal);
-          if (currentHour >= mealHour && lastCompletedHour < mealHour) {
+          const mealTimeMinutes = getMealTimeInMinutes(userProfile.mealTimes[meal]);
+          if (currentTimeMinutes >= mealTimeMinutes && lastCompletedTimeMinutes < mealTimeMinutes) {
             return true;
           }
         }
@@ -117,16 +133,6 @@ export function shouldResetTask(lastCompleted: Date, recurrence: RecurrenceType,
     default:
       return false;
   }
-}
-
-function getMealHour(meal: 'breakfast' | 'lunch' | 'dinner' | 'nightcap'): number {
-  const mealHours = {
-    breakfast: 6,
-    lunch: 11,
-    dinner: 17,
-    nightcap: 21
-  };
-  return mealHours[meal];
 }
 
 export function getNextRecurrenceDate(recurrence: RecurrenceType, lastDate?: Date): Date {
@@ -240,12 +246,16 @@ export function calculateNextDueDate(currentDueDate: Date, recurrence: Recurrenc
 
 /**
  * Calculate the next reset date based on recurrence pattern and from date
+ * Note: Meal-based tasks don't use from dates - they use profile meal times
  */
 export function calculateNextResetDate(recurrence: RecurrenceType, fromDate: Date): Date {
   const nextReset = new Date(fromDate);
 
   switch (recurrence) {
     case 'meals':
+      // Meal-based tasks don't use from dates - they reset based on meal times
+      nextReset.setDate(nextReset.getDate() + 1);
+      break;
     case 'days':
     case 'daily':
       nextReset.setDate(nextReset.getDate() + 1);
@@ -297,9 +307,24 @@ export function calculateNextResetDate(recurrence: RecurrenceType, fromDate: Dat
 /**
  * Get a human-readable description of when the task will reset
  */
-export function getResetDateDescription(recurrence: RecurrenceType, fromDate: Date): string {
+export function getResetDateDescription(recurrence: RecurrenceType, fromDate?: Date, userProfile?: UserProfile, mealConfig?: string[]): string {
   if (recurrence === 'daily') {
     return 'Resets daily';
+  }
+
+  if (recurrence === 'meals' && mealConfig && userProfile?.mealTimes) {
+    const mealTimes = mealConfig.map(meal => {
+      const time = userProfile.mealTimes![meal as keyof typeof userProfile.mealTimes];
+      const [hours, minutes] = time.split(':');
+      const hour12 = parseInt(hours) > 12 ? parseInt(hours) - 12 : parseInt(hours);
+      const ampm = parseInt(hours) >= 12 ? 'PM' : 'AM';
+      return `${meal} (${hour12}:${minutes} ${ampm})`;
+    }).join(', ');
+    return `Resets at ${mealTimes}`;
+  }
+
+  if (!fromDate) {
+    return 'Resets immediately';
   }
 
   const nextReset = calculateNextResetDate(recurrence, fromDate);
