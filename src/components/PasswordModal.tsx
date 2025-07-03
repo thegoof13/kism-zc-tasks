@@ -172,19 +172,13 @@ export function PasswordModal({
             </div>
           )}
 
-          {/* Security Note - COMPLETELY REWRITTEN FOR DARK MODE */}
+          {/* Security Notice - FIXED FOR DARK MODE */}
           {isSettingPassword && (
-            <div className="p-4 rounded-lg border-2" style={{
-              backgroundColor: 'var(--tw-colors-warning-50)',
-              borderColor: 'var(--tw-colors-warning-200)',
-              color: 'var(--tw-colors-warning-800)'
-            }} data-theme="light">
-              <div className="dark:bg-amber-900/40 dark:border-amber-700 dark:text-amber-100 dark:p-4 dark:rounded-lg dark:border-2">
-                <p className="text-xs font-medium">
-                  <strong>Security Notice:</strong> Passwords are stored in plain text on the server for simplicity. 
-                  Do not use passwords that you use for other important accounts.
-                </p>
-              </div>
+            <div className="p-4 bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-lg">
+              <p className="text-warning-700 dark:text-warning-300 text-xs">
+                <strong>Security Notice:</strong> Passwords are stored in plain text on the server for simplicity. 
+                Do not use passwords that you use for other important accounts.
+              </p>
             </div>
           )}
 
