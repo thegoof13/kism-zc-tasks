@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, Users, Calendar, Target, Award, Clock } from 'lucide-react';
+import { TrendingUp, Users, Calendar, Target, Award, Clock, Crown } from 'lucide-react';
 import { HistoryEntry, Task, UserProfile } from '../types';
 
 interface HistoryAnalyticsProps {
@@ -79,26 +79,6 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
     .sort((a, b) => b.consistency - a.consistency)
     .slice(0, 3);
 
-  // Calculate weekly trends
-  const weeklyData = Array.from({ length: 2 }, (_, weekIndex) => {
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - (weekIndex + 1) * 7);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 7);
-    
-    const weekCompletions = completedActions.filter(entry => {
-      const entryDate = new Date(entry.timestamp);
-      return entryDate >= weekStart && entryDate < weekEnd;
-    }).length;
-    
-    return {
-      week: weekIndex === 0 ? 'This Week' : 'Last Week',
-      completions: weekCompletions
-    };
-  });
-
-  const weeklyTrend = weeklyData[0].completions - weeklyData[1].completions;
-
   return (
     <div className="space-y-6">
       {/* Overview Stats */}
@@ -129,13 +109,13 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
 
         <div className="card p-4 text-center">
           <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/20 rounded-full flex items-center justify-center mx-auto mb-2">
-            <TrendingUp className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+            <Users className="w-6 h-6 text-primary-600 dark:text-primary-400" />
           </div>
           <p className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-            {weeklyTrend >= 0 ? '+' : ''}{weeklyTrend}
+            {profiles.length}
           </p>
           <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            Weekly Change
+            Active Profiles
           </p>
         </div>
 
@@ -191,6 +171,91 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
           </div>
         </div>
       </div>
+
+      {/* Top Collaborator (only show if more than 1 profile) */}
+      {profiles.length > 1 && mostActiveProfile && mostActiveProfile.completions > 0 && (
+        <div className="card p-6">
+          <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
+            <Crown className="w-5 h-5 mr-2 text-yellow-500" />
+            Top Collaborator (Last 14 Days)
+          </h4>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center text-2xl">
+                  {mostActiveProfile.profile.avatar}
+                </div>
+                <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center">
+                  <Crown className="w-3 h-3 text-white" />
+                </div>
+              </div>
+              <div>
+                <h5 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">
+                  {mostActiveProfile.profile.name}
+                </h5>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  Most active team member
+                </p>
+                <div className="flex items-center space-x-4 mt-2">
+                  <div className="flex items-center space-x-1">
+                    <Target className="w-4 h-4 text-success-500" />
+                    <span className="text-sm font-medium text-success-600 dark:text-success-400">
+                      {mostActiveProfile.completions} completed
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Award className="w-4 h-4 text-accent-500" />
+                    <span className="text-sm font-medium text-accent-600 dark:text-accent-400">
+                      {Math.round(mostActiveProfile.accuracy)}% accuracy
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-yellow-500 mb-1">
+                #{1}
+              </div>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                Rank
+              </p>
+            </div>
+          </div>
+          
+          {/* Other top performers */}
+          {profileStats.length > 1 && (
+            <div className="mt-6 pt-4 border-t border-neutral-200 dark:border-neutral-700">
+              <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">
+                Other Contributors
+              </p>
+              <div className="space-y-2">
+                {profileStats.slice(1, 3).map((stat, index) => (
+                  <div key={stat.profile.id} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center text-sm">
+                        {stat.profile.avatar}
+                      </div>
+                      <div>
+                        <p className="font-medium text-neutral-900 dark:text-neutral-100">
+                          {stat.profile.name}
+                        </p>
+                        <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                          {stat.completions} completed
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-neutral-600 dark:text-neutral-400">
+                        #{index + 2}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Profile Performance (only show if more than 1 profile) */}
       {profiles.length > 1 && (
@@ -274,37 +339,6 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
           </div>
         </div>
       )}
-
-      {/* Weekly Comparison */}
-      <div className="card p-6">
-        <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
-          <TrendingUp className="w-5 h-5 mr-2 text-primary-500" />
-          Weekly Comparison
-        </h4>
-        <div className="grid grid-cols-2 gap-4">
-          {weeklyData.map((week, index) => (
-            <div key={index} className="text-center">
-              <p className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
-                {week.completions}
-              </p>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                {week.week}
-              </p>
-            </div>
-          ))}
-        </div>
-        {weeklyTrend !== 0 && (
-          <div className="mt-4 text-center">
-            <p className={`text-sm font-medium ${
-              weeklyTrend > 0 
-                ? 'text-success-600 dark:text-success-400' 
-                : 'text-error-600 dark:text-error-400'
-            }`}>
-              {weeklyTrend > 0 ? '↗' : '↘'} {Math.abs(weeklyTrend)} tasks {weeklyTrend > 0 ? 'more' : 'fewer'} than last week
-            </p>
-          </div>
-        )}
-      </div>
 
       {/* Recent Activity Summary */}
       <div className="card p-6">
