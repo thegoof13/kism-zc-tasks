@@ -129,14 +129,15 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
             )}
           </div>
 
-          <div className="p-4 bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-lg">
+          {/* FIXED SECURITY WARNING BOX */}
+          <div className="p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg">
             <div className="flex items-start space-x-3">
-              <Shield className="w-5 h-5 text-warning-600 dark:text-warning-400 flex-shrink-0 mt-0.5" />
+              <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
               <div>
-                <h5 className="text-sm font-medium text-warning-800 dark:text-warning-200 mb-1">
+                <h5 className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
                   Security Notice
                 </h5>
-                <p className="text-xs text-warning-700 dark:text-warning-300">
+                <p className="text-xs text-amber-700 dark:text-amber-300">
                   Passwords are stored in plain text on the server for simplicity. 
                   Do not use passwords that you use for other important accounts.
                 </p>
