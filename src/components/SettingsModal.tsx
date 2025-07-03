@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, User, Palette, Shield, Brain, Bell, Users, Plus, Edit, Trash2, Eye, EyeOff, Clock } from 'lucide-react';
+import { X, Settings, User, Palette, Shield, Brain, Bell, Users, Plus, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { PasswordModal } from './PasswordModal';
 import { AIQueryModal } from './AIQueryModal';
@@ -30,12 +30,6 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
     canDeleteTasks: true,
   });
   const [newProfileIsCompetitor, setNewProfileIsCompetitor] = useState(false);
-  const [newProfileMealTimes, setNewProfileMealTimes] = useState({
-    breakfast: '07:00',
-    lunch: '12:00',
-    dinner: '18:00',
-    nightcap: '21:00',
-  });
 
   // AI Settings
   const [aiProvider, setAiProvider] = useState(state.settings.ai.provider);
@@ -70,7 +64,6 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
         pin: newProfilePin || undefined,
         permissions: newProfilePermissions,
         isTaskCompetitor: newProfileIsCompetitor,
-        mealTimes: newProfileMealTimes,
       },
     });
 
@@ -85,12 +78,6 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
       canDeleteTasks: true,
     });
     setNewProfileIsCompetitor(false);
-    setNewProfileMealTimes({
-      breakfast: '07:00',
-      lunch: '12:00',
-      dinner: '18:00',
-      nightcap: '21:00',
-    });
     setEditingProfile(null);
   };
 
@@ -108,12 +95,6 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
       canDeleteTasks: true,
     });
     setNewProfileIsCompetitor(profile.isTaskCompetitor || false);
-    setNewProfileMealTimes(profile.mealTimes || {
-      breakfast: '07:00',
-      lunch: '12:00',
-      dinner: '18:00',
-      nightcap: '21:00',
-    });
     setEditingProfile(profileId);
   };
 
@@ -130,7 +111,6 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
         pin: newProfilePin || undefined,
         permissions: newProfilePermissions,
         isTaskCompetitor: newProfileIsCompetitor,
-        mealTimes: newProfileMealTimes,
       },
     });
 
@@ -145,12 +125,6 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
       canDeleteTasks: true,
     });
     setNewProfileIsCompetitor(false);
-    setNewProfileMealTimes({
-      breakfast: '07:00',
-      lunch: '12:00',
-      dinner: '18:00',
-      nightcap: '21:00',
-    });
     setEditingProfile(null);
   };
 
@@ -176,29 +150,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
       canDeleteTasks: true,
     });
     setNewProfileIsCompetitor(false);
-    setNewProfileMealTimes({
-      breakfast: '07:00',
-      lunch: '12:00',
-      dinner: '18:00',
-      nightcap: '21:00',
-    });
     setEditingProfile(null);
-  };
-
-  // Format meal time for display
-  const formatMealTime = (time: string) => {
-    const [hours, minutes] = time.split(':');
-    const hour12 = parseInt(hours) > 12 ? parseInt(hours) - 12 : parseInt(hours);
-    const ampm = parseInt(hours) >= 12 ? 'PM' : 'AM';
-    return `${hour12}:${minutes} ${ampm}`;
-  };
-
-  // Check if profile has meal-based tasks
-  const profileHasMealTasks = (profileId: string) => {
-    return state.tasks.some(task => 
-      task.profiles.includes(profileId) && 
-      task.recurrence === 'meals'
-    );
   };
 
   if (!isOpen) return null;
@@ -416,27 +368,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                                       PIN Protected
                                     </span>
                                   )}
-                                  {profileHasMealTasks(profile.id) && (
-                                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-full">
-                                      Has Meal Tasks
-                                    </span>
-                                  )}
                                 </div>
-                                
-                                {/* Show meal times if profile has meal-based tasks */}
-                                {profileHasMealTasks(profile.id) && profile.mealTimes && (
-                                  <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                                    <p className="text-xs text-blue-700 dark:text-blue-300 font-medium mb-1">
-                                      Meal Times:
-                                    </p>
-                                    <div className="text-xs text-blue-600 dark:text-blue-400 grid grid-cols-2 gap-1">
-                                      <div>🌅 Breakfast: {formatMealTime(profile.mealTimes.breakfast)}</div>
-                                      <div>☀️ Lunch: {formatMealTime(profile.mealTimes.lunch)}</div>
-                                      <div>🌆 Dinner: {formatMealTime(profile.mealTimes.dinner)}</div>
-                                      <div>🌙 Night Cap: {formatMealTime(profile.mealTimes.nightcap)}</div>
-                                    </div>
-                                  </div>
-                                )}
                               </div>
                             </div>
                             <div className="flex items-center space-x-2">
@@ -591,79 +523,6 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                             <p className="text-xs text-neutral-500 dark:text-neutral-400 ml-6">
                               Participate in task completion rankings
                             </p>
-                          </div>
-
-                          {/* Meal Times Configuration */}
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">
-                              <div className="flex items-center space-x-2">
-                                <Clock className="w-4 h-4" />
-                                <span>Meal Times</span>
-                              </div>
-                            </label>
-                            <div className="space-y-3">
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">
-                                    🌅 Breakfast
-                                  </label>
-                                  <input
-                                    type="time"
-                                    value={newProfileMealTimes.breakfast}
-                                    onChange={(e) => setNewProfileMealTimes(prev => ({
-                                      ...prev,
-                                      breakfast: e.target.value
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">
-                                    ☀️ Lunch
-                                  </label>
-                                  <input
-                                    type="time"
-                                    value={newProfileMealTimes.lunch}
-                                    onChange={(e) => setNewProfileMealTimes(prev => ({
-                                      ...prev,
-                                      lunch: e.target.value
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">
-                                    🌆 Dinner
-                                  </label>
-                                  <input
-                                    type="time"
-                                    value={newProfileMealTimes.dinner}
-                                    onChange={(e) => setNewProfileMealTimes(prev => ({
-                                      ...prev,
-                                      dinner: e.target.value
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">
-                                    🌙 Night Cap
-                                  </label>
-                                  <input
-                                    type="time"
-                                    value={newProfileMealTimes.nightcap}
-                                    onChange={(e) => setNewProfileMealTimes(prev => ({
-                                      ...prev,
-                                      nightcap: e.target.value
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                                  />
-                                </div>
-                              </div>
-                              <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                                These times will be used for meal-based recurring tasks
-                              </p>
-                            </div>
                           </div>
                         </div>
                       </div>
