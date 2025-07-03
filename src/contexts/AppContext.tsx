@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { AppState, Task, TaskGroup, UserProfile, HistoryEntry } from '../types';
 import { defaultGroups, defaultProfiles, defaultSettings } from '../utils/defaultData';
-import { shouldResetTask } from '../utils/recurrence';
+import { shouldResetTask, calculateNextDueDate } from '../utils/recurrence';
 import { ApiService } from '../services/api';
 
 type AppAction = 
@@ -69,12 +69,27 @@ function appReducer(state: AppState, action: AppAction): AppState {
       const isCompleting = !task.isCompleted;
       const profile = state.profiles.find(p => p.id === action.profileId);
       
-      const updatedTask = {
+      let updatedTask = {
         ...task,
         isCompleted: isCompleting,
         completedBy: isCompleting ? action.profileId : undefined,
         completedAt: isCompleting ? new Date() : undefined,
       };
+
+      // If completing a task with a due date, reschedule it based on recurrence
+      if (isCompleting && task.dueDate) {
+        const group = state.groups.find(g => g.id === task.groupId);
+        if (group?.enableDueDates) {
+          const nextDueDate = calculateNextDueDate(new Date(task.dueDate), task.recurrence);
+          updatedTask = {
+            ...updatedTask,
+            dueDate: nextDueDate,
+            isCompleted: false, // Reset completion status for the new cycle
+            completedBy: undefined,
+            completedAt: undefined,
+          };
+        }
+      }
 
       const historyEntry: HistoryEntry = {
         id: Date.now().toString(),
@@ -84,7 +99,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
         timestamp: new Date(),
         taskTitle: task.title,
         profileName: profile?.name || 'Unknown',
-        details: isCompleting ? 'Task marked as completed' : 'Task unchecked via toggle',
+        details: isCompleting 
+          ? (task.dueDate ? `Task completed and rescheduled to ${updatedTask.dueDate?.toLocaleDateString()}` : 'Task marked as completed')
+          : 'Task unchecked via toggle',
       };
 
       return {
@@ -361,6 +378,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...task,
             createdAt: new Date(task.createdAt),
             completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
+            dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
           }));
         }
         

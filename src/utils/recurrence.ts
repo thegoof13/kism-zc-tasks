@@ -138,3 +138,115 @@ export function getNextRecurrenceDate(recurrence: RecurrenceType, lastDate?: Dat
 
   return next;
 }
+
+/**
+ * Calculate the next due date based on recurrence pattern
+ * This function handles year rollovers automatically
+ */
+export function calculateNextDueDate(currentDueDate: Date, recurrence: RecurrenceType): Date {
+  const nextDue = new Date(currentDueDate);
+
+  switch (recurrence) {
+    case 'breakfast':
+    case 'lunch':
+    case 'dinner':
+    case 'daily':
+      nextDue.setDate(nextDue.getDate() + 1);
+      break;
+    
+    case 'work-daily':
+      // Move to next work day
+      do {
+        nextDue.setDate(nextDue.getDate() + 1);
+      } while (nextDue.getDay() === 0 || nextDue.getDay() === 6); // Skip weekends
+      break;
+    
+    case 'weekend-daily':
+      // Move to next weekend day
+      do {
+        nextDue.setDate(nextDue.getDate() + 1);
+      } while (nextDue.getDay() !== 0 && nextDue.getDay() !== 6); // Only weekends
+      break;
+    
+    case 'weekly':
+      nextDue.setDate(nextDue.getDate() + 7);
+      break;
+    
+    case 'fortnightly':
+      nextDue.setDate(nextDue.getDate() + 14);
+      break;
+    
+    case 'monthly':
+      // Add one month, handling year rollover automatically
+      const currentMonth = nextDue.getMonth();
+      nextDue.setMonth(currentMonth + 1);
+      
+      // Handle edge case where the day doesn't exist in the next month
+      // (e.g., Jan 31 -> Feb 31 becomes Feb 28/29)
+      if (nextDue.getMonth() !== (currentMonth + 1) % 12) {
+        nextDue.setDate(0); // Set to last day of previous month
+      }
+      break;
+    
+    case 'quarterly':
+      // Add 3 months, handling year rollover automatically
+      const currentQuarterMonth = nextDue.getMonth();
+      nextDue.setMonth(currentQuarterMonth + 3);
+      
+      // Handle edge case for day overflow
+      if (nextDue.getMonth() !== (currentQuarterMonth + 3) % 12) {
+        nextDue.setDate(0);
+      }
+      break;
+    
+    case 'half-yearly':
+      // Add 6 months, handling year rollover automatically
+      const currentHalfMonth = nextDue.getMonth();
+      nextDue.setMonth(currentHalfMonth + 6);
+      
+      // Handle edge case for day overflow
+      if (nextDue.getMonth() !== (currentHalfMonth + 6) % 12) {
+        nextDue.setDate(0);
+      }
+      break;
+    
+    case 'yearly':
+      // Add one year
+      nextDue.setFullYear(nextDue.getFullYear() + 1);
+      
+      // Handle leap year edge case (Feb 29 -> Feb 28)
+      if (nextDue.getMonth() !== currentDueDate.getMonth()) {
+        nextDue.setDate(0); // Set to last day of February
+      }
+      break;
+  }
+
+  return nextDue;
+}
+
+/**
+ * Get a human-readable description of when the next due date will be
+ */
+export function getNextDueDateDescription(currentDueDate: Date, recurrence: RecurrenceType): string {
+  const nextDue = calculateNextDueDate(currentDueDate, recurrence);
+  const now = new Date();
+  const diffTime = nextDue.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+    });
+  };
+
+  if (diffDays === 1) {
+    return `Tomorrow (${formatDate(nextDue)})`;
+  } else if (diffDays <= 7) {
+    return `In ${diffDays} days (${formatDate(nextDue)})`;
+  } else {
+    return formatDate(nextDue);
+  }
+}
