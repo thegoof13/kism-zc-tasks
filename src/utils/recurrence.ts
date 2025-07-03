@@ -1,13 +1,10 @@
-import { RecurrenceType } from '../types';
+import { RecurrenceType, Task } from '../types';
 
-export function getRecurrenceLabel(recurrence: RecurrenceType): string {
+export function getRecurrenceLabel(recurrence: RecurrenceType, config?: Task['recurrenceConfig']): string {
   const labels: Record<RecurrenceType, string> = {
-    'breakfast': 'Breakfast',
-    'lunch': 'Lunch',
-    'dinner': 'Dinner',
+    'meals': 'Meal Times',
+    'days': 'Specific Days',
     'daily': 'Daily',
-    'work-daily': 'Work Days',
-    'weekend-daily': 'Weekends',
     'weekly': 'Weekly',
     'fortnightly': 'Fortnightly',
     'monthly': 'Monthly',
@@ -15,10 +12,28 @@ export function getRecurrenceLabel(recurrence: RecurrenceType): string {
     'half-yearly': 'Half-Yearly',
     'yearly': 'Yearly'
   };
+
+  if (recurrence === 'meals' && config?.meals) {
+    const mealLabels = {
+      breakfast: 'Breakfast',
+      lunch: 'Lunch', 
+      dinner: 'Dinner',
+      nightcap: 'Night Cap'
+    };
+    const selectedMeals = config.meals.map(meal => mealLabels[meal]).join(', ');
+    return selectedMeals;
+  }
+
+  if (recurrence === 'days' && config?.days) {
+    const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const selectedDays = config.days.map(day => dayLabels[day]).join(', ');
+    return selectedDays;
+  }
+
   return labels[recurrence];
 }
 
-export function shouldResetTask(lastCompleted: Date, recurrence: RecurrenceType, recurrenceFromDate?: Date): boolean {
+export function shouldResetTask(lastCompleted: Date, recurrence: RecurrenceType, recurrenceFromDate?: Date, config?: Task['recurrenceConfig']): boolean {
   const now = new Date();
   const lastCompletedDate = new Date(lastCompleted);
   
@@ -28,47 +43,49 @@ export function shouldResetTask(lastCompleted: Date, recurrence: RecurrenceType,
   }
   
   switch (recurrence) {
-    case 'breakfast':
-      return now.getHours() >= 6 && (
-        now.getDate() !== lastCompletedDate.getDate() ||
-        now.getMonth() !== lastCompletedDate.getMonth() ||
-        now.getFullYear() !== lastCompletedDate.getFullYear()
-      );
+    case 'meals':
+      if (!config?.meals) return false;
+      
+      // Check if any of the selected meal times have passed since last completion
+      const currentHour = now.getHours();
+      const lastCompletedHour = lastCompletedDate.getHours();
+      const isDifferentDay = now.getDate() !== lastCompletedDate.getDate() ||
+                            now.getMonth() !== lastCompletedDate.getMonth() ||
+                            now.getFullYear() !== lastCompletedDate.getFullYear();
+      
+      // If it's a different day, check if any meal time has passed
+      if (isDifferentDay) {
+        for (const meal of config.meals) {
+          const mealHour = getMealHour(meal);
+          if (currentHour >= mealHour) {
+            return true;
+          }
+        }
+      } else {
+        // Same day - check if any new meal time has passed since completion
+        for (const meal of config.meals) {
+          const mealHour = getMealHour(meal);
+          if (currentHour >= mealHour && lastCompletedHour < mealHour) {
+            return true;
+          }
+        }
+      }
+      return false;
     
-    case 'lunch':
-      return now.getHours() >= 11 && (
-        now.getDate() !== lastCompletedDate.getDate() ||
-        now.getMonth() !== lastCompletedDate.getMonth() ||
-        now.getFullYear() !== lastCompletedDate.getFullYear()
-      );
-    
-    case 'dinner':
-      return now.getHours() >= 17 && (
-        now.getDate() !== lastCompletedDate.getDate() ||
-        now.getMonth() !== lastCompletedDate.getMonth() ||
-        now.getFullYear() !== lastCompletedDate.getFullYear()
-      );
+    case 'days':
+      if (!config?.days) return false;
+      
+      const currentDay = now.getDay();
+      const isDifferentDayFromLast = now.getDate() !== lastCompletedDate.getDate() ||
+                                   now.getMonth() !== lastCompletedDate.getMonth() ||
+                                   now.getFullYear() !== lastCompletedDate.getFullYear();
+      
+      return isDifferentDayFromLast && config.days.includes(currentDay as any);
     
     case 'daily':
       return now.getDate() !== lastCompletedDate.getDate() ||
              now.getMonth() !== lastCompletedDate.getMonth() ||
              now.getFullYear() !== lastCompletedDate.getFullYear();
-    
-    case 'work-daily':
-      const isWorkDay = now.getDay() >= 1 && now.getDay() <= 5;
-      return isWorkDay && (
-        now.getDate() !== lastCompletedDate.getDate() ||
-        now.getMonth() !== lastCompletedDate.getMonth() ||
-        now.getFullYear() !== lastCompletedDate.getFullYear()
-      );
-    
-    case 'weekend-daily':
-      const isWeekend = now.getDay() === 0 || now.getDay() === 6;
-      return isWeekend && (
-        now.getDate() !== lastCompletedDate.getDate() ||
-        now.getMonth() !== lastCompletedDate.getMonth() ||
-        now.getFullYear() !== lastCompletedDate.getFullYear()
-      );
     
     case 'weekly':
       const weeksDiff = Math.floor((now.getTime() - lastCompletedDate.getTime()) / (7 * 24 * 60 * 60 * 1000));
@@ -102,17 +119,24 @@ export function shouldResetTask(lastCompleted: Date, recurrence: RecurrenceType,
   }
 }
 
+function getMealHour(meal: 'breakfast' | 'lunch' | 'dinner' | 'nightcap'): number {
+  const mealHours = {
+    breakfast: 6,
+    lunch: 11,
+    dinner: 17,
+    nightcap: 21
+  };
+  return mealHours[meal];
+}
+
 export function getNextRecurrenceDate(recurrence: RecurrenceType, lastDate?: Date): Date {
   const base = lastDate ? new Date(lastDate) : new Date();
   const next = new Date(base);
 
   switch (recurrence) {
-    case 'breakfast':
-    case 'lunch':
-    case 'dinner':
+    case 'meals':
+    case 'days':
     case 'daily':
-    case 'work-daily':
-    case 'weekend-daily':
       next.setDate(next.getDate() + 1);
       break;
     
@@ -152,25 +176,10 @@ export function calculateNextDueDate(currentDueDate: Date, recurrence: Recurrenc
   const nextDue = new Date(currentDueDate);
 
   switch (recurrence) {
-    case 'breakfast':
-    case 'lunch':
-    case 'dinner':
+    case 'meals':
+    case 'days':
     case 'daily':
       nextDue.setDate(nextDue.getDate() + 1);
-      break;
-    
-    case 'work-daily':
-      // Move to next work day
-      do {
-        nextDue.setDate(nextDue.getDate() + 1);
-      } while (nextDue.getDay() === 0 || nextDue.getDay() === 6); // Skip weekends
-      break;
-    
-    case 'weekend-daily':
-      // Move to next weekend day
-      do {
-        nextDue.setDate(nextDue.getDate() + 1);
-      } while (nextDue.getDay() !== 0 && nextDue.getDay() !== 6); // Only weekends
       break;
     
     case 'weekly':
@@ -230,58 +239,16 @@ export function calculateNextDueDate(currentDueDate: Date, recurrence: Recurrenc
 }
 
 /**
- * Get a human-readable description of when the next due date will be
- */
-export function getNextDueDateDescription(currentDueDate: Date, recurrence: RecurrenceType): string {
-  const nextDue = calculateNextDueDate(currentDueDate, recurrence);
-  const now = new Date();
-  const diffTime = nextDue.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
-    });
-  };
-
-  if (diffDays === 1) {
-    return `Tomorrow (${formatDate(nextDue)})`;
-  } else if (diffDays <= 7) {
-    return `In ${diffDays} days (${formatDate(nextDue)})`;
-  } else {
-    return formatDate(nextDue);
-  }
-}
-
-/**
  * Calculate the next reset date based on recurrence pattern and from date
  */
 export function calculateNextResetDate(recurrence: RecurrenceType, fromDate: Date): Date {
   const nextReset = new Date(fromDate);
 
   switch (recurrence) {
-    case 'breakfast':
-    case 'lunch':
-    case 'dinner':
+    case 'meals':
+    case 'days':
     case 'daily':
       nextReset.setDate(nextReset.getDate() + 1);
-      break;
-    
-    case 'work-daily':
-      // Move to next work day
-      do {
-        nextReset.setDate(nextReset.getDate() + 1);
-      } while (nextReset.getDay() === 0 || nextReset.getDay() === 6);
-      break;
-    
-    case 'weekend-daily':
-      // Move to next weekend day
-      do {
-        nextReset.setDate(nextReset.getDate() + 1);
-      } while (nextReset.getDay() !== 0 && nextReset.getDay() !== 6);
       break;
     
     case 'weekly':
@@ -357,5 +324,32 @@ export function getResetDateDescription(recurrence: RecurrenceType, fromDate: Da
     return `Resets in ${diffDays} days (${formatDate(nextReset)})`;
   } else {
     return `Resets on ${formatDate(nextReset)}`;
+  }
+}
+
+/**
+ * Get a human-readable description of when the next due date will be
+ */
+export function getNextDueDateDescription(currentDueDate: Date, recurrence: RecurrenceType): string {
+  const nextDue = calculateNextDueDate(currentDueDate, recurrence);
+  const now = new Date();
+  const diffTime = nextDue.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+    });
+  };
+
+  if (diffDays === 1) {
+    return `Tomorrow (${formatDate(nextDue)})`;
+  } else if (diffDays <= 7) {
+    return `In ${diffDays} days (${formatDate(nextDue)})`;
+  } else {
+    return formatDate(nextDue);
   }
 }

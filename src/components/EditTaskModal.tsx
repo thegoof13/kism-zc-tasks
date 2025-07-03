@@ -10,13 +10,10 @@ interface EditTaskModalProps {
   task: Task;
 }
 
-const recurrenceOptions: RecurrenceType[] = [
+const basicRecurrenceOptions: RecurrenceType[] = [
   'daily',
-  'breakfast',
-  'lunch',
-  'dinner',
-  'work-daily',
-  'weekend-daily',
+  'meals',
+  'days',
   'weekly',
   'fortnightly',
   'monthly',
@@ -24,6 +21,23 @@ const recurrenceOptions: RecurrenceType[] = [
   'half-yearly',
   'yearly',
 ];
+
+const mealOptions = [
+  { value: 'breakfast', label: 'Breakfast', icon: '🌅' },
+  { value: 'lunch', label: 'Lunch', icon: '☀️' },
+  { value: 'dinner', label: 'Dinner', icon: '🌆' },
+  { value: 'nightcap', label: 'Night Cap', icon: '🌙' },
+] as const;
+
+const dayOptions = [
+  { value: 0, label: 'Sunday', short: 'Sun' },
+  { value: 1, label: 'Monday', short: 'Mon' },
+  { value: 2, label: 'Tuesday', short: 'Tue' },
+  { value: 3, label: 'Wednesday', short: 'Wed' },
+  { value: 4, label: 'Thursday', short: 'Thu' },
+  { value: 5, label: 'Friday', short: 'Fri' },
+  { value: 6, label: 'Saturday', short: 'Sat' },
+] as const;
 
 export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
   const { state, dispatch } = useApp();
@@ -37,10 +51,20 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
   const [recurrenceFromDate, setRecurrenceFromDate] = useState(
     task.recurrenceFromDate ? new Date(task.recurrenceFromDate).toISOString().slice(0, 16) : ''
   );
+  
+  // Recurrence config state
+  const [selectedMeals, setSelectedMeals] = useState<('breakfast' | 'lunch' | 'dinner' | 'nightcap')[]>(
+    task.recurrenceConfig?.meals || ['breakfast']
+  );
+  const [selectedDays, setSelectedDays] = useState<(0 | 1 | 2 | 3 | 4 | 5 | 6)[]>(
+    task.recurrenceConfig?.days || [1, 2, 3, 4, 5]
+  );
 
   const selectedGroup = state.groups.find(g => g.id === groupId);
   const showDueDate = selectedGroup?.enableDueDates;
   const showRecurrenceFromDate = recurrence !== 'daily';
+  const showMealConfig = recurrence === 'meals';
+  const showDayConfig = recurrence === 'days';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +77,15 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
       recurrence,
       profiles: selectedProfiles,
     };
+
+    // Handle recurrence config
+    if (showMealConfig && selectedMeals.length > 0) {
+      updates.recurrenceConfig = { meals: selectedMeals };
+    } else if (showDayConfig && selectedDays.length > 0) {
+      updates.recurrenceConfig = { days: selectedDays };
+    } else {
+      updates.recurrenceConfig = undefined;
+    }
 
     // Handle due date
     if (showDueDate && dueDate) {
@@ -85,6 +118,34 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
         ? prev.filter(id => id !== profileId)
         : [...prev, profileId]
     );
+  };
+
+  const toggleMeal = (meal: 'breakfast' | 'lunch' | 'dinner' | 'nightcap') => {
+    setSelectedMeals(prev => 
+      prev.includes(meal)
+        ? prev.filter(m => m !== meal)
+        : [...prev, meal]
+    );
+  };
+
+  const toggleDay = (day: 0 | 1 | 2 | 3 | 4 | 5 | 6) => {
+    setSelectedDays(prev => 
+      prev.includes(day)
+        ? prev.filter(d => d !== day)
+        : [...prev, day]
+    );
+  };
+
+  const selectAllWeekdays = () => {
+    setSelectedDays([1, 2, 3, 4, 5]);
+  };
+
+  const selectAllWeekends = () => {
+    setSelectedDays([0, 6]);
+  };
+
+  const selectAllDays = () => {
+    setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
   };
 
   if (!isOpen) return null;
@@ -145,23 +206,125 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
               </select>
             </div>
 
-            {/* Recurrence */}
+            {/* Recurrence Type */}
             <div>
               <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-                Recurrence
+                Recurrence Type
               </label>
               <select
                 value={recurrence}
                 onChange={(e) => setRecurrence(e.target.value as RecurrenceType)}
                 className="w-full px-3 py-2 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all duration-200"
               >
-                {recurrenceOptions.map(option => (
+                {basicRecurrenceOptions.map(option => (
                   <option key={option} value={option}>
-                    {getRecurrenceLabel(option)}
+                    {option === 'meals' ? 'Meal Times' : 
+                     option === 'days' ? 'Specific Days' : 
+                     getRecurrenceLabel(option)}
                   </option>
                 ))}
               </select>
             </div>
+
+            {/* Meal Selection */}
+            {showMealConfig && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                  Select Meal Times
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {mealOptions.map(meal => (
+                    <label
+                      key={meal.value}
+                      className={`flex items-center space-x-2 p-2.5 rounded-lg border cursor-pointer transition-all duration-200 ${
+                        selectedMeals.includes(meal.value)
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                          : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedMeals.includes(meal.value)}
+                        onChange={() => toggleMeal(meal.value)}
+                        className="w-3.5 h-3.5 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                      />
+                      <span className="text-sm">{meal.icon}</span>
+                      <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                        {meal.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {selectedMeals.length === 0 && (
+                  <p className="text-xs text-error-600 dark:text-error-400 mt-1">
+                    Please select at least one meal time
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Day Selection */}
+            {showDayConfig && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                  Select Days of Week
+                </label>
+                
+                {/* Quick Select Buttons */}
+                <div className="flex space-x-1 mb-2">
+                  <button
+                    type="button"
+                    onClick={selectAllWeekdays}
+                    className="px-2 py-1 text-xs bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors duration-200"
+                  >
+                    Weekdays
+                  </button>
+                  <button
+                    type="button"
+                    onClick={selectAllWeekends}
+                    className="px-2 py-1 text-xs bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors duration-200"
+                  >
+                    Weekends
+                  </button>
+                  <button
+                    type="button"
+                    onClick={selectAllDays}
+                    className="px-2 py-1 text-xs bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors duration-200"
+                  >
+                    All Days
+                  </button>
+                </div>
+
+                {/* Day Checkboxes */}
+                <div className="grid grid-cols-2 gap-1.5">
+                  {dayOptions.map(day => (
+                    <label
+                      key={day.value}
+                      className={`flex items-center space-x-2 p-2 rounded-lg border cursor-pointer transition-all duration-200 ${
+                        selectedDays.includes(day.value)
+                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                          : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedDays.includes(day.value)}
+                        onChange={() => toggleDay(day.value)}
+                        className="w-3.5 h-3.5 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                      />
+                      <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                        {day.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {selectedDays.length === 0 && (
+                  <p className="text-xs text-error-600 dark:text-error-400 mt-1">
+                    Please select at least one day
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Recurrence From Date (conditional) */}
             {showRecurrenceFromDate && (
@@ -248,7 +411,13 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
             type="submit"
             onClick={handleSubmit}
             className="flex-1 bg-primary-500 hover:bg-primary-600 text-white font-medium py-2 px-3 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md text-sm"
-            disabled={!title.trim() || !groupId || selectedProfiles.length === 0}
+            disabled={
+              !title.trim() || 
+              !groupId || 
+              selectedProfiles.length === 0 ||
+              (showMealConfig && selectedMeals.length === 0) ||
+              (showDayConfig && selectedDays.length === 0)
+            }
           >
             <Save className="w-3.5 h-3.5 mr-1.5 inline" />
             Save

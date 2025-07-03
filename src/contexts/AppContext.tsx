@@ -409,7 +409,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'RESET_RECURRING_TASKS': {
       const updatedTasks = state.tasks.map(task => {
-        if (task.isCompleted && task.completedAt && shouldResetTask(task.completedAt, task.recurrence, task.recurrenceFromDate)) {
+        if (task.isCompleted && task.completedAt && shouldResetTask(task.completedAt, task.recurrence, task.recurrenceFromDate, task.recurrenceConfig)) {
           return {
             ...task,
             isCompleted: false,

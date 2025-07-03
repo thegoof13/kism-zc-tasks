@@ -1,10 +1,7 @@
 export type RecurrenceType = 
-  | 'breakfast'
-  | 'lunch' 
-  | 'dinner'
+  | 'meals'      // New: Multiple meal times
+  | 'days'       // New: Specific days of week
   | 'daily'
-  | 'work-daily'
-  | 'weekend-daily'
   | 'weekly'
   | 'fortnightly'
   | 'monthly'
@@ -19,6 +16,10 @@ export interface Task {
   title: string;
   groupId: string;
   recurrence: RecurrenceType;
+  recurrenceConfig?: {
+    meals?: ('breakfast' | 'lunch' | 'dinner' | 'nightcap')[];
+    days?: (0 | 1 | 2 | 3 | 4 | 5 | 6)[]; // 0 = Sunday, 1 = Monday, etc.
+  };
   isCompleted: boolean;
   completedBy?: string;
   completedAt?: Date;
@@ -26,7 +27,7 @@ export interface Task {
   profiles: string[];
   order: number;
   dueDate?: Date;
-  recurrenceFromDate?: Date; // New field for when recurrence starts
+  recurrenceFromDate?: Date;
 }
 
 export interface TaskGroup {

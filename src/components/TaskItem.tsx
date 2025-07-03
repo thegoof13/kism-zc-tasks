@@ -201,14 +201,14 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   // Get recurrence reset info
   const getRecurrenceInfo = () => {
     if (task.recurrence === 'daily') {
-      return getRecurrenceLabel(task.recurrence);
+      return getRecurrenceLabel(task.recurrence, task.recurrenceConfig);
     }
     
     if (task.recurrenceFromDate) {
       return getResetDateDescription(task.recurrence, new Date(task.recurrenceFromDate));
     }
     
-    return getRecurrenceLabel(task.recurrence);
+    return getRecurrenceLabel(task.recurrence, task.recurrenceConfig);
   };
 
   return (
