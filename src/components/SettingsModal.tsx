@@ -3,6 +3,7 @@ import { X, Settings, Users, FolderOpen, History, Brain, Palette, Bell, Archive,
 import { useApp } from '../contexts/AppContext';
 import { getIconComponent, getAvailableIcons } from '../utils/icons';
 import { AIQueryModal } from './AIQueryModal';
+import { HistoryAnalytics } from './HistoryAnalytics';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [showAIModal, setShowAIModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState<string | null>(null);
   const [editingProfile, setEditingProfile] = useState<string | null>(null);
+  const [showDetailedHistory, setShowDetailedHistory] = useState(false);
 
   if (!isOpen) return null;
 
@@ -324,40 +326,56 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   const renderHistorySettings = () => (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-        Activity History
-      </h3>
-      
-      <div className="space-y-3 max-h-96 overflow-y-auto">
-        {state.history.length === 0 ? (
-          <p className="text-neutral-500 dark:text-neutral-400 text-center py-8">
-            No activity history yet
-          </p>
-        ) : (
-          state.history.slice(0, 50).map(entry => (
-            <div key={entry.id} className="card p-3">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                    {entry.taskTitle}
-                  </p>
-                  <p className="text-xs text-neutral-600 dark:text-neutral-400">
-                    {entry.action} by {entry.profileName}
-                  </p>
-                  {entry.details && (
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                      {entry.details}
-                    </p>
-                  )}
-                </div>
-                <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                  {entry.timestamp.toLocaleDateString()}
-                </span>
-              </div>
-            </div>
-          ))
-        )}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+          Activity History & Analytics
+        </h3>
+        <button
+          onClick={() => setShowDetailedHistory(!showDetailedHistory)}
+          className="btn-secondary text-sm"
+        >
+          {showDetailedHistory ? 'Show Analytics' : 'Show Detailed Log'}
+        </button>
       </div>
+      
+      {!showDetailedHistory ? (
+        <HistoryAnalytics 
+          history={state.history}
+          tasks={state.tasks}
+          profiles={state.profiles}
+        />
+      ) : (
+        <div className="space-y-3 max-h-96 overflow-y-auto">
+          {state.history.length === 0 ? (
+            <p className="text-neutral-500 dark:text-neutral-400 text-center py-8">
+              No activity history yet
+            </p>
+          ) : (
+            state.history.slice(0, 50).map(entry => (
+              <div key={entry.id} className="card p-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                      {entry.taskTitle}
+                    </p>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                      {entry.action} by {entry.profileName}
+                    </p>
+                    {entry.details && (
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                        {entry.details}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                    {entry.timestamp.toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 
