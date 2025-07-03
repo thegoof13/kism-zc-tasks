@@ -35,6 +35,24 @@
   .floating-action-btn {
     @apply fixed bottom-6 right-6 w-14 h-14 bg-primary-500 hover:bg-primary-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center z-50;
   }
+
+  /* Settings Modal Responsive Zoom */
+  .settings-modal {
+    @media (max-width: 768px) {
+      transform: scale(0.9);
+      transform-origin: center;
+    }
+    
+    @media (max-width: 640px) {
+      transform: scale(0.85);
+      transform-origin: center;
+    }
+    
+    @media (max-width: 480px) {
+      transform: scale(0.8);
+      transform-origin: center;
+    }
+  }
 }
 
 @layer utilities {
