@@ -3,6 +3,7 @@
 # ZenTasks Update Script
 # This script updates an existing ZenTasks installation with new code
 # It does NOT modify SSL certificates or Nginx configuration
+# Now includes Kiosk Portal update support
 
 set -e
 
@@ -74,6 +75,30 @@ check_installation() {
     fi
 }
 
+# Function to detect existing kiosk configuration
+detect_kiosk_config() {
+    print_status "Checking for existing Kiosk Portal configuration..."
+    
+    if [[ -f "$APP_DIR/kiosk-config.txt" ]]; then
+        print_status "Found existing Kiosk Portal configuration"
+        
+        # Extract kiosk path from config file
+        EXISTING_KIOSK_PATH=$(grep "KIOSK_PATH=" "$APP_DIR/kiosk-config.txt" | cut -d'=' -f2)
+        
+        if [[ -n "$EXISTING_KIOSK_PATH" ]] && [[ -d "$APP_DIR/kiosk/$EXISTING_KIOSK_PATH" ]]; then
+            print_success "Existing Kiosk Portal found at: /kiosk/$EXISTING_KIOSK_PATH/"
+            KIOSK_PATH="$EXISTING_KIOSK_PATH"
+            KIOSK_EXISTS=true
+        else
+            print_warning "Kiosk configuration file exists but directory not found"
+            KIOSK_EXISTS=false
+        fi
+    else
+        print_status "No existing Kiosk Portal configuration found"
+        KIOSK_EXISTS=false
+    fi
+}
+
 # Function to create backup
 create_backup() {
     print_status "Creating backup of current installation..."
@@ -138,12 +163,100 @@ update_application_files() {
         --exclude='server/data' \
         --exclude='.env' \
         --exclude='*.log' \
+        --exclude='kiosk-config.txt' \
         "$CURRENT_DIR/" "$APP_DIR/"
     
     # Set proper ownership
     sudo chown -R "$APP_USER:$APP_USER" "$APP_DIR"
     
     print_success "Application files updated"
+}
+
+# Function to update kiosk portal
+update_kiosk_portal() {
+    if [[ "$KIOSK_EXISTS" == true ]] && [[ -f "kiosk.html" ]]; then
+        print_status "Updating Kiosk Portal..."
+        
+        # Update the kiosk file in the existing directory
+        KIOSK_DIR="$APP_DIR/kiosk/$KIOSK_PATH"
+        sudo cp kiosk.html "$KIOSK_DIR/index.html"
+        sudo chown -R "$APP_USER:$APP_USER" "$APP_DIR/kiosk"
+        
+        print_success "Kiosk Portal updated at: $KIOSK_DIR"
+    elif [[ "$KIOSK_EXISTS" == false ]] && [[ -f "kiosk.html" ]]; then
+        print_status "New Kiosk Portal detected in update..."
+        
+        read -p "Do you want to install the Kiosk Portal? (y/n): " install_kiosk
+        if [[ "$install_kiosk" =~ ^[Yy]$ ]]; then
+            # Generate new random path
+            KIOSK_PATH=$(openssl rand -hex 8)
+            KIOSK_DIR="$APP_DIR/kiosk/$KIOSK_PATH"
+            
+            # Create kiosk directory and install
+            sudo mkdir -p "$KIOSK_DIR"
+            sudo cp kiosk.html "$KIOSK_DIR/index.html"
+            sudo chown -R "$APP_USER:$APP_USER" "$APP_DIR/kiosk"
+            
+            # Create kiosk config file
+            cat > /tmp/kiosk-config.txt << EOF
+# ZenTasks Kiosk Portal Configuration
+# Generated on: $(date)
+
+KIOSK_ENABLED=true
+KIOSK_PATH=$KIOSK_PATH
+KIOSK_URL=https://$(hostname -f)/kiosk/$KIOSK_PATH/
+KIOSK_DIRECTORY=$APP_DIR/kiosk/$KIOSK_PATH
+
+# Security Notes:
+# - The kiosk path is randomly generated for security
+# - Access is controlled via the random URL path
+# - No authentication is required for kiosk access
+# - Only task completion is allowed, no editing
+
+# To disable the kiosk:
+# 1. Remove the kiosk location block from Nginx config
+# 2. Remove the kiosk directory: rm -rf $APP_DIR/kiosk
+# 3. Reload Nginx: sudo systemctl reload nginx
+EOF
+            
+            sudo mv /tmp/kiosk-config.txt "$APP_DIR/kiosk-config.txt"
+            sudo chown "$APP_USER:$APP_USER" "$APP_DIR/kiosk-config.txt"
+            
+            print_success "Kiosk Portal installed at: $KIOSK_DIR"
+            print_warning "You need to manually update your Nginx configuration to enable the kiosk"
+            print_warning "Add the following location block to your Nginx config:"
+            echo
+            echo "    # Kiosk Portal - Secure random path"
+            echo "    location /kiosk/$KIOSK_PATH/ {"
+            echo "        alias $APP_DIR/kiosk/$KIOSK_PATH/;"
+            echo "        try_files \$uri \$uri/ /kiosk/$KIOSK_PATH/index.html;"
+            echo "        "
+            echo "        # Additional security headers for kiosk"
+            echo "        add_header X-Frame-Options \"DENY\" always;"
+            echo "        add_header Content-Security-Policy \"default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https:; img-src 'self' data: https:;\" always;"
+            echo "        "
+            echo "        # Cache static assets"
+            echo "        location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {"
+            echo "            expires 1y;"
+            echo "            add_header Cache-Control \"public, immutable\";"
+            echo "        }"
+            echo "        "
+            echo "        # Don't cache HTML files"
+            echo "        location ~* \\.html$ {"
+            echo "            expires -1;"
+            echo "            add_header Cache-Control \"no-cache, no-store, must-revalidate\";"
+            echo "        }"
+            echo "    }"
+            echo
+            print_warning "After adding this to your Nginx config, run: sudo nginx -t && sudo systemctl reload nginx"
+            
+            KIOSK_EXISTS=true
+        else
+            print_status "Skipping Kiosk Portal installation"
+        fi
+    else
+        print_status "No Kiosk Portal updates found"
+    fi
 }
 
 # Function to update dependencies
@@ -286,6 +399,15 @@ display_update_summary() {
     print_success "Backup created: $BACKUP_FILE"
     print_success "Application directory: $APP_DIR"
     print_success "Application user: $APP_USER"
+    
+    if [[ "$KIOSK_EXISTS" == true ]]; then
+        echo
+        print_success "Kiosk Portal: ENABLED"
+        print_success "Kiosk URL: https://$(hostname -f)/kiosk/$KIOSK_PATH/"
+        print_success "Kiosk Directory: $APP_DIR/kiosk/$KIOSK_PATH/"
+        print_success "Kiosk Config: $APP_DIR/kiosk-config.txt"
+    fi
+    
     echo
     print_status "Useful commands:"
     echo "  View application status: sudo -u $APP_USER pm2 list"
@@ -301,6 +423,15 @@ display_update_summary() {
     echo
     print_warning "Note: This update script does not modify SSL certificates or Nginx configuration"
     print_warning "If you need to update those, please run the full setup.sh script"
+    
+    if [[ "$KIOSK_EXISTS" == true ]]; then
+        echo
+        print_warning "Kiosk Portal Security Reminder:"
+        echo "  - Access is controlled by the random URL path"
+        echo "  - No authentication is required for kiosk access"
+        echo "  - Only task completion is allowed, no editing"
+        echo "  - Monitor access logs for unusual activity"
+    fi
     echo
 }
 
@@ -340,6 +471,7 @@ main() {
     echo "║                    ZenTasks Update Script                   ║"
     echo "║              Update Existing Installation                   ║"
     echo "║          (Does not modify SSL or Nginx config)             ║"
+    echo "║              Now with Kiosk Portal Support                 ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     
@@ -349,12 +481,14 @@ main() {
     check_root
     check_sudo
     check_installation
+    detect_kiosk_config
     
     print_status "Starting ZenTasks update process..."
     
     create_backup
     stop_application
     update_application_files
+    update_kiosk_portal
     update_dependencies
     build_application
     update_pm2_config

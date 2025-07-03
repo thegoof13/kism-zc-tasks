@@ -3,6 +3,7 @@
 # ZenTasks Ubuntu Deployment Setup Script (LXC Compatible)
 # This script automates the deployment of ZenTasks on Ubuntu with Nginx
 # Compatible with LXC containers and traditional Ubuntu installations
+# Now includes Kiosk Portal support with secure random paths
 
 set -e
 
@@ -25,6 +26,8 @@ CLOUDFLARE_EMAIL=""
 CLOUDFLARE_API_TOKEN=""
 SSL_CONFIG_DIR="/etc/letsencrypt/cloudflare"
 IS_LXC_CONTAINER=false
+KIOSK_PATH=""
+ENABLE_KIOSK=false
 
 # Function to print colored output
 print_status() {
@@ -79,6 +82,11 @@ check_sudo() {
     fi
 }
 
+# Function to generate secure random string
+generate_random_string() {
+    openssl rand -hex 8
+}
+
 # Function to get user input
 get_user_input() {
     echo -e "${BLUE}=== ZenTasks Deployment Configuration ===${NC}"
@@ -112,11 +120,24 @@ get_user_input() {
         fi
     fi
     
+    # Kiosk Portal Configuration
+    echo
+    read -p "Do you want to enable the Kiosk Portal for tablet access? (y/n): " kiosk_choice
+    if [[ "$kiosk_choice" =~ ^[Yy]$ ]]; then
+        ENABLE_KIOSK=true
+        KIOSK_PATH=$(generate_random_string)
+        print_status "Kiosk Portal will be available at: https://$DOMAIN/kiosk/$KIOSK_PATH/"
+    fi
+    
     echo
     print_status "Configuration:"
     print_status "Domain: $DOMAIN"
     print_status "Email: ${EMAIL:-'Not provided'}"
     print_status "SSL: ${USE_SSL}"
+    print_status "Kiosk Portal: ${ENABLE_KIOSK}"
+    if [[ "$ENABLE_KIOSK" == true ]]; then
+        print_status "Kiosk URL: https://$DOMAIN/kiosk/$KIOSK_PATH/"
+    fi
     print_status "Container Environment: ${IS_LXC_CONTAINER}"
     if [[ "$USE_SSL" == true ]]; then
         print_status "SSL Method: Cloudflare DNS Challenge (API Token)"
@@ -282,6 +303,27 @@ setup_app_directory() {
     print_success "Application directory setup complete"
 }
 
+# Function to setup kiosk portal
+setup_kiosk_portal() {
+    if [[ "$ENABLE_KIOSK" == true ]]; then
+        print_status "Setting up Kiosk Portal..."
+        
+        # Create kiosk directory with random path
+        KIOSK_DIR="$APP_DIR/kiosk/$KIOSK_PATH"
+        sudo mkdir -p "$KIOSK_DIR"
+        
+        # Copy kiosk.html to the secure directory
+        if [[ -f "kiosk.html" ]]; then
+            sudo cp kiosk.html "$KIOSK_DIR/index.html"
+            sudo chown -R $APP_USER:$APP_USER "$APP_DIR/kiosk"
+            print_success "Kiosk Portal installed at: $KIOSK_DIR"
+        else
+            print_warning "kiosk.html not found - Kiosk Portal not installed"
+            ENABLE_KIOSK=false
+        fi
+    fi
+}
+
 # Function to install application dependencies
 install_app_dependencies() {
     print_status "Installing application dependencies..."
@@ -412,11 +454,49 @@ start_application() {
 configure_nginx() {
     print_status "Configuring Nginx..."
     
-    # Create Nginx configuration
+    # Create Nginx configuration with HTTP to HTTPS redirect and Kiosk support
     cat > /tmp/zentasks.nginx << EOF
+# HTTP server - redirect all traffic to HTTPS
 server {
     listen 80;
     server_name $DOMAIN;
+    
+    # Redirect all HTTP traffic to HTTPS
+    return 301 https://\$server_name\$request_uri;
+}
+
+# HTTPS server (or HTTP if SSL not enabled)
+server {
+EOF
+
+    if [[ "$USE_SSL" == true ]]; then
+        cat >> /tmp/zentasks.nginx << EOF
+    listen 443 ssl http2;
+    server_name $DOMAIN;
+    
+    # SSL configuration (will be updated after certificate generation)
+    ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
+    ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:MozTLS:10m;
+    ssl_session_tickets off;
+    
+    # Modern SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    
+    # HSTS
+    add_header Strict-Transport-Security "max-age=63072000" always;
+EOF
+    else
+        cat >> /tmp/zentasks.nginx << EOF
+    listen 80;
+    server_name $DOMAIN;
+EOF
+    fi
+
+    cat >> /tmp/zentasks.nginx << EOF
     
     # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -429,6 +509,37 @@ server {
     gzip_vary on;
     gzip_min_length 1024;
     gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+EOF
+
+    # Add Kiosk Portal configuration if enabled
+    if [[ "$ENABLE_KIOSK" == true ]]; then
+        cat >> /tmp/zentasks.nginx << EOF
+    
+    # Kiosk Portal - Secure random path
+    location /kiosk/$KIOSK_PATH/ {
+        alias $APP_DIR/kiosk/$KIOSK_PATH/;
+        try_files \$uri \$uri/ /kiosk/$KIOSK_PATH/index.html;
+        
+        # Additional security headers for kiosk
+        add_header X-Frame-Options "DENY" always;
+        add_header Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https:; img-src 'self' data: https:;" always;
+        
+        # Cache static assets
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+        
+        # Don't cache HTML files
+        location ~* \.html$ {
+            expires -1;
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+        }
+    }
+EOF
+    fi
+
+    cat >> /tmp/zentasks.nginx << EOF
     
     # API routes - proxy to Node.js backend
     location /api/ {
@@ -486,7 +597,10 @@ EOF
     # Reload Nginx
     sudo systemctl reload nginx
     
-    print_success "Nginx configured"
+    print_success "Nginx configured with HTTP to HTTPS redirect"
+    if [[ "$ENABLE_KIOSK" == true ]]; then
+        print_success "Kiosk Portal configured at: /kiosk/$KIOSK_PATH/"
+    fi
 }
 
 # Function to setup Cloudflare credentials
@@ -573,89 +687,9 @@ setup_ssl() {
 update_nginx_ssl_config() {
     print_status "Updating Nginx configuration for SSL..."
     
-    cat > /tmp/zentasks-ssl.nginx << EOF
-server {
-    listen 80;
-    server_name $DOMAIN;
-    return 301 https://\$server_name\$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name $DOMAIN;
-    
-    # SSL configuration
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
-    ssl_session_timeout 1d;
-    ssl_session_cache shared:MozTLS:10m;
-    ssl_session_tickets off;
-    
-    # Modern SSL configuration
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers off;
-    
-    # HSTS
-    add_header Strict-Transport-Security "max-age=63072000" always;
-    
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_min_length 1024;
-    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
-    
-    # API routes - proxy to Node.js backend
-    location /api/ {
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_cache_bypass \$http_upgrade;
-        proxy_read_timeout 86400;
-    }
-    
-    # Static files - serve from built frontend
-    location / {
-        root $APP_DIR/dist;
-        try_files \$uri \$uri/ /index.html;
-        
-        # Cache static assets
-        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-            expires 1y;
-            add_header Cache-Control "public, immutable";
-        }
-        
-        # Don't cache HTML files
-        location ~* \.html$ {
-            expires -1;
-            add_header Cache-Control "no-cache, no-store, must-revalidate";
-        }
-    }
-    
-    # Security: deny access to sensitive files
-    location ~ /\. {
-        deny all;
-    }
-    
-    location ~ /(package\.json|server/|src/|node_modules/) {
-        deny all;
-    }
-}
-EOF
-    
-    # Replace Nginx configuration
-    sudo mv /tmp/zentasks-ssl.nginx /etc/nginx/sites-available/zentasks
+    # Replace the temporary SSL certificate paths with the real ones
+    sudo sed -i "s|ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;|ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;|g" /etc/nginx/sites-available/zentasks
+    sudo sed -i "s|ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;|ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;|g" /etc/nginx/sites-available/zentasks
     
     # Test and reload Nginx
     sudo nginx -t && sudo systemctl reload nginx
@@ -860,12 +894,49 @@ EOF
     print_success "Backup script created and scheduled"
 }
 
+# Function to save kiosk configuration
+save_kiosk_config() {
+    if [[ "$ENABLE_KIOSK" == true ]]; then
+        print_status "Saving Kiosk Portal configuration..."
+        
+        # Create kiosk config file for future reference
+        cat > /tmp/kiosk-config.txt << EOF
+# ZenTasks Kiosk Portal Configuration
+# Generated on: $(date)
+
+KIOSK_ENABLED=true
+KIOSK_PATH=$KIOSK_PATH
+KIOSK_URL=https://$DOMAIN/kiosk/$KIOSK_PATH/
+KIOSK_DIRECTORY=$APP_DIR/kiosk/$KIOSK_PATH
+
+# Security Notes:
+# - The kiosk path is randomly generated for security
+# - Access is controlled via the random URL path
+# - No authentication is required for kiosk access
+# - Only task completion is allowed, no editing
+
+# To disable the kiosk:
+# 1. Remove the kiosk location block from Nginx config
+# 2. Remove the kiosk directory: rm -rf $APP_DIR/kiosk
+# 3. Reload Nginx: sudo systemctl reload nginx
+EOF
+        
+        sudo mv /tmp/kiosk-config.txt $APP_DIR/kiosk-config.txt
+        sudo chown $APP_USER:$APP_USER $APP_DIR/kiosk-config.txt
+        
+        print_success "Kiosk configuration saved to: $APP_DIR/kiosk-config.txt"
+    fi
+}
+
 # Function to display final information
 display_final_info() {
     echo
     echo -e "${GREEN}=== ZenTasks Deployment Complete ===${NC}"
     echo
     print_success "Application URL: http${USE_SSL:+s}://$DOMAIN"
+    if [[ "$ENABLE_KIOSK" == true ]]; then
+        print_success "Kiosk Portal URL: http${USE_SSL:+s}://$DOMAIN/kiosk/$KIOSK_PATH/"
+    fi
     print_success "Application directory: $APP_DIR"
     print_success "Application user: $APP_USER"
     print_success "Logs: /var/log/zentasks/"
@@ -880,6 +951,14 @@ display_final_info() {
     echo "  View Nginx logs: sudo tail -f /var/log/nginx/error.log"
     echo "  Manual backup: sudo /usr/local/bin/backup-zentasks.sh"
     echo
+    if [[ "$ENABLE_KIOSK" == true ]]; then
+        print_status "Kiosk Portal:"
+        echo "  Kiosk URL: http${USE_SSL:+s}://$DOMAIN/kiosk/$KIOSK_PATH/"
+        echo "  Kiosk Directory: $APP_DIR/kiosk/$KIOSK_PATH/"
+        echo "  Kiosk Config: $APP_DIR/kiosk-config.txt"
+        echo "  Security: Access controlled by random URL path"
+        echo
+    fi
     if [[ "$USE_SSL" == true ]]; then
         print_status "SSL certificate management:"
         echo "  Manual renewal check: sudo /usr/local/bin/zentasks-ssl-renewal.sh"
@@ -896,6 +975,7 @@ display_final_info() {
         echo "  - Using Cloudflare API token (no email required)"
         echo "  - DNS challenge method for validation"
         echo "  - 60-second DNS propagation wait time"
+        echo "  - HTTP traffic automatically redirects to HTTPS"
         echo
     fi
     print_warning "Please ensure your domain DNS points to this server's IP address"
@@ -919,6 +999,7 @@ main() {
     echo "║         Ubuntu Setup Script (LXC Compatible)               ║"
     echo "║              PEP 668 Compliant (Ubuntu 24.04)              ║"
     echo "║            Fixed Cloudflare API Token Support              ║"
+    echo "║              Now with Kiosk Portal Support                 ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     
@@ -936,6 +1017,7 @@ main() {
     install_certbot
     create_app_user
     setup_app_directory
+    setup_kiosk_portal
     install_app_dependencies
     build_application
     create_env_file
@@ -947,6 +1029,7 @@ main() {
     configure_firewall
     create_systemd_service
     create_backup_script
+    save_kiosk_config
     
     display_final_info
 }
