@@ -163,16 +163,16 @@ export function PasswordModal({
             </div>
           )}
 
-          {/* Error Message */}
+          {/* Error Message - FIXED DARK MODE STYLING */}
           {error && (
             <div className="p-3 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-lg">
-              <p className="text-error-700 dark:text-error-400 text-sm">
+              <p className="text-error-700 dark:text-error-300 text-sm">
                 {error}
               </p>
             </div>
           )}
 
-          {/* Security Notice - PROPERLY FIXED FOR DARK MODE */}
+          {/* Security Notice - FIXED DARK MODE STYLING */}
           {isSettingPassword && (
             <div className="p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 rounded-lg">
               <p className="text-amber-800 dark:text-amber-200 text-xs">
