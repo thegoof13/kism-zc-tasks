@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, Users, Shield, Brain, History, Folder, Eye, MessageSquare, TestTube, CheckCircle, XCircle } from 'lucide-react';
+import { X, Settings, Users, Shield, Brain, History, Folder, Eye, MessageSquare, TestTube, CheckCircle, XCircle, Plus, Edit, Trash2, Save, User, Lock, Bell, BellOff, Calendar, Home, Heart, Briefcase, Coffee, Dumbbell, Music, ShoppingCart, Book, Car } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { HistoryAnalytics } from './HistoryAnalytics';
 import { AIQueryModal } from './AIQueryModal';
@@ -29,6 +29,29 @@ const tabs: TabConfig[] = [
   { id: 'history', label: 'History', icon: History },
 ];
 
+const iconOptions = [
+  { name: 'User', icon: User },
+  { name: 'Briefcase', icon: Briefcase },
+  { name: 'Heart', icon: Heart },
+  { name: 'Home', icon: Home },
+  { name: 'Book', icon: Book },
+  { name: 'Car', icon: Car },
+  { name: 'Coffee', icon: Coffee },
+  { name: 'Dumbbell', icon: Dumbbell },
+  { name: 'Music', icon: Music },
+  { name: 'ShoppingCart', icon: ShoppingCart },
+];
+
+const colorOptions = [
+  '#6366F1', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', 
+  '#06B6D4', '#84CC16', '#F97316', '#EC4899', '#6B7280'
+];
+
+const avatarOptions = [
+  '👤', '👨', '👩', '🧑', '👶', '👴', '👵', '🧔', '👱', '👨‍💼',
+  '👩‍💼', '👨‍🎓', '👩‍🎓', '👨‍⚕️', '👩‍⚕️', '👨‍🍳', '👩‍🍳', '👨‍🎨', '👩‍🎨', '🧑‍💻'
+];
+
 export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettingsPasswordSet }: SettingsModalProps) {
   const { state, dispatch } = useApp();
   const [activeTab, setActiveTab] = useState<TabType>('general');
@@ -37,6 +60,39 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [aiTestResult, setAiTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [isTestingAI, setIsTestingAI] = useState(false);
+  
+  // Group editing state
+  const [editingGroup, setEditingGroup] = useState<string | null>(null);
+  const [groupForm, setGroupForm] = useState({
+    name: '',
+    color: '#6366F1',
+    icon: 'User',
+    enableDueDates: false,
+    sortByDueDate: false,
+    defaultNotifications: false,
+    completedDisplayMode: 'grey-out' as const
+  });
+
+  // Profile editing state
+  const [editingProfile, setEditingProfile] = useState<string | null>(null);
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    avatar: '👤',
+    color: '#6366F1',
+    isTaskCompetitor: false,
+    pin: '',
+    permissions: {
+      canCreateTasks: true,
+      canEditTasks: true,
+      canDeleteTasks: true
+    },
+    mealTimes: {
+      breakfast: '07:00',
+      lunch: '12:00',
+      dinner: '18:00',
+      nightcap: '21:00'
+    }
+  });
 
   if (!isOpen) return null;
 
@@ -79,6 +135,177 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
       });
     } finally {
       setIsTestingAI(false);
+    }
+  };
+
+  // Group management functions
+  const startEditingGroup = (groupId?: string) => {
+    if (groupId) {
+      const group = state.groups.find(g => g.id === groupId);
+      if (group) {
+        setGroupForm({
+          name: group.name,
+          color: group.color,
+          icon: group.icon,
+          enableDueDates: group.enableDueDates,
+          sortByDueDate: group.sortByDueDate,
+          defaultNotifications: group.defaultNotifications || false,
+          completedDisplayMode: group.completedDisplayMode
+        });
+        setEditingGroup(groupId);
+      }
+    } else {
+      setGroupForm({
+        name: '',
+        color: '#6366F1',
+        icon: 'User',
+        enableDueDates: false,
+        sortByDueDate: false,
+        defaultNotifications: false,
+        completedDisplayMode: 'grey-out'
+      });
+      setEditingGroup('new');
+    }
+  };
+
+  const saveGroup = () => {
+    if (!groupForm.name.trim()) return;
+
+    if (editingGroup === 'new') {
+      dispatch({
+        type: 'ADD_GROUP',
+        group: groupForm
+      });
+    } else if (editingGroup) {
+      dispatch({
+        type: 'UPDATE_GROUP',
+        groupId: editingGroup,
+        updates: groupForm
+      });
+    }
+
+    setEditingGroup(null);
+    setGroupForm({
+      name: '',
+      color: '#6366F1',
+      icon: 'User',
+      enableDueDates: false,
+      sortByDueDate: false,
+      defaultNotifications: false,
+      completedDisplayMode: 'grey-out'
+    });
+  };
+
+  const deleteGroup = (groupId: string) => {
+    if (window.confirm('Are you sure you want to delete this group? All tasks in this group will also be deleted.')) {
+      dispatch({
+        type: 'DELETE_GROUP',
+        groupId
+      });
+    }
+  };
+
+  // Profile management functions
+  const startEditingProfile = (profileId?: string) => {
+    if (profileId) {
+      const profile = state.profiles.find(p => p.id === profileId);
+      if (profile) {
+        setProfileForm({
+          name: profile.name,
+          avatar: profile.avatar,
+          color: profile.color,
+          isTaskCompetitor: profile.isTaskCompetitor || false,
+          pin: profile.pin || '',
+          permissions: profile.permissions || {
+            canCreateTasks: true,
+            canEditTasks: true,
+            canDeleteTasks: true
+          },
+          mealTimes: profile.mealTimes || {
+            breakfast: '07:00',
+            lunch: '12:00',
+            dinner: '18:00',
+            nightcap: '21:00'
+          }
+        });
+        setEditingProfile(profileId);
+      }
+    } else {
+      setProfileForm({
+        name: '',
+        avatar: '👤',
+        color: '#6366F1',
+        isTaskCompetitor: false,
+        pin: '',
+        permissions: {
+          canCreateTasks: true,
+          canEditTasks: true,
+          canDeleteTasks: true
+        },
+        mealTimes: {
+          breakfast: '07:00',
+          lunch: '12:00',
+          dinner: '18:00',
+          nightcap: '21:00'
+        }
+      });
+      setEditingProfile('new');
+    }
+  };
+
+  const saveProfile = () => {
+    if (!profileForm.name.trim()) return;
+
+    const profileData = {
+      ...profileForm,
+      pin: profileForm.pin || undefined // Convert empty string to undefined
+    };
+
+    if (editingProfile === 'new') {
+      dispatch({
+        type: 'ADD_PROFILE',
+        profile: profileData
+      });
+    } else if (editingProfile) {
+      dispatch({
+        type: 'UPDATE_PROFILE',
+        profileId: editingProfile,
+        updates: profileData
+      });
+    }
+
+    setEditingProfile(null);
+    setProfileForm({
+      name: '',
+      avatar: '👤',
+      color: '#6366F1',
+      isTaskCompetitor: false,
+      pin: '',
+      permissions: {
+        canCreateTasks: true,
+        canEditTasks: true,
+        canDeleteTasks: true
+      },
+      mealTimes: {
+        breakfast: '07:00',
+        lunch: '12:00',
+        dinner: '18:00',
+        nightcap: '21:00'
+      }
+    });
+  };
+
+  const deleteProfile = (profileId: string) => {
+    if (state.profiles.length <= 1) {
+      alert('Cannot delete the last profile.');
+      return;
+    }
+    
+    if (window.confirm('Are you sure you want to delete this profile? This action cannot be undone.')) {
+      dispatch({
+        type: 'DELETE_PROFILE',
+        profileId
+      });
     }
   };
 
@@ -233,40 +460,205 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
       case 'groups':
         return (
           <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
-                Task Groups
-              </h3>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
-                Manage your task groups and their settings
-              </p>
-              
-              <div className="space-y-4">
-                {state.groups.map(group => (
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                  Task Groups
+                </h3>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  Manage your task groups and their settings
+                </p>
+              </div>
+              <button
+                onClick={() => startEditingGroup()}
+                className="btn-primary text-sm flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Group</span>
+              </button>
+            </div>
+            
+            {/* Group Form */}
+            {editingGroup && (
+              <div className="card p-4 border-2 border-primary-200 dark:border-primary-800">
+                <h4 className="font-medium text-neutral-900 dark:text-neutral-100 mb-4">
+                  {editingGroup === 'new' ? 'Add New Group' : 'Edit Group'}
+                </h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Name */}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                      Group Name
+                    </label>
+                    <input
+                      type="text"
+                      value={groupForm.name}
+                      onChange={(e) => setGroupForm(prev => ({ ...prev, name: e.target.value }))}
+                      className="input-primary"
+                      placeholder="Enter group name..."
+                    />
+                  </div>
+
+                  {/* Icon */}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                      Icon
+                    </label>
+                    <select
+                      value={groupForm.icon}
+                      onChange={(e) => setGroupForm(prev => ({ ...prev, icon: e.target.value }))}
+                      className="input-primary"
+                    >
+                      {iconOptions.map(option => (
+                        <option key={option.name} value={option.name}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Color */}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                      Color
+                    </label>
+                    <div className="flex space-x-2">
+                      {colorOptions.map(color => (
+                        <button
+                          key={color}
+                          onClick={() => setGroupForm(prev => ({ ...prev, color }))}
+                          className={`w-8 h-8 rounded-full border-2 ${
+                            groupForm.color === color ? 'border-neutral-900 dark:border-neutral-100' : 'border-neutral-300 dark:border-neutral-600'
+                          }`}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Display Mode */}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                      Completed Tasks Display
+                    </label>
+                    <select
+                      value={groupForm.completedDisplayMode}
+                      onChange={(e) => setGroupForm(prev => ({ ...prev, completedDisplayMode: e.target.value as any }))}
+                      className="input-primary"
+                    >
+                      <option value="grey-out">Grey Out</option>
+                      <option value="grey-drop">Grey & Drop Down</option>
+                      <option value="separate-completed">Separate Section</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Checkboxes */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={groupForm.enableDueDates}
+                      onChange={(e) => setGroupForm(prev => ({ ...prev, enableDueDates: e.target.checked }))}
+                      className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                    />
+                    <span className="text-sm text-neutral-700 dark:text-neutral-300">Enable Due Dates</span>
+                  </label>
+
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={groupForm.sortByDueDate}
+                      onChange={(e) => setGroupForm(prev => ({ ...prev, sortByDueDate: e.target.checked }))}
+                      className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                      disabled={!groupForm.enableDueDates}
+                    />
+                    <span className="text-sm text-neutral-700 dark:text-neutral-300">Sort by Due Date</span>
+                  </label>
+
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={groupForm.defaultNotifications}
+                      onChange={(e) => setGroupForm(prev => ({ ...prev, defaultNotifications: e.target.checked }))}
+                      className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                    />
+                    <span className="text-sm text-neutral-700 dark:text-neutral-300">Default Notifications</span>
+                  </label>
+                </div>
+
+                {/* Actions */}
+                <div className="flex space-x-2 mt-4">
+                  <button
+                    onClick={saveGroup}
+                    className="btn-primary text-sm flex items-center space-x-2"
+                    disabled={!groupForm.name.trim()}
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save</span>
+                  </button>
+                  <button
+                    onClick={() => setEditingGroup(null)}
+                    className="btn-secondary text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Groups List */}
+            <div className="space-y-3">
+              {state.groups.map(group => {
+                const IconComponent = iconOptions.find(opt => opt.name === group.icon)?.icon || User;
+                return (
                   <div key={group.id} className="card p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
                         <div 
-                          className="w-4 h-4 rounded-full"
-                          style={{ backgroundColor: group.color }}
-                        />
+                          className="w-10 h-10 rounded-lg flex items-center justify-center"
+                          style={{ backgroundColor: group.color + '20' }}
+                        >
+                          <IconComponent className="w-5 h-5" style={{ color: group.color }} />
+                        </div>
                         <div>
                           <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
                             {group.name}
                           </h4>
-                          <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                            {group.enableDueDates ? 'Due dates enabled' : 'No due dates'} • 
-                            {group.defaultNotifications ? ' Notifications on' : ' Notifications off'}
-                          </p>
+                          <div className="flex items-center space-x-2 text-xs text-neutral-500 dark:text-neutral-400">
+                            {group.enableDueDates && (
+                              <span className="px-2 py-1 bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 rounded-full">
+                                Due dates
+                              </span>
+                            )}
+                            {group.defaultNotifications && (
+                              <span className="px-2 py-1 bg-success-100 dark:bg-success-900/20 text-success-700 dark:text-success-400 rounded-full">
+                                Notifications
+                              </span>
+                            )}
+                            <span>{group.completedDisplayMode}</span>
+                          </div>
                         </div>
                       </div>
-                      <button className="btn-secondary text-sm">
-                        Edit
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => startEditingGroup(group.id)}
+                          className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+                        >
+                          <Edit className="w-4 h-4 text-neutral-500" />
+                        </button>
+                        <button
+                          onClick={() => deleteGroup(group.id)}
+                          className="p-2 rounded-lg hover:bg-error-100 dark:hover:bg-error-900/20 transition-colors duration-200"
+                        >
+                          <Trash2 className="w-4 h-4 text-error-500" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           </div>
         );
@@ -274,45 +666,257 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
       case 'profiles':
         return (
           <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
-                User Profiles
-              </h3>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
-                Manage user profiles and their permissions
-              </p>
-              
-              <div className="space-y-4">
-                {state.profiles.map(profile => (
-                  <div key={profile.id} className="card p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <span className="text-2xl">{profile.avatar}</span>
-                        <div>
-                          <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
-                            {profile.name}
-                          </h4>
-                          <div className="flex items-center space-x-2 text-xs text-neutral-500 dark:text-neutral-400">
-                            {profile.isTaskCompetitor && (
-                              <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 rounded-full">
-                                Competitor
-                              </span>
-                            )}
-                            {profile.pin && (
-                              <span className="px-2 py-1 bg-warning-100 dark:bg-warning-900/20 text-warning-700 dark:text-warning-400 rounded-full">
-                                PIN Protected
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <button className="btn-secondary text-sm">
-                        Edit
-                      </button>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                  User Profiles
+                </h3>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  Manage user profiles and their permissions
+                </p>
+              </div>
+              <button
+                onClick={() => startEditingProfile()}
+                className="btn-primary text-sm flex items-center space-x-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Profile</span>
+              </button>
+            </div>
+            
+            {/* Profile Form */}
+            {editingProfile && (
+              <div className="card p-4 border-2 border-primary-200 dark:border-primary-800">
+                <h4 className="font-medium text-neutral-900 dark:text-neutral-100 mb-4">
+                  {editingProfile === 'new' ? 'Add New Profile' : 'Edit Profile'}
+                </h4>
+                
+                <div className="space-y-4">
+                  {/* Basic Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                        Name
+                      </label>
+                      <input
+                        type="text"
+                        value={profileForm.name}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
+                        className="input-primary"
+                        placeholder="Enter profile name..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+                        PIN (Optional)
+                      </label>
+                      <input
+                        type="password"
+                        value={profileForm.pin}
+                        onChange={(e) => setProfileForm(prev => ({ ...prev, pin: e.target.value }))}
+                        className="input-primary"
+                        placeholder="Enter PIN for protection..."
+                      />
                     </div>
                   </div>
-                ))}
+
+                  {/* Avatar Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                      Avatar
+                    </label>
+                    <div className="grid grid-cols-10 gap-2">
+                      {avatarOptions.map(avatar => (
+                        <button
+                          key={avatar}
+                          onClick={() => setProfileForm(prev => ({ ...prev, avatar }))}
+                          className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center text-lg ${
+                            profileForm.avatar === avatar 
+                              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' 
+                              : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+                          }`}
+                        >
+                          {avatar}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Color Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                      Color
+                    </label>
+                    <div className="flex space-x-2">
+                      {colorOptions.map(color => (
+                        <button
+                          key={color}
+                          onClick={() => setProfileForm(prev => ({ ...prev, color }))}
+                          className={`w-8 h-8 rounded-full border-2 ${
+                            profileForm.color === color ? 'border-neutral-900 dark:border-neutral-100' : 'border-neutral-300 dark:border-neutral-600'
+                          }`}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Meal Times */}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                      Meal Times
+                    </label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {Object.entries(profileForm.mealTimes).map(([meal, time]) => (
+                        <div key={meal}>
+                          <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1 capitalize">
+                            {meal}
+                          </label>
+                          <input
+                            type="time"
+                            value={time}
+                            onChange={(e) => setProfileForm(prev => ({
+                              ...prev,
+                              mealTimes: { ...prev.mealTimes, [meal]: e.target.value }
+                            }))}
+                            className="input-primary text-sm"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Permissions */}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                      Permissions
+                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={profileForm.permissions.canCreateTasks}
+                          onChange={(e) => setProfileForm(prev => ({
+                            ...prev,
+                            permissions: { ...prev.permissions, canCreateTasks: e.target.checked }
+                          }))}
+                          className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                        />
+                        <span className="text-sm text-neutral-700 dark:text-neutral-300">Can Create Tasks</span>
+                      </label>
+
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={profileForm.permissions.canEditTasks}
+                          onChange={(e) => setProfileForm(prev => ({
+                            ...prev,
+                            permissions: { ...prev.permissions, canEditTasks: e.target.checked }
+                          }))}
+                          className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                        />
+                        <span className="text-sm text-neutral-700 dark:text-neutral-300">Can Edit Tasks</span>
+                      </label>
+
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={profileForm.permissions.canDeleteTasks}
+                          onChange={(e) => setProfileForm(prev => ({
+                            ...prev,
+                            permissions: { ...prev.permissions, canDeleteTasks: e.target.checked }
+                          }))}
+                          className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                        />
+                        <span className="text-sm text-neutral-700 dark:text-neutral-300">Can Delete Tasks</span>
+                      </label>
+
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={profileForm.isTaskCompetitor}
+                          onChange={(e) => setProfileForm(prev => ({ ...prev, isTaskCompetitor: e.target.checked }))}
+                          className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                        />
+                        <span className="text-sm text-neutral-700 dark:text-neutral-300">Task Competitor</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={saveProfile}
+                      className="btn-primary text-sm flex items-center space-x-2"
+                      disabled={!profileForm.name.trim()}
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Save</span>
+                    </button>
+                    <button
+                      onClick={() => setEditingProfile(null)}
+                      className="btn-secondary text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               </div>
+            )}
+
+            {/* Profiles List */}
+            <div className="space-y-3">
+              {state.profiles.map(profile => (
+                <div key={profile.id} className="card p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div 
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-xl"
+                        style={{ backgroundColor: profile.color + '20' }}
+                      >
+                        {profile.avatar}
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
+                          {profile.name}
+                        </h4>
+                        <div className="flex items-center space-x-2 text-xs text-neutral-500 dark:text-neutral-400">
+                          {profile.isTaskCompetitor && (
+                            <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 rounded-full">
+                              Competitor
+                            </span>
+                          )}
+                          {profile.pin && (
+                            <span className="px-2 py-1 bg-warning-100 dark:bg-warning-900/20 text-warning-700 dark:text-warning-400 rounded-full">
+                              PIN Protected
+                            </span>
+                          )}
+                          <span>
+                            {Object.values(profile.permissions || {}).filter(Boolean).length}/3 permissions
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => startEditingProfile(profile.id)}
+                        className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+                      >
+                        <Edit className="w-4 h-4 text-neutral-500" />
+                      </button>
+                      {state.profiles.length > 1 && (
+                        <button
+                          onClick={() => deleteProfile(profile.id)}
+                          className="p-2 rounded-lg hover:bg-error-100 dark:hover:bg-error-900/20 transition-colors duration-200"
+                        >
+                          <Trash2 className="w-4 h-4 text-error-500" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         );
@@ -727,6 +1331,64 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
         groups={state.groups}
         aiSettings={state.settings.ai}
       />
+
+      {/* Detailed History Modal */}
+      {showDetailedHistory && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowDetailedHistory(false)} />
+          
+          <div className="relative w-full max-w-4xl mx-4 bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
+              <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                Detailed Activity Log
+              </h3>
+              <button
+                onClick={() => setShowDetailedHistory(false)}
+                className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+              >
+                <X className="w-5 h-5 text-neutral-500" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <div className="space-y-3">
+                {state.history.length === 0 ? (
+                  <p className="text-neutral-500 dark:text-neutral-400 text-center py-8">
+                    No activity history yet
+                  </p>
+                ) : (
+                  state.history.slice(0, 100).map(entry => (
+                    <div key={entry.id} className="card p-3 bg-neutral-50 dark:bg-neutral-800">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                            {entry.taskTitle}
+                          </p>
+                          <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                            {entry.action} by {entry.profileName}
+                          </p>
+                          {entry.details && (
+                            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                              {entry.details}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                          {entry.timestamp.toLocaleDateString()} {entry.timestamp.toLocaleTimeString('en-US', { 
+                            hour: 'numeric', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Password Modal */}
       <PasswordModal
