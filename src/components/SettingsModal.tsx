@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Settings, User, Brain, Shield, Trophy, Users, Plus, Edit, Trash2, Save, ExternalLink, Lock, Unlock, Eye, EyeOff, Check, Calendar, Clock, Bell, BellOff } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { HistoryAnalytics } from './HistoryAnalytics';
@@ -71,6 +71,15 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
     sortByDueDate: false,
     defaultNotifications: false,
   });
+
+  // Check URL for detailed history parameter - moved to always run
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('detailed_history') === 'true') {
+      setShowDetailedHistory(true);
+      setActiveTab('history');
+    }
+  }, []);
 
   if (!isOpen) return null;
 
@@ -221,15 +230,6 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
       }
     }
   };
-
-  // Check URL for detailed history parameter
-  React.useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('detailed_history') === 'true') {
-      setShowDetailedHistory(true);
-      setActiveTab('history');
-    }
-  }, []);
 
   const tabs = [
     { id: 'general' as const, label: 'General', icon: Settings },
