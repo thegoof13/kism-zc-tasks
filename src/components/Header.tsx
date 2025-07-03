@@ -56,6 +56,18 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
 
   const topCompetitor = competitorStats.find(stat => stat.completions > 0);
 
+  // Debug logging
+  console.log('Trophy Debug:', {
+    taskCompetitors: taskCompetitors.length,
+    topCompetitor: topCompetitor ? topCompetitor.profile.name : 'none',
+    competitorStats,
+    recentHistory: recentHistory.length,
+    completedActions: completedActions.length
+  });
+
+  // Show trophy if there are any competitors (even without recent activity for testing)
+  const showTrophy = taskCompetitors.length > 0;
+
   return (
     <>
       <header className="sticky top-0 z-40 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-md border-b border-neutral-200 dark:border-neutral-800">
@@ -78,12 +90,12 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
 
             {/* Profile and Actions */}
             <div className="flex items-center space-x-2">
-              {/* Trophy Button - Only show if there are competitors and a winner */}
-              {taskCompetitors.length > 0 && topCompetitor && (
+              {/* Trophy Button - Show if there are any competitors */}
+              {showTrophy && (
                 <button
                   onClick={() => setShowTrophyModal(true)}
-                  className="p-2 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white transition-all duration-200 shadow-md hover:shadow-lg"
-                  title="View Top Competitor"
+                  className="p-2 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
+                  title={topCompetitor ? `View Top Competitor: ${topCompetitor.profile.name}` : 'View Competition Status'}
                 >
                   <Trophy className="w-5 h-5" />
                 </button>
@@ -265,9 +277,24 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
                   <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">
                     No Champion Yet
                   </h3>
-                  <p className="text-neutral-600 dark:text-neutral-400">
+                  <p className="text-neutral-600 dark:text-neutral-400 mb-4">
                     Complete some tasks to compete for the top spot!
                   </p>
+                  
+                  {/* Show competitor info */}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <strong>{taskCompetitors.length}</strong> competitor{taskCompetitors.length !== 1 ? 's' : ''} registered:
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-2 mt-2">
+                      {taskCompetitors.map(competitor => (
+                        <div key={competitor.id} className="flex items-center space-x-1 px-2 py-1 bg-blue-100 dark:bg-blue-800/30 rounded-full">
+                          <span className="text-sm">{competitor.avatar}</span>
+                          <span className="text-xs text-blue-700 dark:text-blue-300">{competitor.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
