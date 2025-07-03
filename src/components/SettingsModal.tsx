@@ -129,14 +129,15 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
             )}
           </div>
 
-          <div className="p-4 bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-lg">
+          {/* FIXED Security Notice - Main Settings Tab */}
+          <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 rounded-lg">
             <div className="flex items-start space-x-3">
-              <Shield className="w-5 h-5 text-warning-600 dark:text-warning-400 flex-shrink-0 mt-0.5" />
+              <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
               <div>
-                <h5 className="text-sm font-medium text-warning-800 dark:text-warning-200 mb-1">
+                <h5 className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">
                   Security Notice
                 </h5>
-                <p className="text-xs text-warning-700 dark:text-warning-300">
+                <p className="text-xs text-amber-700 dark:text-amber-300">
                   Passwords are stored in plain text on the server for simplicity. 
                   Do not use passwords that you use for other important accounts.
                 </p>
@@ -413,7 +414,11 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                       {group.name}
                     </h4>
                     <div className="flex items-center space-x-4 text-xs text-neutral-500 dark:text-neutral-400">
-                      <span>{getCompletedDisplayModeLabel(group.completedDisplayMode)}</span>
+                      <span>
+                        {group.completedDisplayMode === 'grey-out' && 'Grey out only'}
+                        {group.completedDisplayMode === 'grey-drop' && 'Grey out and drop to bottom of group'}
+                        {group.completedDisplayMode === 'separate-completed' && 'Grey out and put in completed section'}
+                      </span>
                       {group.enableDueDates && (
                         <div className="flex items-center space-x-1">
                           <Calendar className="w-3 h-3" />
@@ -518,21 +523,15 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                       {profile.id === state.activeProfileId ? 'Active' : 'Inactive'}
                       {profile.isTaskCompetitor && ' • Participating in task competition'}
                       {profile.pin && ' • PIN protected'}
+                      {profile.permissions && (
+                        <>
+                          {' • '}
+                          {!profile.permissions.canCreateTasks && 'Cannot create tasks '}
+                          {!profile.permissions.canEditTasks && 'Cannot edit tasks '}
+                          {!profile.permissions.canDeleteTasks && 'Cannot delete tasks'}
+                        </>
+                      )}
                     </p>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                        Permissions:
-                      </span>
-                      {profile.permissions?.canCreateTasks && (
-                        <span className="text-xs bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 px-1 rounded">Create</span>
-                      )}
-                      {profile.permissions?.canEditTasks && (
-                        <span className="text-xs bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-1 rounded">Edit</span>
-                      )}
-                      {profile.permissions?.canDeleteTasks && (
-                        <span className="text-xs bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 px-1 rounded">Delete</span>
-                      )}
-                    </div>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -835,20 +834,6 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
   );
 }
 
-// Helper function to get display mode labels
-function getCompletedDisplayModeLabel(mode: string): string {
-  switch (mode) {
-    case 'grey-out':
-      return 'Grey out only';
-    case 'grey-drop':
-      return 'Grey out and drop to bottom of group';
-    case 'separate-completed':
-      return 'Grey out and put in completed section';
-    default:
-      return mode;
-  }
-}
-
 // Group Edit Form Component
 function GroupEditForm({ 
   group, 
@@ -1011,10 +996,10 @@ function ProfileEditForm({
   const [avatar, setAvatar] = useState(profile.avatar);
   const [isTaskCompetitor, setIsTaskCompetitor] = useState(profile.isTaskCompetitor || false);
   const [pin, setPin] = useState(profile.pin || '');
-  const [permissions, setPermissions] = useState({
-    canEditTasks: profile.permissions?.canEditTasks ?? true,
-    canCreateTasks: profile.permissions?.canCreateTasks ?? true,
-    canDeleteTasks: profile.permissions?.canDeleteTasks ?? true,
+  const [permissions, setPermissions] = useState(profile.permissions || {
+    canEditTasks: true,
+    canCreateTasks: true,
+    canDeleteTasks: true,
   });
   const [avatarType, setAvatarType] = useState<'emoji' | 'text'>(
     // Detect if current avatar is likely an emoji or text
@@ -1168,48 +1153,48 @@ function ProfileEditForm({
         </div>
       </div>
 
-      {/* Task Permissions */}
+      {/* Permissions */}
       <div className="space-y-3">
-        <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-lg border border-green-200 dark:border-green-800">
+        <div className="p-3 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-lg border border-green-200 dark:border-green-800">
           <div className="flex items-center space-x-2 mb-3">
-            <Settings className="w-4 h-4 text-green-600 dark:text-green-400" />
+            <Shield className="w-4 h-4 text-green-600 dark:text-green-400" />
             <label className="text-sm font-medium text-green-800 dark:text-green-200">
               Task Permissions
             </label>
           </div>
           <p className="text-xs text-green-700 dark:text-green-300 mb-3">
-            Control what this profile can do with tasks. Unchecked permissions will hide related buttons and actions.
+            Control what this profile can do with tasks. Unchecked permissions will hide related buttons and prevent actions.
           </p>
           
-          <div className="grid grid-cols-3 gap-4">
-            <label className="flex items-center space-x-2 cursor-pointer">
+          <div className="space-y-2">
+            <label className="flex items-center space-x-3">
               <input
                 type="checkbox"
                 checked={permissions.canCreateTasks}
                 onChange={(e) => setPermissions(prev => ({ ...prev, canCreateTasks: e.target.checked }))}
                 className="w-4 h-4 text-green-500 bg-green-100 border-green-300 rounded focus:ring-green-500"
               />
-              <span className="text-sm text-green-700 dark:text-green-300">Can Create Tasks</span>
+              <span className="text-sm text-green-800 dark:text-green-200">Can Create Tasks</span>
             </label>
             
-            <label className="flex items-center space-x-2 cursor-pointer">
+            <label className="flex items-center space-x-3">
               <input
                 type="checkbox"
                 checked={permissions.canEditTasks}
                 onChange={(e) => setPermissions(prev => ({ ...prev, canEditTasks: e.target.checked }))}
-                className="w-4 h-4 text-blue-500 bg-blue-100 border-blue-300 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-green-500 bg-green-100 border-green-300 rounded focus:ring-green-500"
               />
-              <span className="text-sm text-blue-700 dark:text-blue-300">Can Edit Tasks</span>
+              <span className="text-sm text-green-800 dark:text-green-200">Can Edit Tasks</span>
             </label>
             
-            <label className="flex items-center space-x-2 cursor-pointer">
+            <label className="flex items-center space-x-3">
               <input
                 type="checkbox"
                 checked={permissions.canDeleteTasks}
                 onChange={(e) => setPermissions(prev => ({ ...prev, canDeleteTasks: e.target.checked }))}
-                className="w-4 h-4 text-red-500 bg-red-100 border-red-300 rounded focus:ring-red-500"
+                className="w-4 h-4 text-green-500 bg-green-100 border-green-300 rounded focus:ring-green-500"
               />
-              <span className="text-sm text-red-700 dark:text-red-300">Can Delete Tasks</span>
+              <span className="text-sm text-green-800 dark:text-green-200">Can Delete Tasks</span>
             </label>
           </div>
         </div>
