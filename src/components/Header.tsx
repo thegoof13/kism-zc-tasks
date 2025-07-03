@@ -115,8 +115,8 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
                 <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
                   ZenTasks
                 </h1>
-                {/* Progress text - Hidden on very small screens */}
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 hidden xs:block">
+                {/* Progress text - Always visible, responsive sizing */}
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
                   {completedTasksCount} of {totalTasksCount} completed
                 </p>
               </div>
