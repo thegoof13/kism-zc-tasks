@@ -1,6 +1,6 @@
 # ZenTasks - Smart Task Management System
 
-A beautiful, production-ready task management application with smart recurring tasks, multi-profile support, AI-powered insights, and advanced collaboration features.
+A beautiful, production-ready task management application with smart recurring tasks, multi-profile support, AI-powered insights, advanced collaboration features, and comprehensive notification system.
 
 ![ZenTasks](https://img.shields.io/badge/ZenTasks-v1.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
@@ -10,10 +10,19 @@ A beautiful, production-ready task management application with smart recurring t
 ## 🌟 Features
 
 ### 🎯 **Smart Task Management**
-- **Recurring Tasks** - Daily, weekly, meal-based (breakfast/lunch/dinner), and custom recurrence patterns
+- **Advanced Recurring Tasks** - Meal-based (breakfast/lunch/dinner/nightcap), specific days of week, and traditional patterns
+- **Flexible Recurrence Scheduling** - Set "from dates" for non-daily tasks to control when recurrence begins
 - **Due Date Support** - Set due dates with automatic notifications and overdue tracking
 - **Task Permissions** - Granular control over who can create, edit, or delete tasks
 - **Flexible Display Modes** - Grey out, drop down, or separate completed tasks
+
+### 🔔 **Comprehensive Notification System**
+- **Dual Notification Types** - Due date notifications AND recurrence reset notifications
+- **Smart Timing** - Due date tasks notify at 25% time remaining; recurrence tasks notify at 10% before reset
+- **Group-Level Defaults** - Each task group can set default notification preferences
+- **Task-Level Override** - Individual tasks can override group notification settings
+- **Intelligent Filtering** - Only shows notification options for relevant tasks (no duplicates)
+- **Visual Indicators** - Bell icons show which tasks have notifications enabled
 
 ### 👥 **Multi-Profile System**
 - **Profile Management** - Create unlimited user profiles with custom avatars and colors
@@ -46,10 +55,11 @@ A beautiful, production-ready task management application with smart recurring t
 - **Access Control** - Granular permissions for different user roles
 
 ### 🎨 **Beautiful Design**
-- **Modern UI** - Clean, intuitive interface with smooth animations
+- **Modern UI** - Clean, intuitive interface with smooth animations and compact layouts
 - **Dark Mode Support** - Automatic theme switching with system preference detection
-- **Responsive Design** - Optimized for desktop, tablet, and mobile devices
-- **Touch Gestures** - Swipe actions for mobile task management
+- **Responsive Design** - Optimized for desktop, tablet, and mobile devices with touch gestures
+- **Mobile-First** - Swipe actions for mobile task management, desktop menu buttons for larger screens
+- **Adaptive Styling** - Date/time pickers automatically adapt to light/dark mode
 
 ## 🚀 Quick Start
 
@@ -108,33 +118,101 @@ The application will be available at `http://localhost:5173`
    - Organize tasks into logical groups (Personal, Work, Health, etc.)
    - Choose display modes for completed tasks
    - Enable due dates for time-sensitive groups
+   - **Set notification defaults** - Choose whether new tasks in this group should have notifications enabled by default
    - Customize colors and icons
 
 3. **Adding Tasks**
    - Create tasks with smart recurrence patterns
    - Assign tasks to multiple profiles for collaboration
    - Set due dates with automatic notifications
+   - **Configure notifications** - Enable/disable notifications per task or use group defaults
+   - Set recurrence "from dates" for precise scheduling
    - Organize with drag-and-drop ordering
 
 ### Task Management
 
-#### **Recurrence Types**
-- **Meal-based**: Breakfast, Lunch, Dinner
-- **Daily**: Every day, Work days only, Weekends only
-- **Periodic**: Weekly, Fortnightly, Monthly, Quarterly, Half-yearly, Yearly
+#### **🔄 Recurrence Types**
 
-#### **Task Actions**
-- **Complete**: Mark task as done (✓)
-- **Uncheck**: Remove completion but keep history
-- **Reset**: Uncheck and preserve completion history
-- **Restore**: Remove all completion history
-- **Edit**: Modify task details and settings
-- **Delete**: Remove task permanently
+##### **Meal-Based Recurrence:**
+- **Breakfast** (6:00 AM) - Morning tasks like vitamins, meditation
+- **Lunch** (11:00 AM) - Midday activities, medication
+- **Dinner** (5:00 PM) - Evening routines, supplements
+- **Night Cap** (9:00 PM) - Bedtime routines, reflection
+- **Multiple Meals** - Select any combination of meal times
 
-#### **Mobile Gestures**
-- **Swipe Left**: Access quick actions (edit, delete, uncheck)
-- **Tap**: Complete/uncomplete tasks
-- **Long Press**: Access context menu
+##### **Day-Based Recurrence:**
+- **Specific Days** - Choose any combination of days (Mon, Tue, Wed, etc.)
+- **Quick Presets** - Weekdays, Weekends, or All Days buttons
+- **Flexible Scheduling** - Perfect for gym days, work tasks, or weekly activities
+
+##### **Traditional Recurrence:**
+- **Daily** - Every day without specific timing
+- **Weekly** - Every 7 days from creation/from date
+- **Fortnightly** - Every 14 days
+- **Monthly** - Same date each month
+- **Quarterly** - Every 3 months
+- **Half-yearly** - Every 6 months
+- **Yearly** - Annual recurrence
+
+#### **📅 Recurrence Scheduling**
+- **From Date Setting** - For non-daily tasks, set when recurrence should begin
+- **Immediate Start** - Leave from date empty to start recurring immediately
+- **Future Scheduling** - Set tasks to start recurring at a specific future date/time
+- **Smart Reset Logic** - Tasks only reset when both the time period has passed AND the from date has been reached
+
+#### **🔔 Notification System**
+
+##### **Two Types of Notifications:**
+
+**1. Due Date Notifications** (for tasks with due dates):
+- **25% Time Remaining** - Early warning when 75% of time to due date has passed
+- **Due Today** - Day-of-due-date reminder
+- **Overdue** - Alerts for missed deadlines
+
+**2. Recurrence Reset Notifications** (for tasks with notifications enabled):
+- **10% Before Reset** - Warning when 90% of recurrence period has passed
+- **Smart Timing** - Calculates based on recurrence type and from date
+- **No Conflicts** - Only applies to tasks without due dates
+
+##### **Notification Configuration:**
+- **Group Defaults** - Set default notification preference for each task group
+- **Task Override** - Individual tasks can override group defaults
+- **Visual Indicators** - Bell icons show which tasks have notifications enabled
+- **Conditional Display** - Notification options only appear for relevant tasks
+
+##### **Example Notification Scenarios:**
+- 💊 **"Take vitamins" (Breakfast)** - Notifies before breakfast time passes if not completed
+- 🏃‍♀️ **"Morning run" (Daily)** - Reminds before day ends if not done
+- 📋 **"Submit report" (Due date)** - Uses due date notifications instead
+- 🧘‍♀️ **"Weekly meditation" (Sundays)** - Notifies before Sunday ends
+
+#### **📱 Task Actions**
+- **Complete** - Mark task as done (✓)
+- **Uncheck** - Remove completion but keep history
+- **Reset** - Uncheck and preserve completion history
+- **Restore** - Remove all completion history
+- **Edit** - Modify task details, recurrence, and notification settings
+- **Delete** - Remove task permanently
+
+#### **📱 Mobile & Desktop Interface**
+
+##### **Mobile Experience (< 768px):**
+- **Swipe Left** - Access quick actions (edit, delete, uncheck)
+- **Stacked Layout** - Task title, due date, and recurrence info in separate rows
+- **Touch Optimized** - Larger touch targets and swipe gestures
+- **Compact Design** - Reduced spacing and smaller elements for mobile screens
+
+##### **Desktop Experience (≥ 768px):**
+- **Single Row Layout** - All task information in one compact row
+- **Menu Button** - Click to show/hide action buttons
+- **Hover States** - Rich hover interactions and visual feedback
+- **Keyboard Navigation** - Full keyboard accessibility
+
+##### **Universal Features:**
+- **Visual Indicators** - Bell icons for notifications, calendar icons for due dates
+- **Completion Status** - Clear visual distinction between completed and pending tasks
+- **Profile Attribution** - Shows which profile completed each task
+- **Recurrence Display** - Smart labels showing next reset time or recurrence pattern
 
 ### Profile Management
 
@@ -189,17 +267,24 @@ The application will be available at `http://localhost:5173`
 - "How many tasks did I accidentally check this week?"
 - "When am I most productive during the day?"
 
-### Notifications
+### Notifications Setup
 
-#### **Due Date Notifications**
-- **25% Time Remaining**: Early warning notification
-- **Due Today**: Day-of-due-date reminder
-- **Overdue**: Alerts for missed deadlines
+#### **System Requirements**
+1. **Browser Support** - Modern browsers with Notification API support
+2. **Permission Grant** - Allow notifications when prompted
+3. **Settings Configuration** - Enable notifications in Settings → General
 
-#### **Setup**
-1. Enable notifications in Settings → General
-2. Grant browser notification permissions
-3. Configure due dates on relevant task groups
+#### **Configuration Steps**
+1. **Enable Global Notifications** - Turn on notifications in Settings → General
+2. **Set Group Defaults** - Configure default notification preferences for each task group
+3. **Customize Per Task** - Override group defaults for individual tasks as needed
+4. **Test Notifications** - Create a test task to verify notifications are working
+
+#### **Notification Timing Examples**
+- **Daily Task** - Notifies around 9:30 PM if not completed (90% of day passed)
+- **Weekly Task** - Notifies 16.8 hours before reset (10% of week remaining)
+- **Breakfast Task** - Notifies around 5:30 AM if breakfast time approaching
+- **Due Date Task** - Uses separate due date notification system
 
 ## 🛠 Administration
 
@@ -207,10 +292,16 @@ The application will be available at `http://localhost:5173`
 
 #### **General Settings**
 - **Theme**: Light, Dark, or System preference
-- **Notifications**: Enable/disable due date alerts
+- **Notifications**: Enable/disable all notifications globally
 - **Completed Count**: Show progress in header
 - **Auto-archive**: Automatically archive old completed tasks
 - **Top Collaborator**: Show/hide collaboration leaderboard
+
+#### **Task Group Settings**
+- **Due Dates**: Enable/disable due date support per group
+- **Default Notifications**: Set default notification preference for new tasks in each group
+- **Display Modes**: Configure how completed tasks are shown
+- **Sorting**: Enable due date sorting for groups with due dates
 
 #### **Security Settings**
 - **Settings Password**: Protect settings access
@@ -370,6 +461,7 @@ sudo tail -f /var/log/zentasks/ssl-renewal.log
 - **Frontend**: Verify main page loads
 - **Database**: Check data persistence
 - **SSL**: Verify certificate validity
+- **Notifications**: Test notification delivery
 
 ### Backup Management
 
@@ -421,6 +513,20 @@ sudo nginx -t
 
 # Reload Nginx
 sudo systemctl reload nginx
+```
+
+#### **Notifications Not Working**
+```bash
+# Check browser console for permission errors
+# Verify notification settings in app
+# Test with a simple daily task
+# Check if browser supports notifications
+
+# Common fixes:
+# 1. Grant notification permission in browser
+# 2. Enable notifications in Settings → General
+# 3. Ensure tasks have notifications enabled
+# 4. Check browser notification settings
 ```
 
 #### **SSL Certificate Issues**
@@ -483,10 +589,11 @@ curl http://localhost:3001/api/health
 
 #### **Frontend**
 - **Framework**: React 18.3 with TypeScript
-- **Styling**: Tailwind CSS with custom design system
+- **Styling**: Tailwind CSS with custom design system and responsive utilities
 - **Icons**: Lucide React icon library
 - **Build Tool**: Vite for fast development and building
 - **State Management**: React Context with useReducer
+- **Notifications**: Browser Notification API with smart timing logic
 
 #### **Backend**
 - **Runtime**: Node.js 18+ with Express.js
@@ -506,16 +613,26 @@ curl http://localhost:3001/api/health
 zentasks/
 ├── src/                    # Frontend React application
 │   ├── components/         # React components
+│   │   ├── AddTaskModal.tsx      # Enhanced with meal/day selection
+│   │   ├── EditTaskModal.tsx     # Enhanced with notification settings
+│   │   ├── TaskItem.tsx          # Mobile/desktop responsive design
+│   │   └── TaskGroup.tsx         # Compact layout with notification support
 │   ├── contexts/          # React contexts (state management)
 │   ├── hooks/             # Custom React hooks
+│   │   └── useNotifications.ts   # Dual notification system
 │   ├── services/          # API services and external integrations
 │   ├── types/             # TypeScript type definitions
+│   │   └── index.ts              # Enhanced with notification types
 │   └── utils/             # Utility functions and helpers
+│       ├── notifications.ts      # Comprehensive notification service
+│       └── recurrence.ts         # Enhanced recurrence logic
 ├── server/                # Backend Node.js application
 │   ├── data/              # JSON data storage
 │   └── index.js           # Main server file
 ├── dist/                  # Built frontend (production)
 ├── public/                # Static assets
+│   ├── image.png          # App logo/icon
+│   └── apple-touch-icon.png
 ├── setup.sh               # Ubuntu deployment script
 ├── update.sh              # Update script for existing installations
 ├── nginx.conf.example     # Nginx configuration template
@@ -536,8 +653,29 @@ zentasks/
 #### **Data Format**
 ```json
 {
-  "tasks": [...],
-  "groups": [...],
+  "tasks": [
+    {
+      "id": "string",
+      "title": "string",
+      "recurrence": "meals|days|daily|weekly|...",
+      "recurrenceConfig": {
+        "meals": ["breakfast", "lunch"],
+        "days": [1, 2, 3, 4, 5]
+      },
+      "recurrenceFromDate": "ISO date",
+      "enableNotifications": true,
+      "dueDate": "ISO date",
+      "profiles": ["profileId1", "profileId2"]
+    }
+  ],
+  "groups": [
+    {
+      "id": "string",
+      "name": "string",
+      "defaultNotifications": true,
+      "enableDueDates": true
+    }
+  ],
   "profiles": [...],
   "history": [...],
   "settings": {...},
@@ -610,4 +748,4 @@ For support and questions:
 
 ---
 
-**ZenTasks** - Bringing zen to your task management experience! 🧘‍♀️✨
+**ZenTasks** - Bringing zen to your task management experience with smart notifications and beautiful design! 🧘‍♀️✨🔔
