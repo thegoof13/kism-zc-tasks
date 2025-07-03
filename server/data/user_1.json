@@ -131,6 +131,15 @@
       "isActive": false,
       "id": "1751507199210",
       "createdAt": "2025-07-03T01:46:39.210Z"
+    },
+    {
+      "name": "New Profile",
+      "color": "#6366F1",
+      "avatar": "👤",
+      "isActive": false,
+      "isTaskCompetitor": false,
+      "id": "1751508828805",
+      "createdAt": "2025-07-03T02:13:48.805Z"
     }
   ],
   "history": [
