@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, Users, FolderOpen, History, Brain, Palette, Bell, Archive, Plus, Edit, Trash2, Save, Calendar } from 'lucide-react';
+import { X, Settings, Users, FolderOpen, History, Brain, Palette, Bell, Archive, Plus, Edit, Trash2, Save, Calendar, Type } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { getIconComponent, getAvailableIcons } from '../utils/icons';
 import { AIQueryModal } from './AIQueryModal';
@@ -286,7 +286,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             ) : (
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <span className="text-2xl">{profile.avatar}</span>
+                  <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center text-lg font-medium">
+                    {profile.avatar}
+                  </div>
                   <div>
                     <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
                       {profile.name}
@@ -730,6 +732,10 @@ function ProfileEditForm({
   const [name, setName] = useState(profile.name);
   const [color, setColor] = useState(profile.color);
   const [avatar, setAvatar] = useState(profile.avatar);
+  const [avatarType, setAvatarType] = useState<'emoji' | 'text'>(
+    // Detect if current avatar is likely an emoji or text
+    /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(profile.avatar) ? 'emoji' : 'text'
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -737,6 +743,8 @@ function ProfileEditForm({
   };
 
   const commonEmojis = ['👤', '👨', '👩', '🧑', '👶', '👴', '👵', '🙋‍♂️', '🙋‍♀️', '💼', '👨‍💻', '👩‍💻', '🎓', '👨‍🎓', '👩‍🎓'];
+  
+  const commonTextIcons = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -770,30 +778,103 @@ function ProfileEditForm({
         <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
           Avatar
         </label>
-        <div className="grid grid-cols-8 gap-2 mb-3">
-          {commonEmojis.map(emoji => (
-            <button
-              key={emoji}
-              type="button"
-              onClick={() => setAvatar(emoji)}
-              className={`p-2 rounded-lg border text-lg transition-colors duration-200 ${
-                avatar === emoji
-                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                  : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
-              }`}
-            >
-              {emoji}
-            </button>
-          ))}
+        
+        {/* Avatar Type Toggle */}
+        <div className="flex items-center space-x-4 mb-3">
+          <button
+            type="button"
+            onClick={() => setAvatarType('emoji')}
+            className={`flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors duration-200 ${
+              avatarType === 'emoji'
+                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
+                : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+            }`}
+          >
+            <span className="text-lg">😊</span>
+            <span className="text-sm font-medium">Emoji</span>
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => setAvatarType('text')}
+            className={`flex items-center space-x-2 px-3 py-2 rounded-lg border transition-colors duration-200 ${
+              avatarType === 'text'
+                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
+                : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+            }`}
+          >
+            <Type className="w-4 h-4" />
+            <span className="text-sm font-medium">Text</span>
+          </button>
         </div>
-        <input
-          type="text"
-          value={avatar}
-          onChange={(e) => setAvatar(e.target.value)}
-          placeholder="Or enter custom emoji..."
-          className="input-primary"
-          maxLength={2}
-        />
+
+        {/* Avatar Selection Grid */}
+        {avatarType === 'emoji' ? (
+          <div className="grid grid-cols-8 gap-2 mb-3">
+            {commonEmojis.map(emoji => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => setAvatar(emoji)}
+                className={`p-2 rounded-lg border text-lg transition-colors duration-200 ${
+                  avatar === emoji
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                    : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+                }`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-8 gap-2 mb-3">
+            {commonTextIcons.map(letter => (
+              <button
+                key={letter}
+                type="button"
+                onClick={() => setAvatar(letter)}
+                className={`p-2 rounded-lg border text-sm font-bold transition-colors duration-200 ${
+                  avatar === letter
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
+                    : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300'
+                }`}
+              >
+                {letter}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Custom Input */}
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={avatar}
+            onChange={(e) => setAvatar(e.target.value)}
+            placeholder={avatarType === 'emoji' ? "Or enter custom emoji..." : "Or enter custom text..."}
+            className="input-primary"
+            maxLength={avatarType === 'emoji' ? 4 : 3}
+          />
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            {avatarType === 'emoji' 
+              ? 'Choose from emojis above or enter any emoji (up to 4 characters)'
+              : 'Choose from letters above or enter custom text (up to 3 characters)'
+            }
+          </p>
+        </div>
+
+        {/* Preview */}
+        <div className="mt-3 p-3 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+          <p className="text-xs text-neutral-600 dark:text-neutral-400 mb-2">Preview:</p>
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-600 flex items-center justify-center text-lg font-medium">
+              {avatar}
+            </div>
+            <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+              {name}
+            </span>
+          </div>
+        </div>
       </div>
 
       <div className="flex space-x-3 pt-4">
