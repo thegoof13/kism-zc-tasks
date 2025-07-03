@@ -72,6 +72,10 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
     !t.isCompleted && t.dueDate && NotificationService.isOverdue(new Date(t.dueDate))
   ).length;
 
+  // Check if active profile can create tasks
+  const activeProfile = state.profiles.find(p => p.id === state.activeProfileId);
+  const canCreateTasks = activeProfile?.permissions?.canCreateTasks ?? true;
+
   // Don't render group if no tasks are visible for current profile
   if (profileTasks.length === 0) {
     return null;
@@ -119,13 +123,15 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
         </button>
 
         <div className="flex items-center space-x-1">
-          <button
-            onClick={() => onAddTask(group.id)}
-            className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
-            aria-label="Add task"
-          >
-            <Plus className="w-4 h-4 text-neutral-500 dark:text-neutral-400" />
-          </button>
+          {canCreateTasks && (
+            <button
+              onClick={() => onAddTask(group.id)}
+              className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+              aria-label="Add task"
+            >
+              <Plus className="w-4 h-4 text-neutral-500 dark:text-neutral-400" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -135,12 +141,14 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
           {displayedTasks.length === 0 ? (
             <div className="text-center py-8 text-neutral-500 dark:text-neutral-400">
               <p className="text-sm">No tasks yet</p>
-              <button
-                onClick={() => onAddTask(group.id)}
-                className="text-primary-500 hover:text-primary-600 text-sm font-medium mt-1 transition-colors duration-200"
-              >
-                Add your first task
-              </button>
+              {canCreateTasks && (
+                <button
+                  onClick={() => onAddTask(group.id)}
+                  className="text-primary-500 hover:text-primary-600 text-sm font-medium mt-1 transition-colors duration-200"
+                >
+                  Add your first task
+                </button>
+              )}
             </div>
           ) : (
             displayedTasks.map(task => (

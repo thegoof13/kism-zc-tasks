@@ -50,6 +50,11 @@ export interface UserProfile {
   createdAt: Date;
   isTaskCompetitor?: boolean;
   pin?: string; // New field for profile PIN protection
+  permissions?: {
+    canEditTasks: boolean;
+    canCreateTasks: boolean;
+    canDeleteTasks: boolean;
+  };
 }
 
 export interface HistoryEntry {
@@ -86,6 +91,7 @@ export interface AppSettings {
   archiveDays: number;
   ai: AISettings;
   settingsPassword?: string; // New field for settings password protection
+  showTopCollaborator: boolean; // New field for showing Top Collaborator in Trophy popup
 }
 
 export interface AppState {

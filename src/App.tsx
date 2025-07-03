@@ -121,7 +121,13 @@ function AppContent() {
     task.profiles.includes(state.activeProfileId)
   );
 
+  // Check if active profile can create tasks
+  const activeProfile = state.profiles.find(p => p.id === state.activeProfileId);
+  const canCreateTasks = activeProfile?.permissions?.canCreateTasks ?? true;
+
   const handleAddTask = (groupId?: string) => {
+    if (!canCreateTasks) return;
+    
     setSelectedGroupId(groupId || '');
     setShowAddTask(true);
   };
@@ -181,13 +187,15 @@ function AppContent() {
             <p className="text-neutral-600 dark:text-neutral-400 mb-6 max-w-md mx-auto">
               Start organizing your life with smart recurring tasks. Create your first task to get started.
             </p>
-            <button
-              onClick={() => handleAddTask()}
-              className="btn-primary"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Create Your First Task
-            </button>
+            {canCreateTasks && (
+              <button
+                onClick={() => handleAddTask()}
+                className="btn-primary"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Create Your First Task
+              </button>
+            )}
           </div>
         )}
 
@@ -220,19 +228,21 @@ function AppContent() {
             <p className="text-neutral-500 dark:text-neutral-400 mb-4">
               No tasks assigned to your profile
             </p>
-            <button
-              onClick={() => handleAddTask()}
-              className="btn-primary"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Add Task
-            </button>
+            {canCreateTasks && (
+              <button
+                onClick={() => handleAddTask()}
+                className="btn-primary"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Add Task
+              </button>
+            )}
           </div>
         )}
       </main>
 
       {/* Floating Action Button */}
-      {activeProfileTasks.length > 0 && (
+      {activeProfileTasks.length > 0 && canCreateTasks && (
         <button
           onClick={() => handleAddTask()}
           className="floating-action-btn"
@@ -243,11 +253,13 @@ function AppContent() {
       )}
 
       {/* Modals */}
-      <AddTaskModal
-        isOpen={showAddTask}
-        onClose={() => setShowAddTask(false)}
-        initialGroupId={selectedGroupId}
-      />
+      {canCreateTasks && (
+        <AddTaskModal
+          isOpen={showAddTask}
+          onClose={() => setShowAddTask(false)}
+          initialGroupId={selectedGroupId}
+        />
+      )}
       
       {editingTask && (
         <EditTaskModal

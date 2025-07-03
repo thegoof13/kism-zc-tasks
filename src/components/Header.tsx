@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Moon, Sun, Settings, User, ChevronDown, Users, Trophy, X } from 'lucide-react';
+import { Menu, Moon, Sun, Settings, User, ChevronDown, Users, Trophy, X, Crown } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useTheme } from '../hooks/useTheme';
 
@@ -56,16 +56,34 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
 
   const topCompetitor = competitorStats.find(stat => stat.completions > 0);
 
-  // Debug logging
-  console.log('Trophy Debug:', {
-    taskCompetitors: taskCompetitors.length,
-    topCompetitor: topCompetitor ? topCompetitor.profile.name : 'none',
-    competitorStats,
-    recentHistory: recentHistory.length,
-    completedActions: completedActions.length
-  });
+  // Calculate Top Collaborator (if enabled in settings)
+  const collaborativeTasks = state.tasks.filter(task => task.profiles.length > 1);
+  const collaborativeTaskIds = new Set(collaborativeTasks.map(task => task.id));
+  const collaborativeCompletedActions = completedActions.filter(entry => 
+    collaborativeTaskIds.has(entry.taskId)
+  );
 
-  // Show trophy if there are any competitors (even without recent activity for testing)
+  const collaborativeProfileStats = state.profiles.map(profile => {
+    const profileCollaborativeCompletions = collaborativeCompletedActions.filter(entry => 
+      entry.profileId === profile.id
+    ).length;
+    
+    const profileCollaborativeUnchecked = uncheckedActions.filter(entry => 
+      entry.profileId === profile.id && collaborativeTaskIds.has(entry.taskId)
+    ).length;
+    
+    return {
+      profile,
+      completions: profileCollaborativeCompletions,
+      unchecked: profileCollaborativeUnchecked,
+      accuracy: profileCollaborativeCompletions > 0 ? 
+        Math.max(0, ((profileCollaborativeCompletions - profileCollaborativeUnchecked) / profileCollaborativeCompletions * 100)) : 0
+    };
+  }).sort((a, b) => b.completions - a.completions);
+
+  const topCollaborator = collaborativeProfileStats.find(stat => stat.completions > 0);
+
+  // Show trophy if there are any competitors
   const showTrophy = taskCompetitors.length > 0;
 
   return (
@@ -208,14 +226,14 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
             onClick={() => setShowTrophyModal(false)} 
           />
           
-          <div className="relative w-full max-w-md mx-4 bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in">
+          <div className="relative w-full max-w-2xl mx-4 bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
                   <Trophy className="w-5 h-5 text-white" />
                 </div>
                 <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                  Top Competitor
+                  Competition Status
                 </h2>
               </div>
               <button
@@ -226,29 +244,47 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
               </button>
             </div>
 
-            <div className="p-6">
-              {topCompetitor ? (
-                <div className="text-center">
-                  <div className="relative mb-4">
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-3xl shadow-lg mx-auto">
-                      {topCompetitor.profile.avatar}
+            <div className="p-6 space-y-6">
+              {/* Top Competitor Section */}
+              <div>
+                <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
+                  <Trophy className="w-5 h-5 mr-2 text-orange-500" />
+                  Top Competitor (Last 14 Days)
+                </h3>
+                
+                {topCompetitor ? (
+                  <div className="bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-lg p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="relative">
+                          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-2xl shadow-lg">
+                            {topCompetitor.profile.avatar}
+                          </div>
+                          <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center shadow-md">
+                            <Trophy className="w-3 h-3 text-white" />
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">
+                            {topCompetitor.profile.name}
+                          </h4>
+                          <p className="text-orange-600 dark:text-orange-400 font-medium">
+                            🏆 Current Champion
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-4xl font-bold text-orange-500 mb-1">
+                          #1
+                        </div>
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                          Rank
+                        </p>
+                      </div>
                     </div>
-                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center shadow-md">
-                      <Trophy className="w-4 h-4 text-white" />
-                    </div>
-                  </div>
-                  
-                  <h3 className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
-                    {topCompetitor.profile.name}
-                  </h3>
-                  
-                  <p className="text-orange-600 dark:text-orange-400 font-medium mb-4">
-                    🏆 Current Champion
-                  </p>
-                  
-                  <div className="bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-lg p-4 mb-4">
-                    <div className="grid grid-cols-2 gap-4 text-center">
-                      <div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div className="text-center">
                         <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                           {topCompetitor.completions}
                         </p>
@@ -256,7 +292,7 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
                           Tasks Completed
                         </p>
                       </div>
-                      <div>
+                      <div className="text-center">
                         <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                           {Math.round(topCompetitor.accuracy)}%
                         </p>
@@ -266,35 +302,109 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
                       </div>
                     </div>
                   </div>
-                  
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                    Leading the competition over the last 14 days
-                  </p>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Trophy className="w-16 h-16 mx-auto mb-4 text-neutral-300 dark:text-neutral-600" />
-                  <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">
-                    No Champion Yet
-                  </h3>
-                  <p className="text-neutral-600 dark:text-neutral-400 mb-4">
-                    Complete some tasks to compete for the top spot!
-                  </p>
-                  
-                  {/* Show competitor info */}
-                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-                    <p className="text-sm text-blue-700 dark:text-blue-300">
-                      <strong>{taskCompetitors.length}</strong> competitor{taskCompetitors.length !== 1 ? 's' : ''} registered:
+                ) : (
+                  <div className="text-center py-8 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+                    <Trophy className="w-16 h-16 mx-auto mb-4 text-neutral-300 dark:text-neutral-600" />
+                    <h4 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">
+                      No Champion Yet
+                    </h4>
+                    <p className="text-neutral-600 dark:text-neutral-400 mb-4">
+                      Complete some tasks to compete for the top spot!
                     </p>
-                    <div className="flex flex-wrap justify-center gap-2 mt-2">
-                      {taskCompetitors.map(competitor => (
-                        <div key={competitor.id} className="flex items-center space-x-1 px-2 py-1 bg-blue-100 dark:bg-blue-800/30 rounded-full">
-                          <span className="text-sm">{competitor.avatar}</span>
-                          <span className="text-xs text-blue-700 dark:text-blue-300">{competitor.name}</span>
-                        </div>
-                      ))}
+                    
+                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 max-w-md mx-auto">
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        <strong>{taskCompetitors.length}</strong> competitor{taskCompetitors.length !== 1 ? 's' : ''} registered:
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-2 mt-2">
+                        {taskCompetitors.map(competitor => (
+                          <div key={competitor.id} className="flex items-center space-x-1 px-2 py-1 bg-blue-100 dark:bg-blue-800/30 rounded-full">
+                            <span className="text-sm">{competitor.avatar}</span>
+                            <span className="text-xs text-blue-700 dark:text-blue-300">{competitor.name}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
+                )}
+              </div>
+
+              {/* Top Collaborator Section (conditional) */}
+              {state.settings.showTopCollaborator && (
+                <div>
+                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
+                    <Crown className="w-5 h-5 mr-2 text-blue-500" />
+                    Top Collaborator (Last 14 Days)
+                  </h3>
+                  
+                  {collaborativeTasks.length > 0 && topCollaborator ? (
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="relative">
+                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-2xl shadow-lg">
+                              {topCollaborator.profile.avatar}
+                            </div>
+                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center shadow-md">
+                              <Crown className="w-3 h-3 text-white" />
+                            </div>
+                          </div>
+                          <div>
+                            <h4 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">
+                              {topCollaborator.profile.name}
+                            </h4>
+                            <p className="text-blue-600 dark:text-blue-400 font-medium">
+                              👑 Champion Collaborator
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-4xl font-bold text-blue-500 mb-1">
+                            #1
+                          </div>
+                          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                            Rank
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                            {topCollaborator.completions}
+                          </p>
+                          <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                            Collaborative Tasks
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                            {Math.round(topCollaborator.accuracy)}%
+                          </p>
+                          <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                            Accuracy Rate
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-4 p-3 bg-blue-100 dark:bg-blue-800/30 rounded-lg">
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                          Based on completion of {collaborativeTasks.length} collaborative task{collaborativeTasks.length !== 1 ? 's' : ''} 
+                          (tasks assigned to multiple people)
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+                      <Crown className="w-16 h-16 mx-auto mb-4 text-neutral-300 dark:text-neutral-600" />
+                      <h4 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">
+                        No Collaborative Tasks Yet
+                      </h4>
+                      <p className="text-neutral-600 dark:text-neutral-400">
+                        Create tasks assigned to multiple people to see collaboration statistics.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

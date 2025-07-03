@@ -183,6 +183,7 @@
     "enableNotifications": false,
     "autoArchiveCompleted": false,
     "archiveDays": 30,
+    "showTopCollaborator": true,
     "ai": {
       "apiKey": "",
       "provider": "openai",

@@ -60,6 +60,11 @@ export const defaultProfiles: UserProfile[] = [
     isActive: true,
     createdAt: new Date(),
     isTaskCompetitor: true, // Default to participating in competition
+    permissions: {
+      canEditTasks: true,
+      canCreateTasks: true,
+      canDeleteTasks: true,
+    },
   },
 ];
 
@@ -69,6 +74,7 @@ export const defaultSettings: AppSettings = {
   enableNotifications: true,
   autoArchiveCompleted: false,
   archiveDays: 30,
+  showTopCollaborator: true, // Default to showing Top Collaborator
   ai: {
     apiKey: '',
     provider: 'openai',

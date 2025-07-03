@@ -28,6 +28,10 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   const activeProfile = state.profiles.find(p => p.id === state.activeProfileId);
   const completedByProfile = task.completedBy ? state.profiles.find(p => p.id === task.completedBy) : null;
 
+  // Check profile permissions
+  const canEdit = activeProfile?.permissions?.canEditTasks ?? true;
+  const canDelete = activeProfile?.permissions?.canDeleteTasks ?? true;
+
   // Check if device is mobile/touch
   useEffect(() => {
     isMobile.current = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -58,6 +62,8 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   };
 
   const handleDelete = () => {
+    if (!canDelete) return;
+    
     if (window.confirm(`Are you sure you want to delete "${task.title}"?`)) {
       dispatch({ type: 'DELETE_TASK', taskId: task.id });
     }
@@ -67,6 +73,8 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   };
 
   const handleEdit = () => {
+    if (!canEdit) return;
+    
     if (onEdit) {
       onEdit(task);
     }
@@ -235,13 +243,15 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
       {(showSwipeActions || swipeOffset < 0) && (
         <div className="absolute right-0 top-0 h-full flex items-center bg-neutral-100 dark:bg-neutral-700 rounded-lg">
           <div className="flex items-center space-x-2 px-4">
-            <button
-              onClick={handleEdit}
-              className="p-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors duration-200"
-              aria-label="Edit task"
-            >
-              <Edit className="w-4 h-4" />
-            </button>
+            {canEdit && (
+              <button
+                onClick={handleEdit}
+                className="p-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors duration-200"
+                aria-label="Edit task"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+            )}
             
             {task.isCompleted && (
               <>
@@ -263,13 +273,15 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
               </>
             )}
             
-            <button
-              onClick={handleDelete}
-              className="p-2 rounded-lg bg-error-500 text-white hover:bg-error-600 transition-colors duration-200"
-              aria-label="Delete task"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            {canDelete && (
+              <button
+                onClick={handleDelete}
+                className="p-2 rounded-lg bg-error-500 text-white hover:bg-error-600 transition-colors duration-200"
+                aria-label="Delete task"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -362,14 +374,16 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
 
                 {showMenu && (
                   <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-neutral-800 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-700 py-1 z-[9999] animate-slide-down">
-                    {/* Edit option - always available */}
-                    <button
-                      onClick={handleEdit}
-                      className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
-                    >
-                      <Edit className="w-4 h-4 text-neutral-500" />
-                      <span className="text-sm text-neutral-700 dark:text-neutral-300">Edit</span>
-                    </button>
+                    {/* Edit option - only if allowed */}
+                    {canEdit && (
+                      <button
+                        onClick={handleEdit}
+                        className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+                      >
+                        <Edit className="w-4 h-4 text-neutral-500" />
+                        <span className="text-sm text-neutral-700 dark:text-neutral-300">Edit</span>
+                      </button>
+                    )}
                     
                     {/* Completed task options */}
                     {task.isCompleted && (
@@ -392,14 +406,16 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
                       </>
                     )}
                     
-                    {/* Delete option - always available */}
-                    <button
-                      onClick={handleDelete}
-                      className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-error-50 dark:hover:bg-error-900/20 transition-colors duration-200"
-                    >
-                      <Trash2 className="w-4 h-4 text-error-500" />
-                      <span className="text-sm text-error-600 dark:text-error-400">Delete</span>
-                    </button>
+                    {/* Delete option - only if allowed */}
+                    {canDelete && (
+                      <button
+                        onClick={handleDelete}
+                        className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-error-50 dark:hover:bg-error-900/20 transition-colors duration-200"
+                      >
+                        <Trash2 className="w-4 h-4 text-error-500" />
+                        <span className="text-sm text-error-600 dark:text-error-400">Delete</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

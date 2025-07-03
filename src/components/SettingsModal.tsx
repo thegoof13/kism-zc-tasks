@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, Users, FolderOpen, History, Brain, Palette, Bell, Archive, Plus, Edit, Trash2, Save, Calendar, Type, Trophy, Lock, Shield, ExternalLink } from 'lucide-react';
+import { X, Settings, Users, FolderOpen, History, Brain, Palette, Bell, Archive, Plus, Edit, Trash2, Save, Calendar, Type, Trophy, Lock, Shield, ExternalLink, UserCheck, UserX, Edit3, Trash, PlusCircle } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { getIconComponent, getAvailableIcons } from '../utils/icons';
 import { AIQueryModal } from './AIQueryModal';
@@ -266,6 +266,33 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
 
       <div>
         <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
+          Competition & Collaboration
+        </h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                Show Top Collaborator in Trophy
+              </label>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                Display collaboration statistics in the trophy popup
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={state.settings.showTopCollaborator}
+              onChange={(e) => dispatch({
+                type: 'UPDATE_SETTINGS',
+                updates: { showTopCollaborator: e.target.checked }
+              })}
+              className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
           Notifications
         </h3>
         <div className="space-y-4">
@@ -444,6 +471,11 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
               avatar: '👤',
               isActive: false,
               isTaskCompetitor: false,
+              permissions: {
+                canEditTasks: true,
+                canCreateTasks: true,
+                canDeleteTasks: true,
+              },
             };
             dispatch({ type: 'ADD_PROFILE', profile: newProfile });
           }}
@@ -490,11 +522,24 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                         </div>
                       )}
                     </div>
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                      {profile.id === state.activeProfileId ? 'Active' : 'Inactive'}
-                      {profile.isTaskCompetitor && ' • Participating in task competition'}
-                      {profile.pin && ' • PIN protected'}
-                    </p>
+                    <div className="flex items-center space-x-4 text-xs text-neutral-500 dark:text-neutral-400">
+                      <span>{profile.id === state.activeProfileId ? 'Active' : 'Inactive'}</span>
+                      {profile.isTaskCompetitor && <span>• Competitor</span>}
+                      {profile.pin && <span>• PIN protected</span>}
+                      
+                      {/* Permission indicators */}
+                      <div className="flex items-center space-x-1">
+                        {profile.permissions?.canCreateTasks && (
+                          <PlusCircle className="w-3 h-3 text-success-500" title="Can create tasks" />
+                        )}
+                        {profile.permissions?.canEditTasks && (
+                          <Edit3 className="w-3 h-3 text-primary-500" title="Can edit tasks" />
+                        )}
+                        {profile.permissions?.canDeleteTasks && (
+                          <Trash className="w-3 h-3 text-error-500" title="Can delete tasks" />
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -964,6 +1009,11 @@ function ProfileEditForm({
     /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(profile.avatar) ? 'emoji' : 'text'
   );
 
+  // Profile permissions
+  const [canEditTasks, setCanEditTasks] = useState(profile.permissions?.canEditTasks ?? true);
+  const [canCreateTasks, setCanCreateTasks] = useState(profile.permissions?.canCreateTasks ?? true);
+  const [canDeleteTasks, setCanDeleteTasks] = useState(profile.permissions?.canDeleteTasks ?? true);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave({ 
@@ -971,7 +1021,12 @@ function ProfileEditForm({
       color, 
       avatar, 
       isTaskCompetitor,
-      pin: pin.trim() || undefined // Only save PIN if it's not empty
+      pin: pin.trim() || undefined, // Only save PIN if it's not empty
+      permissions: {
+        canEditTasks,
+        canCreateTasks,
+        canDeleteTasks,
+      },
     });
   };
 
@@ -1106,6 +1161,83 @@ function ProfileEditForm({
             <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
               {name}
             </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Task Permissions */}
+      <div className="space-y-3">
+        <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-lg border border-green-200 dark:border-green-800">
+          <div className="flex items-center space-x-2 mb-3">
+            <UserCheck className="w-5 h-5 text-green-600 dark:text-green-400" />
+            <label className="text-sm font-medium text-green-800 dark:text-green-200">
+              Task Permissions
+            </label>
+          </div>
+          <p className="text-xs text-green-700 dark:text-green-300 mb-4">
+            Control what this profile can do with tasks. Unchecked permissions will hide or disable related features.
+          </p>
+          
+          <div className="grid grid-cols-1 gap-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <PlusCircle className="w-4 h-4 text-success-500" />
+                <div>
+                  <label className="text-sm font-medium text-green-800 dark:text-green-200">
+                    Can Create Tasks
+                  </label>
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    Allow adding new tasks and using the "Add Task" button
+                  </p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={canCreateTasks}
+                onChange={(e) => setCanCreateTasks(e.target.checked)}
+                className="w-4 h-4 text-green-500 bg-green-100 border-green-300 rounded focus:ring-green-500"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Edit3 className="w-4 h-4 text-primary-500" />
+                <div>
+                  <label className="text-sm font-medium text-green-800 dark:text-green-200">
+                    Can Edit Tasks
+                  </label>
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    Allow modifying existing tasks (title, group, recurrence, etc.)
+                  </p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={canEditTasks}
+                onChange={(e) => setCanEditTasks(e.target.checked)}
+                className="w-4 h-4 text-green-500 bg-green-100 border-green-300 rounded focus:ring-green-500"
+              />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Trash className="w-4 h-4 text-error-500" />
+                <div>
+                  <label className="text-sm font-medium text-green-800 dark:text-green-200">
+                    Can Delete Tasks
+                  </label>
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    Allow permanently removing tasks from the system
+                  </p>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={canDeleteTasks}
+                onChange={(e) => setCanDeleteTasks(e.target.checked)}
+                className="w-4 h-4 text-green-500 bg-green-100 border-green-300 rounded focus:ring-green-500"
+              />
+            </div>
           </div>
         </div>
       </div>
