@@ -99,21 +99,24 @@ validate_ssl_certificate() {
     
     print_status "Validating SSL certificate for $domain..."
     
-    # Check if certificate files exist
-    if [[ ! -f "$cert_path" ]]; then
-        print_warning "Certificate file not found: $cert_path"
+    # Check if certificate files exist and are readable
+    if [[ ! -f "$cert_path" ]] || [[ ! -r "$cert_path" ]]; then
+        print_warning "Certificate file not found or not readable: $cert_path"
         return 1
     fi
     
-    if [[ ! -f "$key_path" ]]; then
-        print_warning "Private key file not found: $key_path"
+    if [[ ! -f "$key_path" ]] || [[ ! -r "$key_path" ]]; then
+        print_warning "Private key file not found or not readable: $key_path"
         return 1
     fi
+    
+    print_status "Found certificate: $cert_path"
+    print_status "Found private key: $key_path"
     
     # Check certificate expiry
     local expiry_date
-    if ! expiry_date=$(openssl x509 -enddate -noout -in "$cert_path" 2>/dev/null | cut -d= -f2); then
-        print_warning "Failed to read certificate expiry date"
+    if ! expiry_date=$(sudo openssl x509 -enddate -noout -in "$cert_path" 2>/dev/null | cut -d= -f2); then
+        print_warning "Failed to read certificate expiry date from $cert_path"
         return 1
     fi
     
@@ -139,28 +142,51 @@ validate_ssl_certificate() {
     fi
     
     # Check if certificate matches domain
-    local cert_domains
-    if ! cert_domains=$(openssl x509 -text -noout -in "$cert_path" 2>/dev/null | grep -A1 "Subject Alternative Name" | tail -1 | sed 's/DNS://g' | tr ',' '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//' 2>/dev/null); then
-        # Fallback to CN if SAN is not available
-        if ! cert_domains=$(openssl x509 -subject -noout -in "$cert_path" 2>/dev/null | sed 's/.*CN=\([^,]*\).*/\1/' 2>/dev/null); then
-            print_warning "Failed to extract domains from certificate"
-            return 1
+    local cert_domains=""
+    
+    # Try to get Subject Alternative Names first
+    local san_domains
+    if san_domains=$(sudo openssl x509 -text -noout -in "$cert_path" 2>/dev/null | grep -A1 "Subject Alternative Name" | tail -1 | sed 's/DNS://g' | tr ',' '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//' 2>/dev/null); then
+        if [[ -n "$san_domains" ]]; then
+            cert_domains="$san_domains"
         fi
     fi
+    
+    # If no SAN found, try to get CN from subject
+    if [[ -z "$cert_domains" ]]; then
+        local cn_domain
+        if cn_domain=$(sudo openssl x509 -subject -noout -in "$cert_path" 2>/dev/null | sed -n 's/.*CN=\([^,/]*\).*/\1/p' 2>/dev/null); then
+            if [[ -n "$cn_domain" ]]; then
+                cert_domains="$cn_domain"
+            fi
+        fi
+    fi
+    
+    if [[ -z "$cert_domains" ]]; then
+        print_warning "Failed to extract domains from certificate"
+        return 1
+    fi
+    
+    print_status "Certificate covers domains: $(echo "$cert_domains" | tr '\n' ', ' | sed 's/, $//')"
     
     # Check if our domain is in the certificate
     local domain_found=false
     while IFS= read -r cert_domain; do
         if [[ -n "$cert_domain" ]]; then
+            # Remove any whitespace
+            cert_domain=$(echo "$cert_domain" | tr -d '[:space:]')
+            
             # Handle wildcard certificates
             if [[ "$cert_domain" == "*."* ]]; then
                 local wildcard_base="${cert_domain#*.}"
                 if [[ "$domain" == *".$wildcard_base" ]] || [[ "$domain" == "$wildcard_base" ]]; then
                     domain_found=true
+                    print_status "Domain matches wildcard certificate: $cert_domain"
                     break
                 fi
             elif [[ "$cert_domain" == "$domain" ]]; then
                 domain_found=true
+                print_status "Domain matches certificate: $cert_domain"
                 break
             fi
         fi
@@ -182,22 +208,38 @@ check_existing_ssl() {
     
     print_status "Checking for existing SSL certificates for $domain..."
     
-    # Common SSL certificate locations
+    # Primary Let's Encrypt location (most common)
+    local letsencrypt_cert="/etc/letsencrypt/live/$domain/fullchain.pem"
+    local letsencrypt_key="/etc/letsencrypt/live/$domain/privkey.pem"
+    
+    # Check Let's Encrypt first (most likely location)
+    if [[ -f "$letsencrypt_cert" ]] && [[ -f "$letsencrypt_key" ]]; then
+        print_status "Found Let's Encrypt certificate for $domain"
+        if validate_ssl_certificate "$domain" "$letsencrypt_cert" "$letsencrypt_key"; then
+            SSL_CERT_PATH="$letsencrypt_cert"
+            SSL_KEY_PATH="$letsencrypt_key"
+            EXISTING_SSL=true
+            return 0
+        fi
+    fi
+    
+    # Alternative certificate locations
     local cert_locations=(
-        "/etc/letsencrypt/live/$domain/fullchain.pem"
         "/etc/ssl/certs/$domain.crt"
         "/etc/ssl/certs/$domain.pem"
         "/etc/nginx/ssl/$domain.crt"
         "/etc/nginx/ssl/$domain.pem"
         "/usr/local/etc/ssl/certs/$domain.crt"
         "/usr/local/etc/ssl/certs/$domain.pem"
+        "/etc/pki/tls/certs/$domain.crt"
+        "/etc/pki/tls/certs/$domain.pem"
     )
     
     local key_locations=(
-        "/etc/letsencrypt/live/$domain/privkey.pem"
         "/etc/ssl/private/$domain.key"
         "/etc/nginx/ssl/$domain.key"
         "/usr/local/etc/ssl/private/$domain.key"
+        "/etc/pki/tls/private/$domain.key"
     )
     
     # Check each certificate location
