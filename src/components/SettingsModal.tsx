@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { X, Settings, Users, History, Shield, Plus, Edit, Trash2, Eye, Brain, Trophy, Check, Lock, Clock, User, CheckCircle, AlertTriangle, Crown, Bell, Calendar, ExternalLink } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, Settings, Users, History, Brain, Shield, User, Plus, Edit, Trash2, Trophy, Crown, Eye, ExternalLink, Lock, Unlock, CheckCircle, AlertCircle, Bell, Calendar, Palette, Monitor, Sun, Moon, Key, Save, Cancel } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
+import { useTheme } from '../hooks/useTheme';
 import { HistoryAnalytics } from './HistoryAnalytics';
 import { AIQueryModal } from './AIQueryModal';
 import { PasswordModal } from './PasswordModal';
@@ -12,58 +13,123 @@ interface SettingsModalProps {
   isSettingsPasswordSet: boolean;
 }
 
-type TabType = 'general' | 'groups' | 'profiles' | 'history' | 'security' | 'ai';
-
-const availableAvatars = [
-  '👤', '👨', '👩', '🧑', '👦', '👧', '👴', '👵', '🧔', '👱',
-  '🎭', '🤖', '👽', '🦸', '🧙', '🧚', '🐱', '🐶', '🦊', '🐻'
-];
-
-const availableColors = [
-  '#6366F1', '#8B5CF6', '#EC4899', '#EF4444', '#F59E0B', 
-  '#10B981', '#06B6D4', '#3B82F6', '#6366F1', '#8B5CF6'
-];
-
-const availableIcons = [
-  { name: 'User', icon: User },
-  { name: 'Briefcase', icon: Settings },
-  { name: 'Heart', icon: Trophy },
-  { name: 'Home', icon: Shield },
-  { name: 'Book', icon: History },
-  { name: 'Car', icon: Users },
-];
+type TabType = 'general' | 'profiles' | 'groups' | 'history' | 'ai' | 'security';
 
 export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettingsPasswordSet }: SettingsModalProps) {
   const { state, dispatch } = useApp();
+  const { isDark, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('general');
-  const [showDetailedHistory, setShowDetailedHistory] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
+  const [showDetailedHistory, setShowDetailedHistory] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordModalConfig, setPasswordModalConfig] = useState<{
     title: string;
     description: string;
     onSuccess: () => void;
     isSettingPassword?: boolean;
-  } | null>(null);
+  }>({
+    title: '',
+    description: '',
+    onSuccess: () => {},
+  });
 
-  // AI Settings state
+  // Profile editing states
+  const [editingProfile, setEditingProfile] = useState<string | null>(null);
+  const [editProfileName, setEditProfileName] = useState('');
+  const [editProfileAvatar, setEditProfileAvatar] = useState('');
+  const [editProfileColor, setEditProfileColor] = useState('');
+
+  // AI settings state
   const [aiProvider, setAiProvider] = useState(state.settings.ai.provider);
   const [aiModel, setAiModel] = useState(state.settings.ai.model);
   const [aiApiKey, setAiApiKey] = useState(state.settings.ai.apiKey);
   const [aiEnabled, setAiEnabled] = useState(state.settings.ai.enabled);
-  const [aiConfigured, setAiConfigured] = useState(false);
-  const [aiMinimized, setAiMinimized] = useState(false);
+  const [isAiMinimized, setIsAiMinimized] = useState(!state.settings.ai.enabled);
 
-  // Form states
-  const [editingGroup, setEditingGroup] = useState<string | null>(null);
-  const [editingProfile, setEditingProfile] = useState<string | null>(null);
-  const [newGroupName, setNewGroupName] = useState('');
-  const [newProfileName, setNewProfileName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    setAiConfigured(state.settings.ai.enabled && !!state.settings.ai.apiKey);
-    setAiMinimized(state.settings.ai.enabled && !!state.settings.ai.apiKey);
-  }, [state.settings.ai]);
+  if (!isOpen) return null;
+
+  const handleDetailedHistoryClick = () => {
+    const userChoice = window.confirm(
+      "How would you like to view the detailed history?\n\n" +
+      "OK = Open in new tab (formatted table)\n" +
+      "Cancel = View in this modal (100 items)"
+    );
+
+    if (userChoice) {
+      // Open in new tab with formatted HTML
+      const historyHtml = generateHistoryHTML();
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(historyHtml);
+        newWindow.document.close();
+      }
+    } else {
+      // Show in modal
+      setShowDetailedHistory(true);
+    }
+  };
+
+  const generateHistoryHTML = () => {
+    const sortedHistory = [...state.history].sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>ZenTasks - Detailed History</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+          th { background-color: #f5f5f5; font-weight: 600; }
+          .completed { color: #059669; }
+          .unchecked { color: #d97706; }
+          .reset { color: #7c3aed; }
+          .restored { color: #dc2626; }
+          .timestamp { font-size: 0.875rem; color: #6b7280; }
+          .task-title { font-weight: 500; }
+          .profile-name { font-size: 0.875rem; color: #374151; }
+          .details { font-size: 0.875rem; color: #6b7280; font-style: italic; }
+          h1 { color: #1f2937; margin-bottom: 10px; }
+          .summary { background-color: #f9fafb; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        </style>
+      </head>
+      <body>
+        <h1>ZenTasks - Detailed Activity History</h1>
+        <div class="summary">
+          <strong>Total Entries:</strong> ${sortedHistory.length}<br>
+          <strong>Generated:</strong> ${new Date().toLocaleString()}
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Task</th>
+              <th>Action</th>
+              <th>Profile</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sortedHistory.map(entry => `
+              <tr>
+                <td class="timestamp">${new Date(entry.timestamp).toLocaleString()}</td>
+                <td class="task-title">${entry.taskTitle}</td>
+                <td class="${entry.action}">${entry.action}</td>
+                <td class="profile-name">${entry.profileName}</td>
+                <td class="details">${entry.details || '-'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+  };
 
   const handleSaveAISettings = () => {
     dispatch({
@@ -73,193 +139,170 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
           provider: aiProvider,
           model: aiModel,
           apiKey: aiApiKey,
-          enabled: aiEnabled && !!aiApiKey,
-        }
-      }
+          enabled: aiEnabled,
+        },
+      },
     });
-    setAiConfigured(aiEnabled && !!aiApiKey);
-    setAiMinimized(aiEnabled && !!aiApiKey);
+    
+    if (aiEnabled && aiApiKey) {
+      setIsAiMinimized(true);
+    }
   };
 
-  const handleTestAI = async () => {
-    // Simple test implementation
-    alert('AI connection test would be implemented here');
+  const handleAddProfile = () => {
+    const newProfile = {
+      name: 'New Profile',
+      color: '#6366F1',
+      avatar: '👤',
+      isActive: false,
+      isTaskCompetitor: false,
+      permissions: {
+        canEditTasks: true,
+        canCreateTasks: true,
+        canDeleteTasks: true,
+      },
+    };
+
+    dispatch({ type: 'ADD_PROFILE', profile: newProfile });
   };
 
-  const handleSetSettingsPassword = () => {
+  const handleEditProfile = (profileId: string) => {
+    const profile = state.profiles.find(p => p.id === profileId);
+    if (profile) {
+      setEditingProfile(profileId);
+      setEditProfileName(profile.name);
+      setEditProfileAvatar(profile.avatar);
+      setEditProfileColor(profile.color);
+    }
+  };
+
+  const handleSaveProfile = () => {
+    if (editingProfile) {
+      dispatch({
+        type: 'UPDATE_PROFILE',
+        profileId: editingProfile,
+        updates: {
+          name: editProfileName,
+          avatar: editProfileAvatar,
+          color: editProfileColor,
+        },
+      });
+      setEditingProfile(null);
+    }
+  };
+
+  const handleCancelEditProfile = () => {
+    setEditingProfile(null);
+    setEditProfileName('');
+    setEditProfileAvatar('');
+    setEditProfileColor('');
+  };
+
+  const handleDeleteProfile = (profileId: string) => {
+    const profile = state.profiles.find(p => p.id === profileId);
+    if (profile && window.confirm(`Are you sure you want to delete "${profile.name}"?`)) {
+      dispatch({ type: 'DELETE_PROFILE', profileId });
+    }
+  };
+
+  const handleUpdateProfilePermissions = (profileId: string, permission: string, value: boolean) => {
+    const profile = state.profiles.find(p => p.id === profileId);
+    if (profile) {
+      dispatch({
+        type: 'UPDATE_PROFILE',
+        profileId,
+        updates: {
+          permissions: {
+            ...profile.permissions,
+            [permission]: value,
+          },
+        },
+      });
+    }
+  };
+
+  const handleToggleTaskCompetitor = (profileId: string) => {
+    const profile = state.profiles.find(p => p.id === profileId);
+    if (profile) {
+      dispatch({
+        type: 'UPDATE_PROFILE',
+        profileId,
+        updates: {
+          isTaskCompetitor: !profile.isTaskCompetitor,
+        },
+      });
+    }
+  };
+
+  const handleSetProfilePin = (profileId: string) => {
     setPasswordModalConfig({
-      title: 'Set Settings Password',
-      description: 'Create a password to protect access to settings. This password will be required to open settings in the future.',
+      title: 'Set Profile PIN',
+      description: 'Set a PIN to protect this profile. The PIN will be required to access this profile.',
+      isSettingPassword: true,
       onSuccess: () => {
         setShowPasswordModal(false);
-        setPasswordModalConfig(null);
       },
-      isSettingPassword: true,
     });
     setShowPasswordModal(true);
   };
 
-  const handleAddGroup = () => {
-    if (!newGroupName.trim()) return;
-    
+  const handleRemoveProfilePin = (profileId: string) => {
     dispatch({
-      type: 'ADD_GROUP',
-      group: {
-        name: newGroupName.trim(),
-        color: availableColors[0],
-        icon: 'User',
-        completedDisplayMode: 'grey-out',
-        isCollapsed: false,
-        enableDueDates: false,
-        sortByDueDate: false,
-        defaultNotifications: false,
-      }
+      type: 'UPDATE_PROFILE',
+      profileId,
+      updates: { pin: undefined },
     });
-    setNewGroupName('');
   };
 
-  const handleAddProfile = () => {
-    if (!newProfileName.trim()) return;
-    
-    dispatch({
-      type: 'ADD_PROFILE',
-      profile: {
-        name: newProfileName.trim(),
-        color: availableColors[0],
-        avatar: availableAvatars[0],
-        isActive: true,
-        isTaskCompetitor: false,
-        permissions: {
-          canEditTasks: true,
-          canCreateTasks: true,
-          canDeleteTasks: true,
-        },
-        mealTimes: {
-          breakfast: '07:00',
-          lunch: '12:00',
-          dinner: '18:00',
-          nightcap: '21:00',
-        },
-      }
-    });
-    setNewProfileName('');
+  const handlePasswordModalSuccess = (password?: string) => {
+    if (passwordModalConfig.isSettingPassword && password) {
+      // This would be handled by the profile PIN setting logic
+      // For now, we'll just close the modal
+    }
+    passwordModalConfig.onSuccess();
   };
 
-  // Helper function to get profile task stats
-  const getProfileTaskStats = (profileId: string) => {
+  const generateProfileBypassUrl = (profileId: string) => {
+    const baseUrl = window.location.origin + window.location.pathname;
+    return `${baseUrl}?profile=${profileId}&bypass_pin=true`;
+  };
+
+  const openProfileInNewTab = (profileId: string) => {
+    const bypassUrl = generateProfileBypassUrl(profileId);
+    window.open(bypassUrl, '_blank');
+  };
+
+  // Calculate task statistics for each profile
+  const getProfileStats = (profileId: string) => {
     const profileTasks = state.tasks.filter(task => task.profiles.includes(profileId));
     const completedTasks = profileTasks.filter(task => task.isCompleted);
+    const totalTasks = profileTasks.length;
+    const completionPercentage = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;
+    
     return {
       completed: completedTasks.length,
-      total: profileTasks.length,
-      percentage: profileTasks.length > 0 ? Math.round((completedTasks.length / profileTasks.length) * 100) : 0
+      total: totalTasks,
+      percentage: completionPercentage,
     };
   };
 
-  // Helper function to check if profile is currently active (has open session)
-  const isProfileActive = (profileId: string) => {
-    return state.activeProfileId === profileId;
+  // Get group statistics
+  const getGroupStats = (groupId: string) => {
+    const groupTasks = state.tasks.filter(task => task.groupId === groupId);
+    const completedTasks = groupTasks.filter(task => task.isCompleted);
+    return {
+      completed: completedTasks.length,
+      total: groupTasks.length,
+    };
   };
-
-  // Helper function to get display mode label
-  const getDisplayModeLabel = (mode: string) => {
-    switch (mode) {
-      case 'grey-out': return 'Grey Out';
-      case 'grey-drop': return 'Grey & Drop';
-      case 'separate-completed': return 'Separate';
-      default: return mode;
-    }
-  };
-
-  // Helper function to handle detailed history view choice
-  const handleViewDetailedHistory = () => {
-    const choice = window.confirm(
-      "How would you like to view the detailed history?\n\n" +
-      "OK = Open in new tab\n" +
-      "Cancel = View in current page"
-    );
-    
-    if (choice) {
-      // Open in new tab - create a data URL with the history
-      const historyData = state.history.slice(0, 100).map(entry => ({
-        timestamp: entry.timestamp.toLocaleString(),
-        task: entry.taskTitle,
-        action: entry.action,
-        profile: entry.profileName,
-        details: entry.details || ''
-      }));
-      
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>ZenTasks - Detailed History</title>
-          <style>
-            body { font-family: system-ui, sans-serif; margin: 20px; background: #f9fafb; }
-            .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-            h1 { color: #374151; margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
-            th { background: #f3f4f6; font-weight: 600; color: #374151; }
-            tr:hover { background: #f9fafb; }
-            .action { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
-            .completed { background: #dcfce7; color: #166534; }
-            .unchecked { background: #fef3c7; color: #92400e; }
-            .reset { background: #fecaca; color: #991b1b; }
-            .restored { background: #dbeafe; color: #1e40af; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h1>ZenTasks - Detailed History (Last 100 entries)</h1>
-            <table>
-              <thead>
-                <tr>
-                  <th>Timestamp</th>
-                  <th>Task</th>
-                  <th>Action</th>
-                  <th>Profile</th>
-                  <th>Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${historyData.map(entry => `
-                  <tr>
-                    <td>${entry.timestamp}</td>
-                    <td>${entry.task}</td>
-                    <td><span class="action ${entry.action}">${entry.action}</span></td>
-                    <td>${entry.profile}</td>
-                    <td>${entry.details}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        </body>
-        </html>
-      `;
-      
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      
-      // Clean up the URL after a short delay
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } else {
-      // View in current page
-      setShowDetailedHistory(true);
-    }
-  };
-
-  if (!isOpen) return null;
 
   const tabs = [
     { id: 'general' as TabType, label: 'General', icon: Settings },
-    { id: 'groups' as TabType, label: 'Groups', icon: Trophy },
     { id: 'profiles' as TabType, label: 'Profiles', icon: Users },
+    { id: 'groups' as TabType, label: 'Groups', icon: Palette },
     { id: 'history' as TabType, label: 'History', icon: History },
-    { id: 'security' as TabType, label: 'Security', icon: Shield },
     { id: 'ai' as TabType, label: 'AI', icon: Brain },
+    { id: 'security' as TabType, label: 'Security', icon: Shield },
   ];
 
   return (
@@ -267,856 +310,805 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
       <div className="fixed inset-0 z-50 flex items-center justify-center p-2">
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
         
-        <div className="relative w-full max-w-4xl bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in max-h-[90vh] overflow-hidden flex settings-modal">
-          {/* Sidebar */}
-          <div className="w-16 md:w-64 bg-neutral-50 dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-700 flex-shrink-0">
-            <div className="p-4 border-b border-neutral-200 dark:border-neutral-700">
-              <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 hidden md:block">
-                Settings
-              </h2>
-              <Settings className="w-6 h-6 text-neutral-600 dark:text-neutral-400 md:hidden mx-auto" />
-            </div>
-            
-            <nav className="p-2">
-              {tabs.map(tab => {
-                const IconComponent = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg transition-colors duration-200 mb-1 ${
-                      activeTab === tab.id
-                        ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
-                        : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-                    }`}
-                  >
-                    <IconComponent className="w-5 h-5 flex-shrink-0" />
-                    <span className="font-medium hidden md:block">{tab.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
+        <div className="relative w-full max-w-4xl bg-white dark:bg-neutral-800 rounded-xl shadow-xl animate-scale-in max-h-[95vh] overflow-hidden flex flex-col settings-modal">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-700 flex-shrink-0">
+            <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
+              Settings
+            </h2>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+            >
+              <X className="w-5 h-5 text-neutral-500" />
+            </button>
           </div>
 
-          {/* Main Content */}
-          <div className="flex-1 flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
-              <h3 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
-                {tabs.find(t => t.id === activeTab)?.label}
-              </h3>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
-              >
-                <X className="w-5 h-5 text-neutral-500" />
-              </button>
+          <div className="flex flex-1 overflow-hidden">
+            {/* Sidebar - Responsive */}
+            <div className="w-16 md:w-48 bg-neutral-50 dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-700 flex-shrink-0">
+              <nav className="p-2 space-y-1">
+                {tabs.map(tab => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-left transition-colors duration-200 ${
+                        activeTab === tab.id
+                          ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300'
+                          : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5 flex-shrink-0" />
+                      <span className="hidden md:block font-medium">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {/* General Tab */}
-              {activeTab === 'general' && (
-                <div className="space-y-6">
-                  <div>
-                    <label className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        Theme
-                      </span>
-                      <select
-                        value={state.settings.theme}
-                        onChange={(e) => dispatch({
-                          type: 'UPDATE_SETTINGS',
-                          updates: { theme: e.target.value as any }
-                        })}
-                        className="input-primary w-32"
-                      >
-                        <option value="light">Light</option>
-                        <option value="dark">Dark</option>
-                        <option value="system">System</option>
-                      </select>
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        Show completed count in header
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={state.settings.showCompletedCount}
-                        onChange={(e) => dispatch({
-                          type: 'UPDATE_SETTINGS',
-                          updates: { showCompletedCount: e.target.checked }
-                        })}
-                        className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                      />
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        Enable notifications
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={state.settings.enableNotifications}
-                        onChange={(e) => dispatch({
-                          type: 'UPDATE_SETTINGS',
-                          updates: { enableNotifications: e.target.checked }
-                        })}
-                        className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                      />
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        Show Top Collaborator
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={state.settings.showTopCollaborator}
-                        onChange={(e) => dispatch({
-                          type: 'UPDATE_SETTINGS',
-                          updates: { showTopCollaborator: e.target.checked }
-                        })}
-                        className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                      />
-                    </label>
-                  </div>
-                </div>
-              )}
-
-              {/* Groups Tab */}
-              {activeTab === 'groups' && (
-                <div className="space-y-6">
-                  {/* Add Group */}
-                  <div className="flex space-x-3">
-                    <input
-                      type="text"
-                      value={newGroupName}
-                      onChange={(e) => setNewGroupName(e.target.value)}
-                      placeholder="New group name..."
-                      className="flex-1 input-primary"
-                    />
-                    <button
-                      onClick={handleAddGroup}
-                      disabled={!newGroupName.trim()}
-                      className="btn-primary px-4"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Group
-                    </button>
-                  </div>
-
-                  {/* Groups List */}
-                  <div className="space-y-4">
-                    {state.groups.map(group => {
-                      const groupTasks = state.tasks.filter(task => task.groupId === group.id);
-                      const completedTasks = groupTasks.filter(task => task.isCompleted);
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-6">
+                {/* General Tab */}
+                {activeTab === 'general' && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
+                        General Settings
+                      </h3>
                       
-                      return (
-                        <div key={group.id} className="card p-4">
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center space-x-3">
-                              <div 
-                                className="w-4 h-4 rounded-full"
-                                style={{ backgroundColor: group.color }}
-                              />
-                              <div>
-                                <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
-                                  {group.name}
-                                </h4>
-                                {/* Group summary info */}
-                                <div className="flex items-center space-x-3 mt-1">
-                                  <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                                    {completedTasks.length}/{groupTasks.length} completed
-                                  </span>
-                                  <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-full">
-                                    {getDisplayModeLabel(group.completedDisplayMode)}
-                                  </span>
-                                  {group.enableDueDates && (
-                                    <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-full flex items-center space-x-1">
-                                      <Calendar className="w-2.5 h-2.5" />
-                                      <span>Due dates</span>
-                                    </span>
-                                  )}
-                                  {group.defaultNotifications && (
-                                    <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 rounded-full flex items-center space-x-1">
-                                      <Bell className="w-2.5 h-2.5" />
-                                      <span>Notifications</span>
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => setEditingGroup(editingGroup === group.id ? null : group.id)}
-                                className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                              >
-                                <Edit className="w-4 h-4 text-neutral-500" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (window.confirm(`Delete group "${group.name}"?`)) {
-                                    dispatch({ type: 'DELETE_GROUP', groupId: group.id });
-                                  }
-                                }}
-                                className="p-2 rounded-lg hover:bg-error-100 dark:hover:bg-error-900/20"
-                              >
-                                <Trash2 className="w-4 h-4 text-error-500" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {editingGroup === group.id && (
-                            <div className="space-y-4 border-t border-neutral-200 dark:border-neutral-700 pt-4">
-                              {/* Completed Display Mode - Green box with tick */}
-                              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                                <div className="flex items-center space-x-2 mb-3">
-                                  <div className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                                    <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
-                                  </div>
-                                  <label className="text-sm font-medium text-green-800 dark:text-green-200">
-                                    Completed Display Mode
-                                  </label>
-                                </div>
-                                <select
-                                  value={group.completedDisplayMode}
-                                  onChange={(e) => dispatch({
-                                    type: 'UPDATE_GROUP',
-                                    groupId: group.id,
-                                    updates: { completedDisplayMode: e.target.value as any }
-                                  })}
-                                  className="w-full input-primary"
-                                >
-                                  <option value="grey-out">Grey Out</option>
-                                  <option value="grey-drop">Grey Drop</option>
-                                  <option value="separate-completed">Separate Completed</option>
-                                </select>
-                              </div>
-
-                              {/* Due Dates & Notifications - Yellow box with clock */}
-                              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                                <div className="flex items-center space-x-2 mb-3">
-                                  <div className="w-6 h-6 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
-                                    <Clock className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />
-                                  </div>
-                                  <label className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                                    Date & Time Settings
-                                  </label>
-                                </div>
-                                <div className="space-y-3">
-                                  <label className="flex items-center justify-between">
-                                    <span className="text-sm text-yellow-700 dark:text-yellow-300">Enable Due Dates</span>
-                                    <input
-                                      type="checkbox"
-                                      checked={group.enableDueDates}
-                                      onChange={(e) => dispatch({
-                                        type: 'UPDATE_GROUP',
-                                        groupId: group.id,
-                                        updates: { enableDueDates: e.target.checked }
-                                      })}
-                                      className="w-4 h-4 text-yellow-500 bg-neutral-100 border-neutral-300 rounded focus:ring-yellow-500"
-                                    />
-                                  </label>
-                                  <label className="flex items-center justify-between">
-                                    <span className="text-sm text-yellow-700 dark:text-yellow-300">Sort by Due Date</span>
-                                    <input
-                                      type="checkbox"
-                                      checked={group.sortByDueDate}
-                                      onChange={(e) => dispatch({
-                                        type: 'UPDATE_GROUP',
-                                        groupId: group.id,
-                                        updates: { sortByDueDate: e.target.checked }
-                                      })}
-                                      className="w-4 h-4 text-yellow-500 bg-neutral-100 border-neutral-300 rounded focus:ring-yellow-500"
-                                    />
-                                  </label>
-                                  <label className="flex items-center justify-between">
-                                    <span className="text-sm text-yellow-700 dark:text-yellow-300">Enable Notifications by Default</span>
-                                    <input
-                                      type="checkbox"
-                                      checked={group.defaultNotifications || false}
-                                      onChange={(e) => dispatch({
-                                        type: 'UPDATE_GROUP',
-                                        groupId: group.id,
-                                        updates: { defaultNotifications: e.target.checked }
-                                      })}
-                                      className="w-4 h-4 text-yellow-500 bg-neutral-100 border-neutral-300 rounded focus:ring-yellow-500"
-                                    />
-                                  </label>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Profiles Tab */}
-              {activeTab === 'profiles' && (
-                <div className="space-y-6">
-                  {/* Add Profile */}
-                  <div className="flex space-x-3">
-                    <input
-                      type="text"
-                      value={newProfileName}
-                      onChange={(e) => setNewProfileName(e.target.value)}
-                      placeholder="New profile name..."
-                      className="flex-1 input-primary"
-                    />
-                    <button
-                      onClick={handleAddProfile}
-                      disabled={!newProfileName.trim()}
-                      className="btn-primary px-4"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Profile
-                    </button>
-                  </div>
-
-                  {/* Profiles List */}
-                  <div className="space-y-4">
-                    {state.profiles.map(profile => {
-                      const taskStats = getProfileTaskStats(profile.id);
-                      const isActive = isProfileActive(profile.id);
-                      
-                      return (
-                        <div key={profile.id} className="card p-4">
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center space-x-3">
-                              <span className="text-xl">{profile.avatar}</span>
-                              <div>
-                                <div className="flex items-center space-x-2">
-                                  <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
-                                    {profile.name}
-                                  </h4>
-                                  {isActive && (
-                                    <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-full flex items-center space-x-1">
-                                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                                      <span>Active</span>
-                                    </span>
-                                  )}
-                                  {profile.isTaskCompetitor && (
-                                    <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-yellow-100 to-orange-100 dark:from-yellow-900/20 dark:to-orange-900/20 text-yellow-700 dark:text-yellow-300 rounded-full flex items-center space-x-1">
-                                      <Trophy className="w-2.5 h-2.5" />
-                                      <span>Competitor</span>
-                                    </span>
-                                  )}
-                                </div>
-                                {/* Profile task stats */}
-                                <div className="flex items-center space-x-3 mt-1">
-                                  <span className="text-sm text-neutral-600 dark:text-neutral-400">
-                                    {taskStats.completed}/{taskStats.total} tasks ({taskStats.percentage}%)
-                                  </span>
-                                  {profile.pin && (
-                                    <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-full flex items-center space-x-1">
-                                      <Lock className="w-2.5 h-2.5" />
-                                      <span>PIN</span>
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => setEditingProfile(editingProfile === profile.id ? null : profile.id)}
-                                className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                              >
-                                <Edit className="w-4 h-4 text-neutral-500" />
-                              </button>
-                              {state.profiles.length > 1 && (
-                                <button
-                                  onClick={() => {
-                                    if (window.confirm(`Delete profile "${profile.name}"?`)) {
-                                      dispatch({ type: 'DELETE_PROFILE', profileId: profile.id });
-                                    }
-                                  }}
-                                  className="p-2 rounded-lg hover:bg-error-100 dark:hover:bg-error-900/20"
-                                >
-                                  <Trash2 className="w-4 h-4 text-error-500" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-
-                          {editingProfile === profile.id && (
-                            <div className="space-y-4 border-t border-neutral-200 dark:border-neutral-700 pt-4">
-                              {/* Task Competitor - Gold box with trophy */}
-                              <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-3">
-                                    <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
-                                      <Trophy className="w-4 h-4 text-white" />
-                                    </div>
-                                    <div>
-                                      <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                                        Task Competitor
-                                      </p>
-                                      <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                                        Participate in task completion rankings
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <input
-                                    type="checkbox"
-                                    checked={profile.isTaskCompetitor || false}
-                                    onChange={(e) => dispatch({
-                                      type: 'UPDATE_PROFILE',
-                                      profileId: profile.id,
-                                      updates: { isTaskCompetitor: e.target.checked }
-                                    })}
-                                    className="w-4 h-4 text-yellow-500 bg-neutral-100 border-neutral-300 rounded focus:ring-yellow-500"
-                                  />
-                                </div>
-                              </div>
-
-                              {/* PIN Protection - Blue box with padlock */}
-                              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                                <div className="flex items-center space-x-2 mb-3">
-                                  <div className="w-6 h-6 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                                    <Lock className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                                  </div>
-                                  <label className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                                    PIN Protection
-                                  </label>
-                                </div>
-                                <input
-                                  type="text"
-                                  placeholder="Set PIN (4+ characters)"
-                                  value={profile.pin || ''}
-                                  onChange={(e) => dispatch({
-                                    type: 'UPDATE_PROFILE',
-                                    profileId: profile.id,
-                                    updates: { pin: e.target.value || undefined }
-                                  })}
-                                  className="w-full input-primary"
-                                />
-                              </div>
-
-                              {/* Permissions - Green box with shield */}
-                              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                                <div className="flex items-center space-x-2 mb-3">
-                                  <div className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                                    <Shield className="w-3 h-3 text-green-600 dark:text-green-400" />
-                                  </div>
-                                  <label className="text-sm font-medium text-green-800 dark:text-green-200">
-                                    Permissions
-                                  </label>
-                                </div>
-                                <div className="space-y-2">
-                                  <label className="flex items-center justify-between">
-                                    <span className="text-sm text-green-700 dark:text-green-300">Can Create Tasks</span>
-                                    <input
-                                      type="checkbox"
-                                      checked={profile.permissions?.canCreateTasks ?? true}
-                                      onChange={(e) => dispatch({
-                                        type: 'UPDATE_PROFILE',
-                                        profileId: profile.id,
-                                        updates: { 
-                                          permissions: { 
-                                            ...profile.permissions, 
-                                            canCreateTasks: e.target.checked 
-                                          } 
-                                        }
-                                      })}
-                                      className="w-4 h-4 text-green-500 bg-neutral-100 border-neutral-300 rounded focus:ring-green-500"
-                                    />
-                                  </label>
-                                  <label className="flex items-center justify-between">
-                                    <span className="text-sm text-green-700 dark:text-green-300">Can Edit Tasks</span>
-                                    <input
-                                      type="checkbox"
-                                      checked={profile.permissions?.canEditTasks ?? true}
-                                      onChange={(e) => dispatch({
-                                        type: 'UPDATE_PROFILE',
-                                        profileId: profile.id,
-                                        updates: { 
-                                          permissions: { 
-                                            ...profile.permissions, 
-                                            canEditTasks: e.target.checked 
-                                          } 
-                                        }
-                                      })}
-                                      className="w-4 h-4 text-green-500 bg-neutral-100 border-neutral-300 rounded focus:ring-green-500"
-                                    />
-                                  </label>
-                                  <label className="flex items-center justify-between">
-                                    <span className="text-sm text-green-700 dark:text-green-300">Can Delete Tasks</span>
-                                    <input
-                                      type="checkbox"
-                                      checked={profile.permissions?.canDeleteTasks ?? true}
-                                      onChange={(e) => dispatch({
-                                        type: 'UPDATE_PROFILE',
-                                        profileId: profile.id,
-                                        updates: { 
-                                          permissions: { 
-                                            ...profile.permissions, 
-                                            canDeleteTasks: e.target.checked 
-                                          } 
-                                        }
-                                      })}
-                                      className="w-4 h-4 text-green-500 bg-neutral-100 border-neutral-300 rounded focus:ring-green-500"
-                                    />
-                                  </label>
-                                </div>
-                              </div>
-
-                              {/* Avatar Selection */}
-                              <div>
-                                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                                  Avatar (or use text)
-                                </label>
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <input
-                                    type="text"
-                                    value={profile.avatar}
-                                    onChange={(e) => dispatch({
-                                      type: 'UPDATE_PROFILE',
-                                      profileId: profile.id,
-                                      updates: { avatar: e.target.value }
-                                    })}
-                                    className="flex-1 input-primary"
-                                    placeholder="Enter text or emoji"
-                                  />
-                                </div>
-                                <div className="grid grid-cols-10 gap-2">
-                                  {availableAvatars.map(avatar => (
-                                    <button
-                                      key={avatar}
-                                      onClick={() => dispatch({
-                                        type: 'UPDATE_PROFILE',
-                                        profileId: profile.id,
-                                        updates: { avatar }
-                                      })}
-                                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 ${
-                                        profile.avatar === avatar ? 'bg-primary-100 dark:bg-primary-900/20' : ''
-                                      }`}
-                                    >
-                                      {avatar}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* History Tab */}
-              {activeTab === 'history' && (
-                <div className="space-y-6">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                      Task Analytics
-                    </h4>
-                    <button
-                      onClick={handleViewDetailedHistory}
-                      className="btn-primary"
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      View Detailed History
-                    </button>
-                  </div>
-                  
-                  <HistoryAnalytics 
-                    history={state.history}
-                    tasks={state.tasks}
-                    profiles={state.profiles}
-                  />
-                </div>
-              )}
-
-              {/* Security Tab */}
-              {activeTab === 'security' && (
-                <div className="space-y-6">
-                  {/* Settings Password - Yellow box with shield */}
-                  <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
-                          <Shield className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                            Settings Password
-                          </p>
-                          <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                            Protect access to settings
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        {isSettingsPasswordSet && (
-                          <div className="flex items-center space-x-1">
-                            <CheckCircle className="w-4 h-4 text-green-500" />
-                            <span className="text-xs text-green-600 dark:text-green-400">Set</span>
-                          </div>
-                        )}
-                        <button
-                          onClick={handleSetSettingsPassword}
-                          className="btn-secondary text-sm"
-                        >
-                          {isSettingsPasswordSet ? 'Change' : 'Set'} Password
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Profile Security Overview */}
-                  <div>
-                    <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
-                      Profile Security
-                    </h4>
-                    <div className="space-y-3">
-                      {state.profiles.map(profile => (
-                        <div key={profile.id} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+                      <div className="space-y-4">
+                        {/* Theme */}
+                        <div className="flex items-center justify-between p-4 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
                           <div className="flex items-center space-x-3">
-                            <span className="text-lg">{profile.avatar}</span>
-                            <span className="font-medium text-neutral-900 dark:text-neutral-100">
-                              {profile.name}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            {profile.pin ? (
-                              <div className="flex items-center space-x-1 px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-full">
-                                <Lock className="w-3 h-3" />
-                                <span className="text-xs">PIN Protected</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center space-x-1 px-2 py-1 bg-neutral-200 dark:bg-neutral-600 text-neutral-600 dark:text-neutral-400 rounded-full">
-                                <User className="w-3 h-3" />
-                                <span className="text-xs">Open Access</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* AI Tab */}
-              {activeTab === 'ai' && (
-                <div className="space-y-6">
-                  {!aiConfigured ? (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="flex items-center space-x-2 mb-4">
-                          <input
-                            type="checkbox"
-                            checked={aiEnabled}
-                            onChange={(e) => setAiEnabled(e.target.checked)}
-                            className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                          />
-                          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                            Enable AI Assistant
-                          </span>
-                        </label>
-                      </div>
-
-                      {aiEnabled && (
-                        <>
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                              AI Provider
-                            </label>
-                            <select
-                              value={aiProvider}
-                              onChange={(e) => setAiProvider(e.target.value as any)}
-                              className="input-primary"
-                            >
-                              <option value="openai">OpenAI</option>
-                              <option value="anthropic">Anthropic (Claude)</option>
-                              <option value="gemini">Google Gemini</option>
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                              Model
-                            </label>
-                            <input
-                              type="text"
-                              value={aiModel}
-                              onChange={(e) => setAiModel(e.target.value)}
-                              className="input-primary"
-                              placeholder="e.g., gpt-4, claude-3-sonnet, gemini-pro"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                              API Key
-                            </label>
-                            <input
-                              type="password"
-                              value={aiApiKey}
-                              onChange={(e) => setAiApiKey(e.target.value)}
-                              className="input-primary"
-                              placeholder="Enter your API key..."
-                            />
-                          </div>
-
-                          <div className="flex space-x-3">
-                            <button
-                              onClick={handleTestAI}
-                              disabled={!aiApiKey}
-                              className="btn-secondary"
-                            >
-                              Test Connection
-                            </button>
-                            <button
-                              onClick={handleSaveAISettings}
-                              disabled={!aiApiKey}
-                              className="btn-primary"
-                            >
-                              Save Settings
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <CheckCircle className="w-6 h-6 text-green-500" />
+                            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
+                              {isDark ? <Moon className="w-5 h-5 text-blue-600 dark:text-blue-400" /> : <Sun className="w-5 h-5 text-blue-600 dark:text-blue-400" />}
+                            </div>
                             <div>
-                              <p className="font-medium text-green-800 dark:text-green-200">
-                                AI Assistant Configured
-                              </p>
-                              <p className="text-sm text-green-600 dark:text-green-400">
-                                Provider: {aiProvider} | Model: {aiModel}
+                              <p className="font-medium text-neutral-900 dark:text-neutral-100">Theme</p>
+                              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                                {state.settings.theme === 'system' ? 'System' : state.settings.theme === 'dark' ? 'Dark' : 'Light'}
                               </p>
                             </div>
                           </div>
                           <button
-                            onClick={() => setAiConfigured(false)}
-                            className="btn-secondary text-sm"
+                            onClick={toggleTheme}
+                            className="btn-secondary"
                           >
-                            Reconfigure
+                            Toggle
                           </button>
                         </div>
-                      </div>
 
+                        {/* Show Completed Count */}
+                        <div className="flex items-center justify-between p-4 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
+                              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-neutral-900 dark:text-neutral-100">Show Completed Count</p>
+                              <p className="text-sm text-neutral-600 dark:text-neutral-400">Display progress in header</p>
+                            </div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={state.settings.showCompletedCount}
+                            onChange={(e) => dispatch({
+                              type: 'UPDATE_SETTINGS',
+                              updates: { showCompletedCount: e.target.checked }
+                            })}
+                            className="w-5 h-5 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                          />
+                        </div>
+
+                        {/* Enable Notifications */}
+                        <div className="flex items-center justify-between p-4 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center">
+                              <Bell className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-neutral-900 dark:text-neutral-100">Enable Notifications</p>
+                              <p className="text-sm text-neutral-600 dark:text-neutral-400">Browser notifications for due dates and task resets</p>
+                            </div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={state.settings.enableNotifications}
+                            onChange={(e) => dispatch({
+                              type: 'UPDATE_SETTINGS',
+                              updates: { enableNotifications: e.target.checked }
+                            })}
+                            className="w-5 h-5 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                          />
+                        </div>
+
+                        {/* Show Top Collaborator */}
+                        <div className="flex items-center justify-between p-4 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
+                              <Crown className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-neutral-900 dark:text-neutral-100">Show Top Collaborator</p>
+                              <p className="text-sm text-neutral-600 dark:text-neutral-400">Display collaboration leaderboard in trophy popup</p>
+                            </div>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={state.settings.showTopCollaborator}
+                            onChange={(e) => dispatch({
+                              type: 'UPDATE_SETTINGS',
+                              updates: { showTopCollaborator: e.target.checked }
+                            })}
+                            className="w-5 h-5 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Profiles Tab */}
+                {activeTab === 'profiles' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                        User Profiles
+                      </h3>
                       <button
-                        onClick={() => setShowAIModal(true)}
-                        className="btn-primary w-full"
+                        onClick={handleAddProfile}
+                        className="btn-primary"
                       >
-                        <Brain className="w-4 h-4 mr-2" />
-                        Open AI Agent
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Profile
                       </button>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Detailed History Modal */}
-      {showDetailedHistory && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowDetailedHistory(false)} />
-          
-          <div className="relative w-full max-w-4xl bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
-              <h3 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
-                Detailed Task History (Last 100 entries)
-              </h3>
-              <button
-                onClick={() => setShowDetailedHistory(false)}
-                className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
-              >
-                <X className="w-5 h-5 text-neutral-500" />
-              </button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-              <div className="space-y-3">
-                {state.history.length === 0 ? (
-                  <p className="text-neutral-500 dark:text-neutral-400 text-center py-8">
-                    No activity history yet
-                  </p>
-                ) : (
-                  state.history.slice(0, 100).map(entry => (
-                    <div key={entry.id} className="card p-4 bg-neutral-50 dark:bg-neutral-800">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                            {entry.taskTitle}
-                          </p>
-                          <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                            {entry.action} by {entry.profileName}
-                          </p>
-                          {entry.details && (
-                            <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-                              {entry.details}
-                            </p>
-                          )}
+                    <div className="space-y-4">
+                      {state.profiles.map(profile => {
+                        const stats = getProfileStats(profile.id);
+                        const isEditing = editingProfile === profile.id;
+                        
+                        return (
+                          <div key={profile.id} className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center space-x-4">
+                                <div className="w-12 h-12 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center text-lg">
+                                  {isEditing ? (
+                                    <input
+                                      type="text"
+                                      value={editProfileAvatar}
+                                      onChange={(e) => setEditProfileAvatar(e.target.value)}
+                                      className="w-8 text-center bg-transparent border-none outline-none text-lg"
+                                      maxLength={2}
+                                    />
+                                  ) : (
+                                    profile.avatar
+                                  )}
+                                </div>
+                                <div className="flex-1">
+                                  {isEditing ? (
+                                    <div className="space-y-2">
+                                      <input
+                                        type="text"
+                                        value={editProfileName}
+                                        onChange={(e) => setEditProfileName(e.target.value)}
+                                        className="input-primary text-sm"
+                                        placeholder="Profile name"
+                                      />
+                                      <input
+                                        type="color"
+                                        value={editProfileColor}
+                                        onChange={(e) => setEditProfileColor(e.target.value)}
+                                        className="w-16 h-8 rounded border border-neutral-300 dark:border-neutral-600"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className="flex items-center space-x-2">
+                                        <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
+                                          {profile.name}
+                                        </h4>
+                                        
+                                        {/* Status Badges */}
+                                        {profile.id === state.activeProfileId && (
+                                          <span className="px-2 py-1 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-xs rounded-full font-medium flex items-center space-x-1">
+                                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                                            <span>Active</span>
+                                          </span>
+                                        )}
+                                        
+                                        {profile.isTaskCompetitor && (
+                                          <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 text-xs rounded-full font-medium flex items-center space-x-1">
+                                            <Trophy className="w-3 h-3" />
+                                            <span>Competitor</span>
+                                          </span>
+                                        )}
+                                        
+                                        {profile.pin && (
+                                          <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 text-xs rounded-full font-medium flex items-center space-x-1">
+                                            <Lock className="w-3 h-3" />
+                                            <span>PIN Protected</span>
+                                          </span>
+                                        )}
+                                      </div>
+                                      
+                                      <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                                        {stats.completed}/{stats.total} tasks ({stats.percentage}%)
+                                      </p>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center space-x-2">
+                                {isEditing ? (
+                                  <>
+                                    <button
+                                      onClick={handleSaveProfile}
+                                      className="p-2 rounded-lg bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/40 transition-colors duration-200"
+                                    >
+                                      <Save className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={handleCancelEditProfile}
+                                      className="p-2 rounded-lg bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors duration-200"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      onClick={() => handleEditProfile(profile.id)}
+                                      className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+                                    >
+                                      <Edit className="w-4 h-4 text-neutral-500" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteProfile(profile.id)}
+                                      className="p-2 rounded-lg hover:bg-error-100 dark:hover:bg-error-900/20 transition-colors duration-200"
+                                    >
+                                      <Trash2 className="w-4 h-4 text-error-500" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            {!isEditing && (
+                              <>
+                                {/* Task Competitor Toggle */}
+                                <div className="mb-4 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/10 dark:to-orange-900/10 border border-yellow-200 dark:border-yellow-800/30 rounded-lg">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                      <div className="w-8 h-8 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center">
+                                        <Trophy className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                                      </div>
+                                      <div>
+                                        <p className="font-medium text-neutral-900 dark:text-neutral-100">Task Competitor</p>
+                                        <p className="text-sm text-neutral-600 dark:text-neutral-400">Participate in task completion rankings</p>
+                                      </div>
+                                    </div>
+                                    <input
+                                      type="checkbox"
+                                      checked={profile.isTaskCompetitor || false}
+                                      onChange={() => handleToggleTaskCompetitor(profile.id)}
+                                      className="w-5 h-5 text-yellow-500 bg-neutral-100 border-neutral-300 rounded focus:ring-yellow-500"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* PIN Protection */}
+                                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/30 rounded-lg">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                      <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
+                                        <Lock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                      </div>
+                                      <div>
+                                        <p className="font-medium text-neutral-900 dark:text-neutral-100">PIN Protection</p>
+                                        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                                          {profile.pin ? 'PIN is set' : 'No PIN protection'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      {profile.pin ? (
+                                        <div className="flex items-center space-x-1">
+                                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                          <span className="text-xs text-green-600 dark:text-green-400 font-medium">Protected</span>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center space-x-1">
+                                          <div className="w-2 h-2 bg-neutral-400 rounded-full"></div>
+                                          <span className="text-xs text-neutral-500 dark:text-neutral-400">Open</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Permissions */}
+                                <div className="p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/30 rounded-lg">
+                                  <div className="flex items-center space-x-3 mb-3">
+                                    <div className="w-8 h-8 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
+                                      <Shield className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                    </div>
+                                    <div>
+                                      <p className="font-medium text-neutral-900 dark:text-neutral-100">Permissions</p>
+                                      <p className="text-sm text-neutral-600 dark:text-neutral-400">Control what this profile can do</p>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="space-y-2">
+                                    {[
+                                      { key: 'canCreateTasks', label: 'Can Create Tasks' },
+                                      { key: 'canEditTasks', label: 'Can Edit Tasks' },
+                                      { key: 'canDeleteTasks', label: 'Can Delete Tasks' },
+                                    ].map(permission => (
+                                      <label key={permission.key} className="flex items-center justify-between">
+                                        <span className="text-sm text-neutral-700 dark:text-neutral-300">
+                                          {permission.label}
+                                        </span>
+                                        <input
+                                          type="checkbox"
+                                          checked={profile.permissions?.[permission.key as keyof typeof profile.permissions] ?? true}
+                                          onChange={(e) => handleUpdateProfilePermissions(profile.id, permission.key, e.target.checked)}
+                                          className="w-4 h-4 text-green-500 bg-neutral-100 border-neutral-300 rounded focus:ring-green-500"
+                                        />
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Groups Tab */}
+                {activeTab === 'groups' && (
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                      Task Groups
+                    </h3>
+
+                    <div className="space-y-4">
+                      {state.groups.map(group => {
+                        const stats = getGroupStats(group.id);
+                        
+                        return (
+                          <div key={group.id} className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center space-x-4">
+                                <div 
+                                  className="w-12 h-12 rounded-lg flex items-center justify-center"
+                                  style={{ backgroundColor: group.color + '20' }}
+                                >
+                                  <div 
+                                    className="w-6 h-6 rounded-full"
+                                    style={{ backgroundColor: group.color }}
+                                  />
+                                </div>
+                                <div>
+                                  <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
+                                    {group.name}
+                                  </h4>
+                                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                                    {stats.completed}/{stats.total} completed
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {/* Completed Display Mode */}
+                              <div className="p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/30 rounded-lg">
+                                <div className="flex items-center space-x-3">
+                                  <div className="w-8 h-8 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
+                                    <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-neutral-900 dark:text-neutral-100">Display Mode</p>
+                                    <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                                      {group.completedDisplayMode === 'grey-out' && 'Grey Out'}
+                                      {group.completedDisplayMode === 'grey-drop' && 'Grey & Drop'}
+                                      {group.completedDisplayMode === 'separate-completed' && 'Separate'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Due Dates & Notifications */}
+                              <div className="p-3 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800/30 rounded-lg">
+                                <div className="flex items-center space-x-3">
+                                  <div className="w-8 h-8 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center">
+                                    <Calendar className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-neutral-900 dark:text-neutral-100">Features</p>
+                                    <div className="text-sm text-neutral-600 dark:text-neutral-400 space-y-1">
+                                      {group.enableDueDates && <div>• Due dates enabled</div>}
+                                      {group.sortByDueDate && <div>• Sort by due date</div>}
+                                      {group.defaultNotifications && <div>• Notifications by default</div>}
+                                      {!group.enableDueDates && !group.sortByDueDate && !group.defaultNotifications && (
+                                        <div>No special features</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* History Tab */}
+                {activeTab === 'history' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                        Activity History
+                      </h3>
+                      <button
+                        onClick={handleDetailedHistoryClick}
+                        className="btn-primary"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        View Detailed History
+                      </button>
+                    </div>
+
+                    {showDetailedHistory ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-lg font-medium text-neutral-900 dark:text-neutral-100">
+                            Detailed Activity Log (Last 100 entries)
+                          </h4>
+                          <button
+                            onClick={() => setShowDetailedHistory(false)}
+                            className="btn-secondary"
+                          >
+                            Show Analytics
+                          </button>
                         </div>
-                        <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                          {entry.timestamp.toLocaleDateString()} {entry.timestamp.toLocaleTimeString('en-US', { 
-                            hour: 'numeric', 
-                            minute: '2-digit',
-                            hour12: true 
-                          })}
-                        </span>
+                        
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                          {state.history.slice(0, 100).map(entry => (
+                            <div key={entry.id} className="card p-3 bg-neutral-50 dark:bg-neutral-800">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                                    {entry.taskTitle}
+                                  </p>
+                                  <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                                    {entry.action} by {entry.profileName}
+                                  </p>
+                                  {entry.details && (
+                                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                                      {entry.details}
+                                    </p>
+                                  )}
+                                </div>
+                                <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                                  {new Date(entry.timestamp).toLocaleDateString()} {new Date(entry.timestamp).toLocaleTimeString('en-US', { 
+                                    hour: 'numeric', 
+                                    minute: '2-digit',
+                                    hour12: true 
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <HistoryAnalytics 
+                        history={state.history}
+                        tasks={state.tasks}
+                        profiles={state.profiles}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* AI Tab */}
+                {activeTab === 'ai' && (
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                      AI Assistant
+                    </h3>
+
+                    {!isAiMinimized ? (
+                      <div className="space-y-4">
+                        {/* AI Provider */}
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                            AI Provider
+                          </label>
+                          <select
+                            value={aiProvider}
+                            onChange={(e) => setAiProvider(e.target.value as any)}
+                            className="input-primary"
+                          >
+                            <option value="openai">OpenAI</option>
+                            <option value="anthropic">Anthropic (Claude)</option>
+                            <option value="gemini">Google Gemini</option>
+                          </select>
+                        </div>
+
+                        {/* AI Model */}
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                            Model
+                          </label>
+                          <select
+                            value={aiModel}
+                            onChange={(e) => setAiModel(e.target.value)}
+                            className="input-primary"
+                          >
+                            {aiProvider === 'openai' && (
+                              <>
+                                <option value="gpt-4">GPT-4</option>
+                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                              </>
+                            )}
+                            {aiProvider === 'anthropic' && (
+                              <>
+                                <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                                <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+                                <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+                              </>
+                            )}
+                            {aiProvider === 'gemini' && (
+                              <>
+                                <option value="gemini-pro">Gemini Pro</option>
+                                <option value="gemini-pro-vision">Gemini Pro Vision</option>
+                              </>
+                            )}
+                          </select>
+                        </div>
+
+                        {/* API Key */}
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                            API Key
+                          </label>
+                          <input
+                            type="password"
+                            value={aiApiKey}
+                            onChange={(e) => setAiApiKey(e.target.value)}
+                            placeholder="Enter your API key..."
+                            className="input-primary"
+                          />
+                        </div>
+
+                        {/* Enable AI */}
+                        <div className="flex items-center justify-between p-4 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+                          <div>
+                            <p className="font-medium text-neutral-900 dark:text-neutral-100">Enable AI Assistant</p>
+                            <p className="text-sm text-neutral-600 dark:text-neutral-400">Allow AI-powered task insights</p>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={aiEnabled}
+                            onChange={(e) => setAiEnabled(e.target.checked)}
+                            className="w-5 h-5 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                          />
+                        </div>
+
+                        {/* Save Button */}
+                        <button
+                          onClick={handleSaveAISettings}
+                          className="btn-primary"
+                        >
+                          Save AI Settings
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        {state.settings.ai.enabled && state.settings.ai.apiKey ? (
+                          <div className="space-y-4">
+                            <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center mx-auto">
+                              <Brain className="w-8 h-8 text-white" />
+                            </div>
+                            <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                              AI Assistant Ready
+                            </h4>
+                            <p className="text-neutral-600 dark:text-neutral-400">
+                              Provider: {state.settings.ai.provider} • Model: {state.settings.ai.model}
+                            </p>
+                            <div className="flex justify-center space-x-3">
+                              <button
+                                onClick={() => setShowAIModal(true)}
+                                className="btn-primary"
+                              >
+                                <Brain className="w-4 h-4 mr-2" />
+                                Open AI Agent
+                              </button>
+                              <button
+                                onClick={() => setIsAiMinimized(false)}
+                                className="btn-secondary"
+                              >
+                                <Settings className="w-4 h-4 mr-2" />
+                                Configure
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <Brain className="w-16 h-16 mx-auto text-neutral-300 dark:text-neutral-600" />
+                            <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                              AI Assistant Not Configured
+                            </h4>
+                            <p className="text-neutral-600 dark:text-neutral-400">
+                              Configure your AI settings to enable intelligent task insights
+                            </p>
+                            <button
+                              onClick={() => setIsAiMinimized(false)}
+                              className="btn-primary"
+                            >
+                              <Settings className="w-4 h-4 mr-2" />
+                              Configure AI
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Security Tab */}
+                {activeTab === 'security' && (
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                      Security Settings
+                    </h3>
+
+                    <div className="space-y-4">
+                      {/* Settings Password */}
+                      <div className="p-4 bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800/30 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center">
+                              <Shield className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-neutral-900 dark:text-neutral-100">Settings Password</p>
+                              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                                Protect access to settings
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            {isSettingsPasswordSet ? (
+                              <div className="flex items-center space-x-2">
+                                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                                <span className="text-sm text-green-600 dark:text-green-400 font-medium">Protected</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center space-x-2">
+                                <div className="w-3 h-3 bg-neutral-400 rounded-full"></div>
+                                <span className="text-sm text-neutral-500 dark:text-neutral-400">Not Set</span>
+                              </div>
+                            )}
+                            <button
+                              onClick={() => {
+                                setPasswordModalConfig({
+                                  title: 'Set Settings Password',
+                                  description: 'Set a password to protect access to settings.',
+                                  isSettingPassword: true,
+                                  onSuccess: () => setShowPasswordModal(false),
+                                });
+                                setShowPasswordModal(true);
+                              }}
+                              className="btn-secondary text-sm"
+                            >
+                              {isSettingsPasswordSet ? 'Change' : 'Set Password'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Profile Security */}
+                      <div className="space-y-3">
+                        <h4 className="font-medium text-neutral-900 dark:text-neutral-100">Profile Security</h4>
+                        
+                        {state.profiles.map(profile => (
+                          <div key={profile.id} className="p-4 border border-neutral-200 dark:border-neutral-700 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <span className="text-lg">{profile.avatar}</span>
+                                <div>
+                                  <p className="font-medium text-neutral-900 dark:text-neutral-100">
+                                    {profile.name}
+                                  </p>
+                                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                                    {profile.pin ? 'PIN protected' : 'No PIN protection'}
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center space-x-2">
+                                {profile.pin ? (
+                                  <>
+                                    <div className="flex items-center space-x-1">
+                                      <Lock className="w-4 h-4 text-green-500" />
+                                      <span className="text-sm text-green-600 dark:text-green-400 font-medium">Protected</span>
+                                    </div>
+                                    <button
+                                      onClick={() => openProfileInNewTab(profile.id)}
+                                      className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/40 transition-colors duration-200"
+                                      title="Open profile in new tab (PIN bypass)"
+                                    >
+                                      <ExternalLink className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleRemoveProfilePin(profile.id)}
+                                      className="btn-secondary text-sm"
+                                    >
+                                      Remove PIN
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="flex items-center space-x-1">
+                                      <Unlock className="w-4 h-4 text-neutral-400" />
+                                      <span className="text-sm text-neutral-500 dark:text-neutral-400">Open</span>
+                                    </div>
+                                    <button
+                                      onClick={() => handleSetProfilePin(profile.id)}
+                                      className="btn-secondary text-sm"
+                                    >
+                                      Set PIN
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))
+                  </div>
                 )}
               </div>
             </div>
           </div>
         </div>
-      )}
+      </div>
 
       {/* AI Query Modal */}
-      {showAIModal && (
-        <AIQueryModal
-          isOpen={showAIModal}
-          onClose={() => setShowAIModal(false)}
-          history={state.history}
-          tasks={state.tasks}
-          profiles={state.profiles}
-          groups={state.groups}
-          aiSettings={state.settings.ai}
-        />
-      )}
+      <AIQueryModal
+        isOpen={showAIModal}
+        onClose={() => setShowAIModal(false)}
+        history={state.history}
+        tasks={state.tasks}
+        profiles={state.profiles}
+        groups={state.groups}
+        aiSettings={state.settings.ai}
+      />
 
       {/* Password Modal */}
-      {showPasswordModal && passwordModalConfig && (
-        <PasswordModal
-          isOpen={showPasswordModal}
-          onClose={() => {
-            setShowPasswordModal(false);
-            setPasswordModalConfig(null);
-          }}
-          onSuccess={passwordModalConfig.onSuccess}
-          title={passwordModalConfig.title}
-          description={passwordModalConfig.description}
-          onPasswordSet={passwordModalConfig.isSettingPassword ? onSetSettingsPassword : undefined}
-          isSettingPassword={passwordModalConfig.isSettingPassword}
-        />
-      )}
+      <PasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        onSuccess={handlePasswordModalSuccess}
+        onPasswordSet={onSetSettingsPassword}
+        title={passwordModalConfig.title}
+        description={passwordModalConfig.description}
+        isSettingPassword={passwordModalConfig.isSettingPassword}
+      />
     </>
   );
 }
