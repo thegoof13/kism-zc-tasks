@@ -329,7 +329,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
                 </button>
 
                 {showMenu && (
-                  <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-neutral-800 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-700 py-1 z-[60] animate-slide-down">
+                  <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-neutral-800 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-700 py-1 z-[9999] animate-slide-down">
                     {/* Edit option - only if allowed */}
                     {canEdit && (
                       <button
@@ -395,10 +395,10 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
           )}
         </div>
 
-        {/* Close menu when clicking outside */}
+        {/* Close menu when clicking outside - HIGHEST Z-INDEX */}
         {showMenu && (
           <div
-            className="fixed inset-0 z-[59]"
+            className="fixed inset-0 z-[9998]"
             onClick={() => setShowMenu(false)}
           />
         )}
