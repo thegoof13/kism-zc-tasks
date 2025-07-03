@@ -75,8 +75,8 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
           </div>
 
           <div className="flex h-[calc(95vh-80px)]">
-            {/* Sidebar */}
-            <div className="w-48 border-r border-neutral-200 dark:border-neutral-700 p-3">
+            {/* Sidebar - Responsive width and content */}
+            <div className="w-12 sm:w-16 md:w-48 border-r border-neutral-200 dark:border-neutral-700 p-2 md:p-3">
               <nav className="space-y-1">
                 {tabs.map(tab => {
                   const Icon = tab.icon;
@@ -84,14 +84,16 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center space-x-2 px-3 py-2 text-left rounded-lg transition-colors duration-200 ${
+                      className={`w-full flex items-center justify-center md:justify-start space-x-0 md:space-x-2 px-2 md:px-3 py-2 text-left rounded-lg transition-colors duration-200 ${
                         activeTab === tab.id
                           ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
                           : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700'
                       }`}
+                      title={tab.label} // Tooltip for small screens
                     >
-                      <Icon className="w-4 h-4" />
-                      <span className="text-sm font-medium">{tab.label}</span>
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      {/* Hide text on small screens, show on md and up */}
+                      <span className="hidden md:block text-sm font-medium">{tab.label}</span>
                     </button>
                   );
                 })}
@@ -101,7 +103,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
             {/* Content */}
             <div className="flex-1 overflow-y-auto">
               {activeTab === 'general' && (
-                <div className="p-6 space-y-6">
+                <div className="p-4 md:p-6 space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
                       General Settings
@@ -186,7 +188,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
               )}
 
               {activeTab === 'profiles' && (
-                <div className="p-6 space-y-6">
+                <div className="p-4 md:p-6 space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
                       User Profiles
@@ -227,7 +229,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
               )}
 
               {activeTab === 'groups' && (
-                <div className="p-6 space-y-6">
+                <div className="p-4 md:p-6 space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
                       Task Groups
@@ -276,7 +278,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
               )}
 
               {activeTab === 'security' && (
-                <div className="p-6 space-y-6">
+                <div className="p-4 md:p-6 space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
                       Security Settings
@@ -365,7 +367,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
               )}
 
               {activeTab === 'ai' && (
-                <div className="p-6 space-y-6">
+                <div className="p-4 md:p-6 space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
                       AI Assistant
@@ -390,7 +392,8 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                               onClick={() => setShowAIModal(true)}
                               className="btn-primary text-sm"
                             >
-                              Open AI Assistant
+                              <span className="hidden sm:inline">Open AI Assistant</span>
+                              <span className="sm:hidden">Open AI</span>
                             </button>
                           </div>
                         </div>
@@ -425,7 +428,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
               )}
 
               {activeTab === 'history' && (
-                <div className="p-6">
+                <div className="p-4 md:p-6">
                   <HistoryAnalytics 
                     history={state.history}
                     tasks={state.tasks}
