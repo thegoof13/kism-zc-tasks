@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Moon, Sun, Settings, User, ChevronDown, Users, Trophy, X, Crown, Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useTheme } from '../hooks/useTheme';
+import { PasswordModal } from './PasswordModal';
 
 interface HeaderProps {
   onOpenSettings: () => void;
@@ -13,6 +14,7 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
   const { isDark, toggleTheme } = useTheme();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showTrophyModal, setShowTrophyModal] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
   
   const activeProfile = state.profiles.find(p => p.id === state.activeProfileId);
   const completedTasksCount = state.tasks.filter(t => t.isCompleted).length;
@@ -91,11 +93,33 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
   const hasCollaborativeFeature = state.settings.showTopCollaborator && collaborativeTasks.length > 0;
   const showTrophy = hasCompetitors || hasCollaborativeFeature;
 
-  const handleToggleViewOnlyMode = () => {
+  const handleDisableViewOnlyMode = () => {
+    // Check if current profile has a PIN
+    if (activeProfile?.pin) {
+      // Show PIN modal for authentication
+      setShowPinModal(true);
+      setShowProfileMenu(false);
+    } else {
+      // No PIN required, disable view only mode directly
+      dispatch({
+        type: 'UPDATE_SETTINGS',
+        updates: { viewOnlyMode: false }
+      });
+      setShowProfileMenu(false);
+    }
+  };
+
+  const handlePinSuccess = () => {
+    // PIN verified, disable view only mode
     dispatch({
       type: 'UPDATE_SETTINGS',
-      updates: { viewOnlyMode: !isViewOnlyMode }
+      updates: { viewOnlyMode: false }
     });
+    setShowPinModal(false);
+  };
+
+  const handlePinClose = () => {
+    setShowPinModal(false);
   };
 
   return (
@@ -193,16 +217,20 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
                     {isViewOnlyMode && (
                       <div className="border-b border-neutral-200 dark:border-neutral-700">
                         <button
-                          onClick={() => {
-                            handleToggleViewOnlyMode();
-                            setShowProfileMenu(false);
-                          }}
+                          onClick={handleDisableViewOnlyMode}
                           className="w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
                         >
                           <EyeOff className="w-4 h-4 text-blue-500" />
-                          <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                            Disable View Only Mode
-                          </span>
+                          <div className="flex-1">
+                            <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                              Disable View Only Mode
+                            </span>
+                            {activeProfile?.pin && (
+                              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                                PIN required
+                              </p>
+                            )}
+                          </div>
                         </button>
                       </div>
                     )}
@@ -277,6 +305,17 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
           />
         )}
       </header>
+
+      {/* PIN Modal for Disabling View Only Mode */}
+      <PasswordModal
+        isOpen={showPinModal}
+        onClose={handlePinClose}
+        onSuccess={handlePinSuccess}
+        title={`Disable View Only Mode`}
+        description={`Enter your PIN to disable view only mode and gain full access to ${activeProfile?.name}'s tasks.`}
+        placeholder="Enter PIN..."
+        expectedPassword={activeProfile?.pin}
+      />
 
       {/* Trophy Modal */}
       {showTrophyModal && (
