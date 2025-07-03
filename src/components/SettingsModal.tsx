@@ -129,7 +129,6 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
             )}
           </div>
 
-          {/* FIXED Security Notice - Main Settings Tab */}
           <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/50 rounded-lg">
             <div className="flex items-start space-x-3">
               <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
@@ -268,7 +267,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                 Show Top Collaborator
               </label>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                Display Top Collaborator section in Trophy popup
+                Display collaboration leaderboard in trophy popup
               </p>
             </div>
             <input
@@ -523,14 +522,6 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                       {profile.id === state.activeProfileId ? 'Active' : 'Inactive'}
                       {profile.isTaskCompetitor && ' • Participating in task competition'}
                       {profile.pin && ' • PIN protected'}
-                      {profile.permissions && (
-                        <>
-                          {' • '}
-                          {!profile.permissions.canCreateTasks && 'Cannot create tasks '}
-                          {!profile.permissions.canEditTasks && 'Cannot edit tasks '}
-                          {!profile.permissions.canDeleteTasks && 'Cannot delete tasks'}
-                        </>
-                      )}
                     </p>
                   </div>
                 </div>
@@ -996,15 +987,17 @@ function ProfileEditForm({
   const [avatar, setAvatar] = useState(profile.avatar);
   const [isTaskCompetitor, setIsTaskCompetitor] = useState(profile.isTaskCompetitor || false);
   const [pin, setPin] = useState(profile.pin || '');
-  const [permissions, setPermissions] = useState(profile.permissions || {
-    canEditTasks: true,
-    canCreateTasks: true,
-    canDeleteTasks: true,
-  });
   const [avatarType, setAvatarType] = useState<'emoji' | 'text'>(
     // Detect if current avatar is likely an emoji or text
     /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(profile.avatar) ? 'emoji' : 'text'
   );
+
+  // Profile permissions
+  const [permissions, setPermissions] = useState({
+    canEditTasks: profile.permissions?.canEditTasks ?? true,
+    canCreateTasks: profile.permissions?.canCreateTasks ?? true,
+    canDeleteTasks: profile.permissions?.canDeleteTasks ?? true,
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1153,7 +1146,7 @@ function ProfileEditForm({
         </div>
       </div>
 
-      {/* Permissions */}
+      {/* Profile Permissions */}
       <div className="space-y-3">
         <div className="p-3 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-lg border border-green-200 dark:border-green-800">
           <div className="flex items-center space-x-2 mb-3">
@@ -1163,7 +1156,7 @@ function ProfileEditForm({
             </label>
           </div>
           <p className="text-xs text-green-700 dark:text-green-300 mb-3">
-            Control what this profile can do with tasks. Unchecked permissions will hide related buttons and prevent actions.
+            Control what this profile can do with tasks. Unchecking permissions will hide relevant buttons and actions.
           </p>
           
           <div className="space-y-2">
@@ -1174,7 +1167,7 @@ function ProfileEditForm({
                 onChange={(e) => setPermissions(prev => ({ ...prev, canCreateTasks: e.target.checked }))}
                 className="w-4 h-4 text-green-500 bg-green-100 border-green-300 rounded focus:ring-green-500"
               />
-              <span className="text-sm text-green-800 dark:text-green-200">Can Create Tasks</span>
+              <span className="text-sm text-green-700 dark:text-green-300">Can Create Tasks</span>
             </label>
             
             <label className="flex items-center space-x-3">
@@ -1184,7 +1177,7 @@ function ProfileEditForm({
                 onChange={(e) => setPermissions(prev => ({ ...prev, canEditTasks: e.target.checked }))}
                 className="w-4 h-4 text-green-500 bg-green-100 border-green-300 rounded focus:ring-green-500"
               />
-              <span className="text-sm text-green-800 dark:text-green-200">Can Edit Tasks</span>
+              <span className="text-sm text-green-700 dark:text-green-300">Can Edit Tasks</span>
             </label>
             
             <label className="flex items-center space-x-3">
@@ -1194,7 +1187,7 @@ function ProfileEditForm({
                 onChange={(e) => setPermissions(prev => ({ ...prev, canDeleteTasks: e.target.checked }))}
                 className="w-4 h-4 text-green-500 bg-green-100 border-green-300 rounded focus:ring-green-500"
               />
-              <span className="text-sm text-green-800 dark:text-green-200">Can Delete Tasks</span>
+              <span className="text-sm text-green-700 dark:text-green-300">Can Delete Tasks</span>
             </label>
           </div>
         </div>
@@ -1220,6 +1213,7 @@ function ProfileEditForm({
             className="input-primary"
             maxLength={6}
             pattern="[0-9]*"
+            inputMode="numeric"
           />
           <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
             Leave empty to remove PIN protection. PIN must be 4-6 digits.
