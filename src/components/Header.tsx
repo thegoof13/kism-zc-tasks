@@ -83,8 +83,12 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
 
   const topCollaborator = collaborativeProfileStats.find(stat => stat.completions > 0);
 
-  // Show trophy if there are any competitors
-  const showTrophy = taskCompetitors.length > 0;
+  // Show trophy if:
+  // 1. There are task competitors (Top Competitor is functional), OR
+  // 2. Top Collaborator is enabled in settings AND there are collaborative tasks
+  const hasCompetitors = taskCompetitors.length > 0;
+  const hasCollaborativeFeature = state.settings.showTopCollaborator && collaborativeTasks.length > 0;
+  const showTrophy = hasCompetitors || hasCollaborativeFeature;
 
   return (
     <>
@@ -108,12 +112,18 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
 
             {/* Profile and Actions */}
             <div className="flex items-center space-x-2">
-              {/* Trophy Button - Show if there are any competitors */}
+              {/* Trophy Button - Show if there are competitors OR collaborative features enabled */}
               {showTrophy && (
                 <button
                   onClick={() => setShowTrophyModal(true)}
                   className="p-2 rounded-lg bg-gradient-to-br from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105"
-                  title={topCompetitor ? `View Top Competitor: ${topCompetitor.profile.name}` : 'View Competition Status'}
+                  title={
+                    hasCompetitors && hasCollaborativeFeature 
+                      ? 'View Competition & Collaboration Status'
+                      : hasCompetitors 
+                        ? (topCompetitor ? `View Top Competitor: ${topCompetitor.profile.name}` : 'View Competition Status')
+                        : 'View Collaboration Status'
+                  }
                 >
                   <Trophy className="w-5 h-5" />
                 </button>
@@ -233,7 +243,12 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
                   <Trophy className="w-5 h-5 text-white" />
                 </div>
                 <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                  Competition Status
+                  {hasCompetitors && hasCollaborativeFeature 
+                    ? 'Competition & Collaboration Status'
+                    : hasCompetitors 
+                      ? 'Competition Status'
+                      : 'Collaboration Status'
+                  }
                 </h2>
               </div>
               <button
@@ -245,91 +260,93 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Top Competitor Section */}
-              <div>
-                <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
-                  <Trophy className="w-5 h-5 mr-2 text-orange-500" />
-                  Top Competitor (Last 14 Days)
-                </h3>
-                
-                {topCompetitor ? (
-                  <div className="bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-lg p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="relative">
-                          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-2xl shadow-lg">
-                            {topCompetitor.profile.avatar}
+              {/* Top Competitor Section - Only show if there are competitors */}
+              {hasCompetitors && (
+                <div>
+                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
+                    <Trophy className="w-5 h-5 mr-2 text-orange-500" />
+                    Top Competitor (Last 14 Days)
+                  </h3>
+                  
+                  {topCompetitor ? (
+                    <div className="bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 rounded-lg p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="relative">
+                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-2xl shadow-lg">
+                              {topCompetitor.profile.avatar}
+                            </div>
+                            <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center shadow-md">
+                              <Trophy className="w-3 h-3 text-white" />
+                            </div>
                           </div>
-                          <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center shadow-md">
-                            <Trophy className="w-3 h-3 text-white" />
+                          <div>
+                            <h4 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">
+                              {topCompetitor.profile.name}
+                            </h4>
+                            <p className="text-orange-600 dark:text-orange-400 font-medium">
+                              🏆 Current Champion
+                            </p>
                           </div>
                         </div>
-                        <div>
-                          <h4 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">
-                            {topCompetitor.profile.name}
-                          </h4>
-                          <p className="text-orange-600 dark:text-orange-400 font-medium">
-                            🏆 Current Champion
+                        <div className="text-right">
+                          <div className="text-4xl font-bold text-orange-500 mb-1">
+                            #1
+                          </div>
+                          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                            Rank
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-4xl font-bold text-orange-500 mb-1">
-                          #1
+                      
+                      <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                            {topCompetitor.completions}
+                          </p>
+                          <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                            Tasks Completed
+                          </p>
                         </div>
-                        <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                          Rank
-                        </p>
+                        <div className="text-center">
+                          <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                            {Math.round(topCompetitor.accuracy)}%
+                          </p>
+                          <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                            Accuracy Rate
+                          </p>
+                        </div>
                       </div>
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                          {topCompetitor.completions}
-                        </p>
-                        <p className="text-xs text-neutral-600 dark:text-neutral-400">
-                          Tasks Completed
-                        </p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                          {Math.round(topCompetitor.accuracy)}%
-                        </p>
-                        <p className="text-xs text-neutral-600 dark:text-neutral-400">
-                          Accuracy Rate
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
-                    <Trophy className="w-16 h-16 mx-auto mb-4 text-neutral-300 dark:text-neutral-600" />
-                    <h4 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">
-                      No Champion Yet
-                    </h4>
-                    <p className="text-neutral-600 dark:text-neutral-400 mb-4">
-                      Complete some tasks to compete for the top spot!
-                    </p>
-                    
-                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 max-w-md mx-auto">
-                      <p className="text-sm text-blue-700 dark:text-blue-300">
-                        <strong>{taskCompetitors.length}</strong> competitor{taskCompetitors.length !== 1 ? 's' : ''} registered:
+                  ) : (
+                    <div className="text-center py-8 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+                      <Trophy className="w-16 h-16 mx-auto mb-4 text-neutral-300 dark:text-neutral-600" />
+                      <h4 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">
+                        No Champion Yet
+                      </h4>
+                      <p className="text-neutral-600 dark:text-neutral-400 mb-4">
+                        Complete some tasks to compete for the top spot!
                       </p>
-                      <div className="flex flex-wrap justify-center gap-2 mt-2">
-                        {taskCompetitors.map(competitor => (
-                          <div key={competitor.id} className="flex items-center space-x-1 px-2 py-1 bg-blue-100 dark:bg-blue-800/30 rounded-full">
-                            <span className="text-sm">{competitor.avatar}</span>
-                            <span className="text-xs text-blue-700 dark:text-blue-300">{competitor.name}</span>
-                          </div>
-                        ))}
+                      
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 max-w-md mx-auto">
+                        <p className="text-sm text-blue-700 dark:text-blue-300">
+                          <strong>{taskCompetitors.length}</strong> competitor{taskCompetitors.length !== 1 ? 's' : ''} registered:
+                        </p>
+                        <div className="flex flex-wrap justify-center gap-2 mt-2">
+                          {taskCompetitors.map(competitor => (
+                            <div key={competitor.id} className="flex items-center space-x-1 px-2 py-1 bg-blue-100 dark:bg-blue-800/30 rounded-full">
+                              <span className="text-sm">{competitor.avatar}</span>
+                              <span className="text-xs text-blue-700 dark:text-blue-300">{competitor.name}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
-              {/* Top Collaborator Section (conditional) */}
+              {/* Top Collaborator Section - Only show if enabled in settings */}
               {state.settings.showTopCollaborator && (
                 <div>
                   <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
@@ -405,6 +422,24 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
                       </p>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Show message if neither feature is available */}
+              {!hasCompetitors && !hasCollaborativeFeature && (
+                <div className="text-center py-12">
+                  <Trophy className="w-20 h-20 mx-auto mb-6 text-neutral-300 dark:text-neutral-600" />
+                  <h3 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">
+                    No Competition or Collaboration Features Active
+                  </h3>
+                  <div className="space-y-3 text-neutral-600 dark:text-neutral-400 max-w-md mx-auto">
+                    <p className="text-sm">
+                      To enable competition features, mark profiles as "Task Competitors" in Settings → Profiles.
+                    </p>
+                    <p className="text-sm">
+                      To enable collaboration tracking, create tasks assigned to multiple profiles and enable "Show Top Collaborator" in Settings → General.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>
