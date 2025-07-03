@@ -94,8 +94,10 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
   const showTrophy = hasCompetitors || hasCollaborativeFeature;
 
   const handleDisableViewOnlyMode = () => {
-    // Check if current profile has a PIN
-    if (activeProfile?.pin) {
+    // Check if current profile has a VALID PIN (not empty/undefined/null)
+    const hasValidPin = activeProfile?.pin && activeProfile.pin.trim().length > 0;
+    
+    if (hasValidPin) {
       // Show PIN modal for authentication
       setShowPinModal(true);
       setShowProfileMenu(false);
@@ -201,7 +203,7 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
                         <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
                           {activeProfile?.name}
                         </span>
-                        {activeProfile?.pin && (
+                        {activeProfile?.pin && activeProfile.pin.trim().length > 0 && (
                           <div className="w-2 h-2 bg-warning-500 rounded-full" title="PIN Protected" />
                         )}
                         {isViewOnlyMode && (
@@ -225,7 +227,7 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
                             <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
                               Disable View Only Mode
                             </span>
-                            {activeProfile?.pin && (
+                            {activeProfile?.pin && activeProfile.pin.trim().length > 0 && (
                               <p className="text-xs text-neutral-500 dark:text-neutral-400">
                                 PIN required
                               </p>
@@ -236,7 +238,7 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
                     )}
 
                     {/* Quick Switch Profiles (non-PIN protected) */}
-                    {state.profiles.filter(p => p.id !== state.activeProfileId && !p.pin).map(profile => (
+                    {state.profiles.filter(p => p.id !== state.activeProfileId && (!p.pin || p.pin.trim().length === 0)).map(profile => (
                       <button
                         key={profile.id}
                         onClick={() => {

@@ -23,7 +23,10 @@ export function ProfileSelectionModal({
   const [isViewOnlySelection, setIsViewOnlySelection] = useState(false);
 
   const handleProfileClick = (profile: UserProfile, viewOnly: boolean = false) => {
-    if (profile.pin && !viewOnly) {
+    // Check if profile actually has a PIN set (not empty/undefined/null)
+    const hasValidPin = profile.pin && profile.pin.trim().length > 0;
+    
+    if (hasValidPin && !viewOnly) {
       setSelectedProfile(profile);
       setIsViewOnlySelection(false);
       setShowPinModal(true);
@@ -103,57 +106,62 @@ export function ProfileSelectionModal({
             </p>
 
             <div className="space-y-3">
-              {profiles.map(profile => (
-                <div key={profile.id} className="border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
-                  {/* Main Profile Button */}
-                  <button
-                    onClick={() => handleProfileClick(profile)}
-                    className="w-full flex items-center justify-between p-4 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors duration-200 group"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center text-lg font-medium">
-                        {profile.avatar}
-                      </div>
-                      <div className="text-left">
-                        <h3 className="font-medium text-neutral-900 dark:text-neutral-100 group-hover:text-primary-600 dark:group-hover:text-primary-400">
-                          {profile.name}
-                        </h3>
-                        <div className="flex items-center space-x-2">
-                          <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                            {profile.isTaskCompetitor ? 'Task Competitor' : 'Regular User'}
-                          </p>
-                          {profile.pin && (
-                            <div className="flex items-center space-x-1 px-2 py-1 bg-warning-100 dark:bg-warning-900/20 text-warning-700 dark:text-warning-400 text-xs rounded-full">
-                              <Lock className="w-3 h-3" />
-                              <span>PIN Protected</span>
-                            </div>
-                          )}
+              {profiles.map(profile => {
+                // Check if profile actually has a valid PIN set
+                const hasValidPin = profile.pin && profile.pin.trim().length > 0;
+                
+                return (
+                  <div key={profile.id} className="border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+                    {/* Main Profile Button */}
+                    <button
+                      onClick={() => handleProfileClick(profile)}
+                      className="w-full flex items-center justify-between p-4 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors duration-200 group"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div className="w-12 h-12 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center text-lg font-medium">
+                          {profile.avatar}
+                        </div>
+                        <div className="text-left">
+                          <h3 className="font-medium text-neutral-900 dark:text-neutral-100 group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                            {profile.name}
+                          </h3>
+                          <div className="flex items-center space-x-2">
+                            <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                              {profile.isTaskCompetitor ? 'Task Competitor' : 'Regular User'}
+                            </p>
+                            {hasValidPin && (
+                              <div className="flex items-center space-x-1 px-2 py-1 bg-warning-100 dark:bg-warning-900/20 text-warning-700 dark:text-warning-400 text-xs rounded-full">
+                                <Lock className="w-3 h-3" />
+                                <span>PIN Protected</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2">
-                      {profile.pin && (
-                        <Lock className="w-4 h-4 text-warning-500" />
-                      )}
-                      <User className="w-4 h-4 text-neutral-400 group-hover:text-primary-500" />
-                    </div>
-                  </button>
+                      
+                      <div className="flex items-center space-x-2">
+                        {hasValidPin && (
+                          <Lock className="w-4 h-4 text-warning-500" />
+                        )}
+                        <User className="w-4 h-4 text-neutral-400 group-hover:text-primary-500" />
+                      </div>
+                    </button>
 
-                  {/* View Only Button - Only show for PIN protected profiles */}
-                  {profile.pin && (
-                    <div className="border-t border-neutral-200 dark:border-neutral-700">
-                      <button
-                        onClick={() => handleViewOnlyClick(profile)}
-                        className="w-full flex items-center justify-center space-x-2 p-3 bg-neutral-50 dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 transition-colors duration-200 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
-                      >
-                        <Eye className="w-4 h-4" />
-                        <span className="text-sm font-medium">View Only</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    {/* View Only Button - Only show for PIN protected profiles */}
+                    {hasValidPin && (
+                      <div className="border-t border-neutral-200 dark:border-neutral-700">
+                        <button
+                          onClick={() => handleViewOnlyClick(profile)}
+                          className="w-full flex items-center justify-center space-x-2 p-3 bg-neutral-50 dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 transition-colors duration-200 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
+                        >
+                          <Eye className="w-4 h-4" />
+                          <span className="text-sm font-medium">View Only</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {profiles.length === 0 && (
