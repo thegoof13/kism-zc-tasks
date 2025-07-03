@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, Users, Calendar, Target, Award, Clock, Crown, RefreshCw } from 'lucide-react';
+import { TrendingUp, Users, Calendar, Target, Award, Clock, Crown, RefreshCw, CheckCircle } from 'lucide-react';
 import { HistoryEntry, Task, UserProfile } from '../types';
 
 interface HistoryAnalyticsProps {
@@ -15,6 +15,14 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
   
   const recentHistory = history.filter(entry => 
     new Date(entry.timestamp) >= fourteenDaysAgo
+  );
+
+  // Filter history for last 2 days for Recent Activity Summary
+  const twoDaysAgo = new Date();
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+  
+  const lastTwoDaysHistory = history.filter(entry => 
+    new Date(entry.timestamp) >= twoDaysAgo
   );
 
   // Filter history for last 2 months for reset tasks
@@ -101,6 +109,24 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
     .filter(stat => stat.completions >= 3)
     .sort((a, b) => b.consistency - a.consistency)
     .slice(0, 3);
+
+  // Recent Activity Summary - Last 2 days, completed items only
+  const recentCompletedActions = lastTwoDaysHistory.filter(entry => entry.action === 'completed');
+  
+  // Group by day
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const todayCompletions = recentCompletedActions.filter(entry => {
+    const entryDate = new Date(entry.timestamp);
+    return entryDate.toDateString() === today.toDateString();
+  });
+  
+  const yesterdayCompletions = recentCompletedActions.filter(entry => {
+    const entryDate = new Date(entry.timestamp);
+    return entryDate.toDateString() === yesterday.toDateString();
+  });
 
   return (
     <div className="space-y-6">
@@ -363,37 +389,133 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
         </div>
       )}
 
-      {/* Recent Activity Summary */}
+      {/* Recent Activity Summary - Last 2 Days, Completed Items Only */}
       <div className="card p-6">
-        <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
-          Recent Activity Summary
+        <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
+          <CheckCircle className="w-5 h-5 mr-2 text-success-500" />
+          Recent Activity Summary (Last 2 Days)
         </h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-          <div>
-            <p className="text-xl font-bold text-success-600 dark:text-success-400">
-              {completedActions.length}
+        
+        {recentCompletedActions.length === 0 ? (
+          <div className="text-center py-8">
+            <CheckCircle className="w-12 h-12 mx-auto mb-3 text-neutral-300 dark:text-neutral-600" />
+            <p className="text-neutral-500 dark:text-neutral-400">
+              No tasks completed in the last 2 days
             </p>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400">Completed</p>
           </div>
-          <div>
-            <p className="text-xl font-bold text-warning-600 dark:text-warning-400">
-              {uncheckedActions.length}
-            </p>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400">Unchecked</p>
+        ) : (
+          <div className="space-y-6">
+            {/* Today's Completions */}
+            {todayCompletions.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h5 className="font-medium text-neutral-900 dark:text-neutral-100">
+                    Today ({todayCompletions.length} completed)
+                  </h5>
+                  <span className="text-sm text-neutral-500 dark:text-neutral-400">
+                    {today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {todayCompletions.slice(0, 5).map(entry => {
+                    const profile = profiles.find(p => p.id === entry.profileId);
+                    return (
+                      <div key={entry.id} className="flex items-center justify-between p-3 bg-success-50 dark:bg-success-900/10 rounded-lg border border-success-200 dark:border-success-800">
+                        <div className="flex items-center space-x-3">
+                          <CheckCircle className="w-4 h-4 text-success-500" />
+                          <div>
+                            <p className="font-medium text-neutral-900 dark:text-neutral-100">
+                              {entry.taskTitle}
+                            </p>
+                            <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                              Completed by {profile?.name || 'Unknown'}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                          {new Date(entry.timestamp).toLocaleTimeString('en-US', { 
+                            hour: 'numeric', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {todayCompletions.length > 5 && (
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center">
+                      +{todayCompletions.length - 5} more completed today
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Yesterday's Completions */}
+            {yesterdayCompletions.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h5 className="font-medium text-neutral-900 dark:text-neutral-100">
+                    Yesterday ({yesterdayCompletions.length} completed)
+                  </h5>
+                  <span className="text-sm text-neutral-500 dark:text-neutral-400">
+                    {yesterday.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {yesterdayCompletions.slice(0, 5).map(entry => {
+                    const profile = profiles.find(p => p.id === entry.profileId);
+                    return (
+                      <div key={entry.id} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                        <div className="flex items-center space-x-3">
+                          <CheckCircle className="w-4 h-4 text-neutral-400" />
+                          <div>
+                            <p className="font-medium text-neutral-900 dark:text-neutral-100">
+                              {entry.taskTitle}
+                            </p>
+                            <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                              Completed by {profile?.name || 'Unknown'}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                          {new Date(entry.timestamp).toLocaleTimeString('en-US', { 
+                            hour: 'numeric', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {yesterdayCompletions.length > 5 && (
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400 text-center">
+                      +{yesterdayCompletions.length - 5} more completed yesterday
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Summary Stats */}
+            <div className="pt-4 border-t border-neutral-200 dark:border-neutral-700">
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div>
+                  <p className="text-2xl font-bold text-success-600 dark:text-success-400">
+                    {todayCompletions.length}
+                  </p>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">Today</p>
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-neutral-600 dark:text-neutral-400">
+                    {yesterdayCompletions.length}
+                  </p>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">Yesterday</p>
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="text-xl font-bold text-neutral-600 dark:text-neutral-400">
-              {resetActions.length}
-            </p>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400">Reset</p>
-          </div>
-          <div>
-            <p className="text-xl font-bold text-primary-600 dark:text-primary-400">
-              {restoredActions.length}
-            </p>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400">Restored</p>
-          </div>
-        </div>
+        )}
         
         {/* Reset Tasks Warning */}
         {resetTasksCount > 0 && (
