@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Users, History, Shield, Plus, Edit, Trash2, Eye, Brain, Trophy, Check, Lock, Clock, User, CheckCircle, AlertTriangle, Crown } from 'lucide-react';
+import { X, Settings, Users, History, Shield, Plus, Edit, Trash2, Eye, Brain, Trophy, Check, Lock, Clock, User, CheckCircle, AlertTriangle, Crown, Bell, Calendar, ExternalLink } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { HistoryAnalytics } from './HistoryAnalytics';
 import { AIQueryModal } from './AIQueryModal';
@@ -143,6 +143,112 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
       }
     });
     setNewProfileName('');
+  };
+
+  // Helper function to get profile task stats
+  const getProfileTaskStats = (profileId: string) => {
+    const profileTasks = state.tasks.filter(task => task.profiles.includes(profileId));
+    const completedTasks = profileTasks.filter(task => task.isCompleted);
+    return {
+      completed: completedTasks.length,
+      total: profileTasks.length,
+      percentage: profileTasks.length > 0 ? Math.round((completedTasks.length / profileTasks.length) * 100) : 0
+    };
+  };
+
+  // Helper function to check if profile is currently active (has open session)
+  const isProfileActive = (profileId: string) => {
+    return state.activeProfileId === profileId;
+  };
+
+  // Helper function to get display mode label
+  const getDisplayModeLabel = (mode: string) => {
+    switch (mode) {
+      case 'grey-out': return 'Grey Out';
+      case 'grey-drop': return 'Grey & Drop';
+      case 'separate-completed': return 'Separate';
+      default: return mode;
+    }
+  };
+
+  // Helper function to handle detailed history view choice
+  const handleViewDetailedHistory = () => {
+    const choice = window.confirm(
+      "How would you like to view the detailed history?\n\n" +
+      "OK = Open in new tab\n" +
+      "Cancel = View in current page"
+    );
+    
+    if (choice) {
+      // Open in new tab - create a data URL with the history
+      const historyData = state.history.slice(0, 100).map(entry => ({
+        timestamp: entry.timestamp.toLocaleString(),
+        task: entry.taskTitle,
+        action: entry.action,
+        profile: entry.profileName,
+        details: entry.details || ''
+      }));
+      
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>ZenTasks - Detailed History</title>
+          <style>
+            body { font-family: system-ui, sans-serif; margin: 20px; background: #f9fafb; }
+            .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+            h1 { color: #374151; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+            th { background: #f3f4f6; font-weight: 600; color: #374151; }
+            tr:hover { background: #f9fafb; }
+            .action { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+            .completed { background: #dcfce7; color: #166534; }
+            .unchecked { background: #fef3c7; color: #92400e; }
+            .reset { background: #fecaca; color: #991b1b; }
+            .restored { background: #dbeafe; color: #1e40af; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>ZenTasks - Detailed History (Last 100 entries)</h1>
+            <table>
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Task</th>
+                  <th>Action</th>
+                  <th>Profile</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${historyData.map(entry => `
+                  <tr>
+                    <td>${entry.timestamp}</td>
+                    <td>${entry.task}</td>
+                    <td><span class="action ${entry.action}">${entry.action}</span></td>
+                    <td>${entry.profile}</td>
+                    <td>${entry.details}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </body>
+        </html>
+      `;
+      
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      
+      // Clean up the URL after a short delay
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } else {
+      // View in current page
+      setShowDetailedHistory(true);
+    }
   };
 
   if (!isOpen) return null;
@@ -309,121 +415,149 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
 
                   {/* Groups List */}
                   <div className="space-y-4">
-                    {state.groups.map(group => (
-                      <div key={group.id} className="card p-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center space-x-3">
-                            <div 
-                              className="w-4 h-4 rounded-full"
-                              style={{ backgroundColor: group.color }}
-                            />
-                            <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
-                              {group.name}
-                            </h4>
-                          </div>
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => setEditingGroup(editingGroup === group.id ? null : group.id)}
-                              className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                            >
-                              <Edit className="w-4 h-4 text-neutral-500" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (window.confirm(`Delete group "${group.name}"?`)) {
-                                  dispatch({ type: 'DELETE_GROUP', groupId: group.id });
-                                }
-                              }}
-                              className="p-2 rounded-lg hover:bg-error-100 dark:hover:bg-error-900/20"
-                            >
-                              <Trash2 className="w-4 h-4 text-error-500" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {editingGroup === group.id && (
-                          <div className="space-y-4 border-t border-neutral-200 dark:border-neutral-700 pt-4">
-                            {/* Completed Display Mode - Green box with tick */}
-                            <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                              <div className="flex items-center space-x-2 mb-3">
-                                <div className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                                  <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
+                    {state.groups.map(group => {
+                      const groupTasks = state.tasks.filter(task => task.groupId === group.id);
+                      const completedTasks = groupTasks.filter(task => task.isCompleted);
+                      
+                      return (
+                        <div key={group.id} className="card p-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center space-x-3">
+                              <div 
+                                className="w-4 h-4 rounded-full"
+                                style={{ backgroundColor: group.color }}
+                              />
+                              <div>
+                                <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
+                                  {group.name}
+                                </h4>
+                                {/* Group summary info */}
+                                <div className="flex items-center space-x-3 mt-1">
+                                  <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                                    {completedTasks.length}/{groupTasks.length} completed
+                                  </span>
+                                  <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-full">
+                                    {getDisplayModeLabel(group.completedDisplayMode)}
+                                  </span>
+                                  {group.enableDueDates && (
+                                    <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-full flex items-center space-x-1">
+                                      <Calendar className="w-2.5 h-2.5" />
+                                      <span>Due dates</span>
+                                    </span>
+                                  )}
+                                  {group.defaultNotifications && (
+                                    <span className="text-xs px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 rounded-full flex items-center space-x-1">
+                                      <Bell className="w-2.5 h-2.5" />
+                                      <span>Notifications</span>
+                                    </span>
+                                  )}
                                 </div>
-                                <label className="text-sm font-medium text-green-800 dark:text-green-200">
-                                  Completed Display Mode
-                                </label>
                               </div>
-                              <select
-                                value={group.completedDisplayMode}
-                                onChange={(e) => dispatch({
-                                  type: 'UPDATE_GROUP',
-                                  groupId: group.id,
-                                  updates: { completedDisplayMode: e.target.value as any }
-                                })}
-                                className="w-full input-primary"
+                            </div>
+                            <div className="flex space-x-2">
+                              <button
+                                onClick={() => setEditingGroup(editingGroup === group.id ? null : group.id)}
+                                className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700"
                               >
-                                <option value="grey-out">Grey Out</option>
-                                <option value="grey-drop">Grey Drop</option>
-                                <option value="separate-completed">Separate Completed</option>
-                              </select>
-                            </div>
-
-                            {/* Due Dates & Notifications - Yellow box with clock */}
-                            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                              <div className="flex items-center space-x-2 mb-3">
-                                <div className="w-6 h-6 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
-                                  <Clock className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />
-                                </div>
-                                <label className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                                  Date & Time Settings
-                                </label>
-                              </div>
-                              <div className="space-y-3">
-                                <label className="flex items-center justify-between">
-                                  <span className="text-sm text-yellow-700 dark:text-yellow-300">Enable Due Dates</span>
-                                  <input
-                                    type="checkbox"
-                                    checked={group.enableDueDates}
-                                    onChange={(e) => dispatch({
-                                      type: 'UPDATE_GROUP',
-                                      groupId: group.id,
-                                      updates: { enableDueDates: e.target.checked }
-                                    })}
-                                    className="w-4 h-4 text-yellow-500 bg-neutral-100 border-neutral-300 rounded focus:ring-yellow-500"
-                                  />
-                                </label>
-                                <label className="flex items-center justify-between">
-                                  <span className="text-sm text-yellow-700 dark:text-yellow-300">Sort by Due Date</span>
-                                  <input
-                                    type="checkbox"
-                                    checked={group.sortByDueDate}
-                                    onChange={(e) => dispatch({
-                                      type: 'UPDATE_GROUP',
-                                      groupId: group.id,
-                                      updates: { sortByDueDate: e.target.checked }
-                                    })}
-                                    className="w-4 h-4 text-yellow-500 bg-neutral-100 border-neutral-300 rounded focus:ring-yellow-500"
-                                  />
-                                </label>
-                                <label className="flex items-center justify-between">
-                                  <span className="text-sm text-yellow-700 dark:text-yellow-300">Enable Notifications by Default</span>
-                                  <input
-                                    type="checkbox"
-                                    checked={group.defaultNotifications || false}
-                                    onChange={(e) => dispatch({
-                                      type: 'UPDATE_GROUP',
-                                      groupId: group.id,
-                                      updates: { defaultNotifications: e.target.checked }
-                                    })}
-                                    className="w-4 h-4 text-yellow-500 bg-neutral-100 border-neutral-300 rounded focus:ring-yellow-500"
-                                  />
-                                </label>
-                              </div>
+                                <Edit className="w-4 h-4 text-neutral-500" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Delete group "${group.name}"?`)) {
+                                    dispatch({ type: 'DELETE_GROUP', groupId: group.id });
+                                  }
+                                }}
+                                className="p-2 rounded-lg hover:bg-error-100 dark:hover:bg-error-900/20"
+                              >
+                                <Trash2 className="w-4 h-4 text-error-500" />
+                              </button>
                             </div>
                           </div>
-                        )}
-                      </div>
-                    ))}
+
+                          {editingGroup === group.id && (
+                            <div className="space-y-4 border-t border-neutral-200 dark:border-neutral-700 pt-4">
+                              {/* Completed Display Mode - Green box with tick */}
+                              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                <div className="flex items-center space-x-2 mb-3">
+                                  <div className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                                    <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
+                                  </div>
+                                  <label className="text-sm font-medium text-green-800 dark:text-green-200">
+                                    Completed Display Mode
+                                  </label>
+                                </div>
+                                <select
+                                  value={group.completedDisplayMode}
+                                  onChange={(e) => dispatch({
+                                    type: 'UPDATE_GROUP',
+                                    groupId: group.id,
+                                    updates: { completedDisplayMode: e.target.value as any }
+                                  })}
+                                  className="w-full input-primary"
+                                >
+                                  <option value="grey-out">Grey Out</option>
+                                  <option value="grey-drop">Grey Drop</option>
+                                  <option value="separate-completed">Separate Completed</option>
+                                </select>
+                              </div>
+
+                              {/* Due Dates & Notifications - Yellow box with clock */}
+                              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                                <div className="flex items-center space-x-2 mb-3">
+                                  <div className="w-6 h-6 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center">
+                                    <Clock className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />
+                                  </div>
+                                  <label className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                                    Date & Time Settings
+                                  </label>
+                                </div>
+                                <div className="space-y-3">
+                                  <label className="flex items-center justify-between">
+                                    <span className="text-sm text-yellow-700 dark:text-yellow-300">Enable Due Dates</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={group.enableDueDates}
+                                      onChange={(e) => dispatch({
+                                        type: 'UPDATE_GROUP',
+                                        groupId: group.id,
+                                        updates: { enableDueDates: e.target.checked }
+                                      })}
+                                      className="w-4 h-4 text-yellow-500 bg-neutral-100 border-neutral-300 rounded focus:ring-yellow-500"
+                                    />
+                                  </label>
+                                  <label className="flex items-center justify-between">
+                                    <span className="text-sm text-yellow-700 dark:text-yellow-300">Sort by Due Date</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={group.sortByDueDate}
+                                      onChange={(e) => dispatch({
+                                        type: 'UPDATE_GROUP',
+                                        groupId: group.id,
+                                        updates: { sortByDueDate: e.target.checked }
+                                      })}
+                                      className="w-4 h-4 text-yellow-500 bg-neutral-100 border-neutral-300 rounded focus:ring-yellow-500"
+                                    />
+                                  </label>
+                                  <label className="flex items-center justify-between">
+                                    <span className="text-sm text-yellow-700 dark:text-yellow-300">Enable Notifications by Default</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={group.defaultNotifications || false}
+                                      onChange={(e) => dispatch({
+                                        type: 'UPDATE_GROUP',
+                                        groupId: group.id,
+                                        updates: { defaultNotifications: e.target.checked }
+                                      })}
+                                      className="w-4 h-4 text-yellow-500 bg-neutral-100 border-neutral-300 rounded focus:ring-yellow-500"
+                                    />
+                                  </label>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -452,199 +586,232 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
 
                   {/* Profiles List */}
                   <div className="space-y-4">
-                    {state.profiles.map(profile => (
-                      <div key={profile.id} className="card p-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center space-x-3">
-                            <span className="text-xl">{profile.avatar}</span>
-                            <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
-                              {profile.name}
-                            </h4>
-                          </div>
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => setEditingProfile(editingProfile === profile.id ? null : profile.id)}
-                              className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700"
-                            >
-                              <Edit className="w-4 h-4 text-neutral-500" />
-                            </button>
-                            {state.profiles.length > 1 && (
+                    {state.profiles.map(profile => {
+                      const taskStats = getProfileTaskStats(profile.id);
+                      const isActive = isProfileActive(profile.id);
+                      
+                      return (
+                        <div key={profile.id} className="card p-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center space-x-3">
+                              <span className="text-xl">{profile.avatar}</span>
+                              <div>
+                                <div className="flex items-center space-x-2">
+                                  <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
+                                    {profile.name}
+                                  </h4>
+                                  {isActive && (
+                                    <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 rounded-full flex items-center space-x-1">
+                                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                                      <span>Active</span>
+                                    </span>
+                                  )}
+                                  {profile.isTaskCompetitor && (
+                                    <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-yellow-100 to-orange-100 dark:from-yellow-900/20 dark:to-orange-900/20 text-yellow-700 dark:text-yellow-300 rounded-full flex items-center space-x-1">
+                                      <Trophy className="w-2.5 h-2.5" />
+                                      <span>Competitor</span>
+                                    </span>
+                                  )}
+                                </div>
+                                {/* Profile task stats */}
+                                <div className="flex items-center space-x-3 mt-1">
+                                  <span className="text-sm text-neutral-600 dark:text-neutral-400">
+                                    {taskStats.completed}/{taskStats.total} tasks ({taskStats.percentage}%)
+                                  </span>
+                                  {profile.pin && (
+                                    <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-full flex items-center space-x-1">
+                                      <Lock className="w-2.5 h-2.5" />
+                                      <span>PIN</span>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex space-x-2">
                               <button
-                                onClick={() => {
-                                  if (window.confirm(`Delete profile "${profile.name}"?`)) {
-                                    dispatch({ type: 'DELETE_PROFILE', profileId: profile.id });
-                                  }
-                                }}
-                                className="p-2 rounded-lg hover:bg-error-100 dark:hover:bg-error-900/20"
+                                onClick={() => setEditingProfile(editingProfile === profile.id ? null : profile.id)}
+                                className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700"
                               >
-                                <Trash2 className="w-4 h-4 text-error-500" />
+                                <Edit className="w-4 h-4 text-neutral-500" />
                               </button>
-                            )}
+                              {state.profiles.length > 1 && (
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Delete profile "${profile.name}"?`)) {
+                                      dispatch({ type: 'DELETE_PROFILE', profileId: profile.id });
+                                    }
+                                  }}
+                                  className="p-2 rounded-lg hover:bg-error-100 dark:hover:bg-error-900/20"
+                                >
+                                  <Trash2 className="w-4 h-4 text-error-500" />
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
 
-                        {editingProfile === profile.id && (
-                          <div className="space-y-4 border-t border-neutral-200 dark:border-neutral-700 pt-4">
-                            {/* Task Competitor - Gold box with trophy */}
-                            <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-3">
-                                  <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
-                                    <Trophy className="w-4 h-4 text-white" />
+                          {editingProfile === profile.id && (
+                            <div className="space-y-4 border-t border-neutral-200 dark:border-neutral-700 pt-4">
+                              {/* Task Competitor - Gold box with trophy */}
+                              <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-3">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
+                                      <Trophy className="w-4 h-4 text-white" />
+                                    </div>
+                                    <div>
+                                      <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                                        Task Competitor
+                                      </p>
+                                      <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                                        Participate in task completion rankings
+                                      </p>
+                                    </div>
                                   </div>
-                                  <div>
-                                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                                      Task Competitor
-                                    </p>
-                                    <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                                      Participate in task completion rankings
-                                    </p>
+                                  <input
+                                    type="checkbox"
+                                    checked={profile.isTaskCompetitor || false}
+                                    onChange={(e) => dispatch({
+                                      type: 'UPDATE_PROFILE',
+                                      profileId: profile.id,
+                                      updates: { isTaskCompetitor: e.target.checked }
+                                    })}
+                                    className="w-4 h-4 text-yellow-500 bg-neutral-100 border-neutral-300 rounded focus:ring-yellow-500"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* PIN Protection - Blue box with padlock */}
+                              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                <div className="flex items-center space-x-2 mb-3">
+                                  <div className="w-6 h-6 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                                    <Lock className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                                   </div>
+                                  <label className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                                    PIN Protection
+                                  </label>
                                 </div>
-                                <input
-                                  type="checkbox"
-                                  checked={profile.isTaskCompetitor || false}
-                                  onChange={(e) => dispatch({
-                                    type: 'UPDATE_PROFILE',
-                                    profileId: profile.id,
-                                    updates: { isTaskCompetitor: e.target.checked }
-                                  })}
-                                  className="w-4 h-4 text-yellow-500 bg-neutral-100 border-neutral-300 rounded focus:ring-yellow-500"
-                                />
-                              </div>
-                            </div>
-
-                            {/* PIN Protection - Blue box with padlock */}
-                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                              <div className="flex items-center space-x-2 mb-3">
-                                <div className="w-6 h-6 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                                  <Lock className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                                </div>
-                                <label className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                                  PIN Protection
-                                </label>
-                              </div>
-                              <input
-                                type="text"
-                                placeholder="Set PIN (4+ characters)"
-                                value={profile.pin || ''}
-                                onChange={(e) => dispatch({
-                                  type: 'UPDATE_PROFILE',
-                                  profileId: profile.id,
-                                  updates: { pin: e.target.value || undefined }
-                                })}
-                                className="w-full input-primary"
-                              />
-                            </div>
-
-                            {/* Permissions - Green box with shield */}
-                            <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                              <div className="flex items-center space-x-2 mb-3">
-                                <div className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                                  <Shield className="w-3 h-3 text-green-600 dark:text-green-400" />
-                                </div>
-                                <label className="text-sm font-medium text-green-800 dark:text-green-200">
-                                  Permissions
-                                </label>
-                              </div>
-                              <div className="space-y-2">
-                                <label className="flex items-center justify-between">
-                                  <span className="text-sm text-green-700 dark:text-green-300">Can Create Tasks</span>
-                                  <input
-                                    type="checkbox"
-                                    checked={profile.permissions?.canCreateTasks ?? true}
-                                    onChange={(e) => dispatch({
-                                      type: 'UPDATE_PROFILE',
-                                      profileId: profile.id,
-                                      updates: { 
-                                        permissions: { 
-                                          ...profile.permissions, 
-                                          canCreateTasks: e.target.checked 
-                                        } 
-                                      }
-                                    })}
-                                    className="w-4 h-4 text-green-500 bg-neutral-100 border-neutral-300 rounded focus:ring-green-500"
-                                  />
-                                </label>
-                                <label className="flex items-center justify-between">
-                                  <span className="text-sm text-green-700 dark:text-green-300">Can Edit Tasks</span>
-                                  <input
-                                    type="checkbox"
-                                    checked={profile.permissions?.canEditTasks ?? true}
-                                    onChange={(e) => dispatch({
-                                      type: 'UPDATE_PROFILE',
-                                      profileId: profile.id,
-                                      updates: { 
-                                        permissions: { 
-                                          ...profile.permissions, 
-                                          canEditTasks: e.target.checked 
-                                        } 
-                                      }
-                                    })}
-                                    className="w-4 h-4 text-green-500 bg-neutral-100 border-neutral-300 rounded focus:ring-green-500"
-                                  />
-                                </label>
-                                <label className="flex items-center justify-between">
-                                  <span className="text-sm text-green-700 dark:text-green-300">Can Delete Tasks</span>
-                                  <input
-                                    type="checkbox"
-                                    checked={profile.permissions?.canDeleteTasks ?? true}
-                                    onChange={(e) => dispatch({
-                                      type: 'UPDATE_PROFILE',
-                                      profileId: profile.id,
-                                      updates: { 
-                                        permissions: { 
-                                          ...profile.permissions, 
-                                          canDeleteTasks: e.target.checked 
-                                        } 
-                                      }
-                                    })}
-                                    className="w-4 h-4 text-green-500 bg-neutral-100 border-neutral-300 rounded focus:ring-green-500"
-                                  />
-                                </label>
-                              </div>
-                            </div>
-
-                            {/* Avatar Selection */}
-                            <div>
-                              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                                Avatar (or use text)
-                              </label>
-                              <div className="flex items-center space-x-2 mb-2">
                                 <input
                                   type="text"
-                                  value={profile.avatar}
+                                  placeholder="Set PIN (4+ characters)"
+                                  value={profile.pin || ''}
                                   onChange={(e) => dispatch({
                                     type: 'UPDATE_PROFILE',
                                     profileId: profile.id,
-                                    updates: { avatar: e.target.value }
+                                    updates: { pin: e.target.value || undefined }
                                   })}
-                                  className="flex-1 input-primary"
-                                  placeholder="Enter text or emoji"
+                                  className="w-full input-primary"
                                 />
                               </div>
-                              <div className="grid grid-cols-10 gap-2">
-                                {availableAvatars.map(avatar => (
-                                  <button
-                                    key={avatar}
-                                    onClick={() => dispatch({
+
+                              {/* Permissions - Green box with shield */}
+                              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                <div className="flex items-center space-x-2 mb-3">
+                                  <div className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                                    <Shield className="w-3 h-3 text-green-600 dark:text-green-400" />
+                                  </div>
+                                  <label className="text-sm font-medium text-green-800 dark:text-green-200">
+                                    Permissions
+                                  </label>
+                                </div>
+                                <div className="space-y-2">
+                                  <label className="flex items-center justify-between">
+                                    <span className="text-sm text-green-700 dark:text-green-300">Can Create Tasks</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={profile.permissions?.canCreateTasks ?? true}
+                                      onChange={(e) => dispatch({
+                                        type: 'UPDATE_PROFILE',
+                                        profileId: profile.id,
+                                        updates: { 
+                                          permissions: { 
+                                            ...profile.permissions, 
+                                            canCreateTasks: e.target.checked 
+                                          } 
+                                        }
+                                      })}
+                                      className="w-4 h-4 text-green-500 bg-neutral-100 border-neutral-300 rounded focus:ring-green-500"
+                                    />
+                                  </label>
+                                  <label className="flex items-center justify-between">
+                                    <span className="text-sm text-green-700 dark:text-green-300">Can Edit Tasks</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={profile.permissions?.canEditTasks ?? true}
+                                      onChange={(e) => dispatch({
+                                        type: 'UPDATE_PROFILE',
+                                        profileId: profile.id,
+                                        updates: { 
+                                          permissions: { 
+                                            ...profile.permissions, 
+                                            canEditTasks: e.target.checked 
+                                          } 
+                                        }
+                                      })}
+                                      className="w-4 h-4 text-green-500 bg-neutral-100 border-neutral-300 rounded focus:ring-green-500"
+                                    />
+                                  </label>
+                                  <label className="flex items-center justify-between">
+                                    <span className="text-sm text-green-700 dark:text-green-300">Can Delete Tasks</span>
+                                    <input
+                                      type="checkbox"
+                                      checked={profile.permissions?.canDeleteTasks ?? true}
+                                      onChange={(e) => dispatch({
+                                        type: 'UPDATE_PROFILE',
+                                        profileId: profile.id,
+                                        updates: { 
+                                          permissions: { 
+                                            ...profile.permissions, 
+                                            canDeleteTasks: e.target.checked 
+                                          } 
+                                        }
+                                      })}
+                                      className="w-4 h-4 text-green-500 bg-neutral-100 border-neutral-300 rounded focus:ring-green-500"
+                                    />
+                                  </label>
+                                </div>
+                              </div>
+
+                              {/* Avatar Selection */}
+                              <div>
+                                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                                  Avatar (or use text)
+                                </label>
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <input
+                                    type="text"
+                                    value={profile.avatar}
+                                    onChange={(e) => dispatch({
                                       type: 'UPDATE_PROFILE',
                                       profileId: profile.id,
-                                      updates: { avatar }
+                                      updates: { avatar: e.target.value }
                                     })}
-                                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 ${
-                                      profile.avatar === avatar ? 'bg-primary-100 dark:bg-primary-900/20' : ''
-                                    }`}
-                                  >
-                                    {avatar}
-                                  </button>
-                                ))}
+                                    className="flex-1 input-primary"
+                                    placeholder="Enter text or emoji"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-10 gap-2">
+                                  {availableAvatars.map(avatar => (
+                                    <button
+                                      key={avatar}
+                                      onClick={() => dispatch({
+                                        type: 'UPDATE_PROFILE',
+                                        profileId: profile.id,
+                                        updates: { avatar }
+                                      })}
+                                      className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 ${
+                                        profile.avatar === avatar ? 'bg-primary-100 dark:bg-primary-900/20' : ''
+                                      }`}
+                                    >
+                                      {avatar}
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -657,7 +824,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                       Task Analytics
                     </h4>
                     <button
-                      onClick={() => setShowDetailedHistory(true)}
+                      onClick={handleViewDetailedHistory}
                       className="btn-primary"
                     >
                       <Eye className="w-4 h-4 mr-2" />
@@ -872,7 +1039,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
           <div className="relative w-full max-w-4xl bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in max-h-[90vh] overflow-hidden">
             <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
               <h3 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
-                Detailed Task History
+                Detailed Task History (Last 100 entries)
               </h3>
               <button
                 onClick={() => setShowDetailedHistory(false)}
