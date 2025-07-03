@@ -82,26 +82,26 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
   }
 
   return (
-    <div className="card mb-4 animate-slide-up">
-      {/* Group Header */}
-      <div className="flex items-center justify-between p-4 border-b border-neutral-100 dark:border-neutral-700">
+    <div className="card mb-3 animate-slide-up">
+      {/* Group Header - Reduced padding */}
+      <div className="flex items-center justify-between p-3 border-b border-neutral-100 dark:border-neutral-700">
         <button
           onClick={() => dispatch({ type: 'TOGGLE_GROUP_COLLAPSE', groupId: group.id })}
           className="flex items-center space-x-3 flex-1 text-left group"
         >
           <div className="flex items-center space-x-2">
             {group.isCollapsed ? (
-              <ChevronRight className="w-5 h-5 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 transition-colors duration-200" />
+              <ChevronRight className="w-4 h-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 transition-colors duration-200" />
             ) : (
-              <ChevronDown className="w-5 h-5 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 transition-colors duration-200" />
+              <ChevronDown className="w-4 h-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 transition-colors duration-200" />
             )}
             <div 
-              className="w-3 h-3 rounded-full flex-shrink-0"
+              className="w-2.5 h-2.5 rounded-full flex-shrink-0"
               style={{ backgroundColor: group.color }}
             />
-            <IconComponent className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
+            <IconComponent className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
             {group.enableDueDates && (
-              <Calendar className="w-4 h-4 text-primary-500" title="Due dates enabled" />
+              <Calendar className="w-3.5 h-3.5 text-primary-500" title="Due dates enabled" />
             )}
           </div>
           <div className="flex-1">
@@ -110,7 +110,7 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
                 {group.name}
               </h3>
               {overdueTasks > 0 && (
-                <span className="px-2 py-1 bg-error-100 dark:bg-error-900/20 text-error-700 dark:text-error-400 text-xs rounded-full font-medium">
+                <span className="px-1.5 py-0.5 bg-error-100 dark:bg-error-900/20 text-error-700 dark:text-error-400 text-xs rounded-full font-medium">
                   {overdueTasks} overdue
                 </span>
               )}
@@ -126,7 +126,7 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
           {canCreateTasks && (
             <button
               onClick={() => onAddTask(group.id)}
-              className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+              className="p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
               aria-label="Add task"
             >
               <Plus className="w-4 h-4 text-neutral-500 dark:text-neutral-400" />
@@ -135,11 +135,11 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
         </div>
       </div>
 
-      {/* Tasks List */}
+      {/* Tasks List - Reduced padding and spacing */}
       {!group.isCollapsed && (
-        <div className="p-4 space-y-2">
+        <div className="p-3 space-y-1.5">
           {displayedTasks.length === 0 ? (
-            <div className="text-center py-8 text-neutral-500 dark:text-neutral-400">
+            <div className="text-center py-6 text-neutral-500 dark:text-neutral-400">
               <p className="text-sm">No tasks yet</p>
               {canCreateTasks && (
                 <button
@@ -162,13 +162,13 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
             ))
           )}
 
-          {/* Completed Section for Separate Mode */}
+          {/* Completed Section for Separate Mode - Reduced spacing */}
           {group.completedDisplayMode === 'separate-completed' && completedTasks.length > 0 && (
-            <div className="pt-4 mt-4 border-t border-neutral-200 dark:border-neutral-700">
-              <h4 className="text-sm font-medium text-neutral-500 dark:text-neutral-400 mb-2">
+            <div className="pt-3 mt-3 border-t border-neutral-200 dark:border-neutral-700">
+              <h4 className="text-sm font-medium text-neutral-500 dark:text-neutral-400 mb-1.5">
                 Completed ({completedTasks.length})
               </h4>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {completedTasks.map(task => (
                   <TaskItem 
                     key={task.id} 

@@ -158,7 +158,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
 
   // Apply styling based on completion status and display mode
   const getItemClasses = () => {
-    const baseClasses = "group flex items-center space-x-3 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:shadow-sm transition-all duration-200 relative overflow-hidden";
+    const baseClasses = "group flex items-center space-x-2.5 p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:shadow-sm transition-all duration-200 relative overflow-hidden";
     
     if (task.isCompleted) {
       switch (displayMode) {
@@ -206,14 +206,14 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
       {/* Swipe Actions Background - Shows on both mobile and desktop when triggered */}
       {(showSwipeActions || swipeOffset < 0) && (
         <div className="absolute right-0 top-0 h-full flex items-center bg-neutral-100 dark:bg-neutral-700 rounded-lg">
-          <div className="flex items-center space-x-2 px-4">
+          <div className="flex items-center space-x-1.5 px-3">
             {canEdit && (
               <button
                 onClick={handleEdit}
-                className="p-2 rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors duration-200"
+                className="p-1.5 rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors duration-200"
                 aria-label="Edit task"
               >
-                <Edit className="w-4 h-4" />
+                <Edit className="w-3.5 h-3.5" />
               </button>
             )}
             
@@ -221,18 +221,18 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
               <>
                 <button
                   onClick={handleUncheck}
-                  className="p-2 rounded-lg bg-warning-500 text-white hover:bg-warning-600 transition-colors duration-200"
+                  className="p-1.5 rounded-lg bg-warning-500 text-white hover:bg-warning-600 transition-colors duration-200"
                   aria-label="Uncheck task"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
                 
                 <button
                   onClick={handleReset}
-                  className="p-2 rounded-lg bg-neutral-500 text-white hover:bg-neutral-600 transition-colors duration-200"
+                  className="p-1.5 rounded-lg bg-neutral-500 text-white hover:bg-neutral-600 transition-colors duration-200"
                   aria-label="Reset task"
                 >
-                  <RefreshCw className="w-4 h-4" />
+                  <RefreshCw className="w-3.5 h-3.5" />
                 </button>
               </>
             )}
@@ -240,10 +240,10 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
             {canDelete && (
               <button
                 onClick={handleDelete}
-                className="p-2 rounded-lg bg-error-500 text-white hover:bg-error-600 transition-colors duration-200"
+                className="p-1.5 rounded-lg bg-error-500 text-white hover:bg-error-600 transition-colors duration-200"
                 aria-label="Delete task"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -261,10 +261,10 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
-        {/* Checkbox */}
+        {/* Checkbox - Slightly smaller */}
         <button
           onClick={handleToggle}
-          className={`flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
+          className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
             task.isCompleted
               ? 'bg-success-500 border-success-500 scale-110 cursor-default'
               : 'border-neutral-300 dark:border-neutral-600 hover:border-success-400 dark:hover:border-success-400 cursor-pointer'
@@ -273,7 +273,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
           disabled={task.isCompleted}
         >
           {task.isCompleted && (
-            <Check className="w-4 h-4 text-white animate-scale-in" />
+            <Check className="w-3 h-3 text-white animate-scale-in" />
           )}
         </button>
 
@@ -282,7 +282,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
           {/* Desktop Layout (md and up) - Everything in one row */}
           <div className="hidden md:flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <h4 className={`font-medium truncate ${
+              <h4 className={`font-medium truncate text-sm ${
                 task.isCompleted 
                   ? 'line-through text-neutral-500 dark:text-neutral-400' 
                   : 'text-neutral-900 dark:text-neutral-100'
@@ -292,12 +292,12 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
               
               {/* Due Date Display - Desktop */}
               {dueDateInfo && (
-                <div className="flex items-center space-x-2 mt-1">
+                <div className="flex items-center space-x-1 mt-0.5">
                   <div className={`flex items-center space-x-1 ${dueDateInfo.colorClass}`}>
                     {dueDateInfo.isOverdue ? (
-                      <AlertTriangle className="w-3 h-3" />
+                      <AlertTriangle className="w-2.5 h-2.5" />
                     ) : (
-                      <Calendar className="w-3 h-3" />
+                      <Calendar className="w-2.5 h-2.5" />
                     )}
                     <span className="text-xs font-medium">
                       {dueDateInfo.formattedDate}
@@ -308,10 +308,10 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
             </div>
             
             {/* Desktop Right Side - Recurrence + Completed By + Menu Button */}
-            <div className="flex items-center space-x-2 ml-4">
+            <div className="flex items-center space-x-1.5 ml-3">
               {/* Recurrence Badge - Desktop */}
-              <div className="flex items-center space-x-1 px-2 py-1 bg-neutral-100 dark:bg-neutral-700 rounded-full">
-                <Clock className="w-3 h-3 text-neutral-500 dark:text-neutral-400" />
+              <div className="flex items-center space-x-1 px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-700 rounded-full">
+                <Clock className="w-2.5 h-2.5 text-neutral-500 dark:text-neutral-400" />
                 <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
                   {getRecurrenceLabel(task.recurrence)}
                 </span>
@@ -319,7 +319,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
 
               {/* Completed By Indicator - Desktop */}
               {task.isCompleted && completedByProfile && (
-                <div className="flex items-center space-x-1 px-2 py-1 bg-success-100 dark:bg-success-900/20 rounded-full">
+                <div className="flex items-center space-x-1 px-1.5 py-0.5 bg-success-100 dark:bg-success-900/20 rounded-full">
                   <span className="text-xs">{completedByProfile.avatar}</span>
                   <span className="text-xs text-success-700 dark:text-success-400 font-medium">
                     {completedByProfile.name}
@@ -330,14 +330,14 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
               {/* Desktop Menu Button - Always visible */}
               <button
                 onClick={handleMenuClick}
-                className={`p-2 rounded-lg transition-all duration-200 ${
+                className={`p-1.5 rounded-lg transition-all duration-200 ${
                   showSwipeActions 
                     ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400' 
                     : 'hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-500 dark:text-neutral-400'
                 }`}
                 aria-label={showSwipeActions ? 'Hide task actions' : 'Show task actions'}
               >
-                <ChevronLeft className={`w-4 h-4 transition-transform duration-200 ${
+                <ChevronLeft className={`w-3.5 h-3.5 transition-transform duration-200 ${
                   showSwipeActions ? 'rotate-180' : ''
                 }`} />
               </button>
@@ -348,7 +348,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
           <div className="md:hidden">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <h4 className={`font-medium truncate ${
+                <h4 className={`font-medium truncate text-sm ${
                   task.isCompleted 
                     ? 'line-through text-neutral-500 dark:text-neutral-400' 
                     : 'text-neutral-900 dark:text-neutral-100'
@@ -360,8 +360,8 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
               {/* Mobile Swipe Indicator */}
               <div className="ml-2">
                 {!showSwipeActions && (
-                  <div className="flex items-center justify-center w-6 h-6">
-                    <ChevronLeft className="w-4 h-4 text-neutral-400 dark:text-neutral-500 animate-pulse" />
+                  <div className="flex items-center justify-center w-5 h-5">
+                    <ChevronLeft className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500 animate-pulse" />
                   </div>
                 )}
               </div>
@@ -369,12 +369,12 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
 
             {/* Mobile Second Row - Due Date */}
             {dueDateInfo && (
-              <div className="flex items-center space-x-2 mt-1">
+              <div className="flex items-center space-x-1 mt-0.5">
                 <div className={`flex items-center space-x-1 ${dueDateInfo.colorClass}`}>
                   {dueDateInfo.isOverdue ? (
-                    <AlertTriangle className="w-3 h-3" />
+                    <AlertTriangle className="w-2.5 h-2.5" />
                   ) : (
-                    <Calendar className="w-3 h-3" />
+                    <Calendar className="w-2.5 h-2.5" />
                   )}
                   <span className="text-xs font-medium">
                     {dueDateInfo.formattedDate}
@@ -384,10 +384,10 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
             )}
 
             {/* Mobile Third Row - Recurrence + Completed By */}
-            <div className="flex items-center space-x-2 mt-1">
+            <div className="flex items-center space-x-1.5 mt-1">
               {/* Recurrence Badge - Mobile */}
-              <div className="flex items-center space-x-1 px-2 py-1 bg-neutral-100 dark:bg-neutral-700 rounded-full">
-                <Clock className="w-3 h-3 text-neutral-500 dark:text-neutral-400" />
+              <div className="flex items-center space-x-1 px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-700 rounded-full">
+                <Clock className="w-2.5 h-2.5 text-neutral-500 dark:text-neutral-400" />
                 <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
                   {getRecurrenceLabel(task.recurrence)}
                 </span>
@@ -395,7 +395,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
 
               {/* Completed By Indicator - Mobile */}
               {task.isCompleted && completedByProfile && (
-                <div className="flex items-center space-x-1 px-2 py-1 bg-success-100 dark:bg-success-900/20 rounded-full">
+                <div className="flex items-center space-x-1 px-1.5 py-0.5 bg-success-100 dark:bg-success-900/20 rounded-full">
                   <span className="text-xs">{completedByProfile.avatar}</span>
                   <span className="text-xs text-success-700 dark:text-success-400 font-medium">
                     {completedByProfile.name}
