@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Moon, Sun, Settings, User, ChevronDown, Users, Trophy, X, Crown } from 'lucide-react';
+import { Moon, Sun, Settings, User, ChevronDown, Users, Trophy, X, Crown } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useTheme } from '../hooks/useTheme';
 
@@ -97,7 +97,7 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
           <div className="flex items-center justify-between">
             {/* Logo and Title */}
             <div className="flex items-center space-x-3">
-              {/* Logo - Hidden on very small screens */}
+              {/* Logo - Only shown on larger screens (sm and up) */}
               <div className="w-8 h-8 hidden sm:block">
                 <img 
                   src="/image.png" 
@@ -106,11 +106,7 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
                 />
               </div>
               
-              {/* Fallback icon for very small screens */}
-              <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center sm:hidden">
-                <Menu className="w-5 h-5 text-white" />
-              </div>
-              
+              {/* Title and Progress - Always visible */}
               <div>
                 <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
                   ZenTasks
