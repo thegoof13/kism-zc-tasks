@@ -112,6 +112,13 @@
       @apply space-x-1 space-y-1;
     }
   }
+
+  /* Extra small breakpoint for very small screens */
+  @media (min-width: 360px) {
+    .xs\:block {
+      display: block;
+    }
+  }
 }
 
 /* Custom scrollbar */

@@ -97,14 +97,26 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
           <div className="flex items-center justify-between">
             {/* Logo and Title */}
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center">
+              {/* Logo - Hidden on very small screens */}
+              <div className="w-8 h-8 hidden sm:block">
+                <img 
+                  src="/image.png" 
+                  alt="ZenTasks Logo" 
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              
+              {/* Fallback icon for very small screens */}
+              <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg flex items-center justify-center sm:hidden">
                 <Menu className="w-5 h-5 text-white" />
               </div>
+              
               <div>
                 <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
                   ZenTasks
                 </h1>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                {/* Progress text - Hidden on very small screens */}
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 hidden xs:block">
                   {completedTasksCount} of {totalTasksCount} completed
                 </p>
               </div>
