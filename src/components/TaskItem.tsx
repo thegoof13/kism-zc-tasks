@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Check, Clock, MoreVertical, Edit, Trash2, RefreshCw, X, Calendar, AlertTriangle } from 'lucide-react';
+import { Check, Clock, MoreVertical, Edit, Trash2, RefreshCw, X, Calendar, AlertTriangle, ChevronLeft } from 'lucide-react';
 import { Task, CompletedDisplayMode } from '../types';
 import { useApp } from '../contexts/AppContext';
 import { getRecurrenceLabel } from '../utils/recurrence';
@@ -379,10 +379,8 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
               {/* Mobile Swipe Indicator - ONLY on mobile (below md) */}
               <div className="md:hidden">
                 {!showSwipeActions && (
-                  <div className="flex space-x-1">
-                    <div className="w-1 h-1 bg-neutral-400 rounded-full"></div>
-                    <div className="w-1 h-1 bg-neutral-400 rounded-full"></div>
-                    <div className="w-1 h-1 bg-neutral-400 rounded-full"></div>
+                  <div className="flex items-center justify-center w-6 h-6">
+                    <ChevronLeft className="w-4 h-4 text-neutral-400 dark:text-neutral-500 animate-pulse" />
                   </div>
                 )}
               </div>
