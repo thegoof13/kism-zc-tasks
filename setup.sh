@@ -4,7 +4,7 @@
 # This script automates the deployment of ZenTasks on Ubuntu with Nginx
 # Compatible with LXC containers and traditional Ubuntu installations
 # Now includes Kiosk Portal support with secure random paths
-# Enhanced with SSL certificate validation
+# Enhanced with comprehensive SSL certificate detection
 
 set -e
 
@@ -98,66 +98,101 @@ validate_ssl_certificate() {
     local key_path="$3"
     
     print_status "Validating SSL certificate for $domain..."
+    print_status "Certificate: $cert_path"
+    print_status "Private key: $key_path"
     
-    # Check if certificate files exist and are readable
-    if [[ ! -f "$cert_path" ]] || [[ ! -r "$cert_path" ]]; then
-        print_warning "Certificate file not found or not readable: $cert_path"
+    # Check if certificate files exist
+    if [[ ! -f "$cert_path" ]]; then
+        print_warning "Certificate file not found: $cert_path"
         return 1
     fi
     
-    if [[ ! -f "$key_path" ]] || [[ ! -r "$key_path" ]]; then
-        print_warning "Private key file not found or not readable: $key_path"
+    if [[ ! -f "$key_path" ]]; then
+        print_warning "Private key file not found: $key_path"
         return 1
     fi
     
-    print_status "Found certificate: $cert_path"
-    print_status "Found private key: $key_path"
+    # Check if files are readable (try with sudo if needed)
+    local cert_readable=false
+    local key_readable=false
+    
+    if [[ -r "$cert_path" ]]; then
+        cert_readable=true
+    elif sudo test -r "$cert_path" 2>/dev/null; then
+        cert_readable=true
+        print_status "Certificate requires sudo access to read"
+    fi
+    
+    if [[ -r "$key_path" ]]; then
+        key_readable=true
+    elif sudo test -r "$key_path" 2>/dev/null; then
+        key_readable=true
+        print_status "Private key requires sudo access to read"
+    fi
+    
+    if [[ "$cert_readable" == false ]]; then
+        print_warning "Certificate file not readable: $cert_path"
+        return 1
+    fi
+    
+    if [[ "$key_readable" == false ]]; then
+        print_warning "Private key file not readable: $key_path"
+        return 1
+    fi
     
     # Check certificate expiry
     local expiry_date
-    if ! expiry_date=$(sudo openssl x509 -enddate -noout -in "$cert_path" 2>/dev/null | cut -d= -f2); then
+    if expiry_date=$(sudo openssl x509 -enddate -noout -in "$cert_path" 2>/dev/null | cut -d= -f2); then
+        local expiry_epoch
+        if expiry_epoch=$(date -d "$expiry_date" +%s 2>/dev/null); then
+            local current_epoch=$(date +%s)
+            local days_until_expiry=$(( (expiry_epoch - current_epoch) / 86400 ))
+            
+            if [[ $days_until_expiry -le 0 ]]; then
+                print_warning "Certificate has expired ($days_until_expiry days ago)"
+                return 1
+            fi
+            
+            if [[ $days_until_expiry -le 30 ]]; then
+                print_warning "Certificate expires soon (in $days_until_expiry days)"
+                print_warning "Consider renewing before deployment"
+            else
+                print_success "Certificate is valid (expires in $days_until_expiry days)"
+            fi
+        else
+            print_warning "Failed to parse certificate expiry date: $expiry_date"
+            return 1
+        fi
+    else
         print_warning "Failed to read certificate expiry date from $cert_path"
         return 1
     fi
     
-    local expiry_epoch
-    if ! expiry_epoch=$(date -d "$expiry_date" +%s 2>/dev/null); then
-        print_warning "Failed to parse certificate expiry date: $expiry_date"
-        return 1
-    fi
-    
-    local current_epoch=$(date +%s)
-    local days_until_expiry=$(( (expiry_epoch - current_epoch) / 86400 ))
-    
-    if [[ $days_until_expiry -le 0 ]]; then
-        print_warning "Certificate has expired ($days_until_expiry days ago)"
-        return 1
-    fi
-    
-    if [[ $days_until_expiry -le 30 ]]; then
-        print_warning "Certificate expires soon (in $days_until_expiry days)"
-        print_warning "Consider renewing before deployment"
-    else
-        print_success "Certificate is valid (expires in $days_until_expiry days)"
-    fi
-    
     # Check if certificate matches domain
     local cert_domains=""
+    local domain_found=false
     
     # Try to get Subject Alternative Names first
-    local san_domains
-    if san_domains=$(sudo openssl x509 -text -noout -in "$cert_path" 2>/dev/null | grep -A1 "Subject Alternative Name" | tail -1 | sed 's/DNS://g' | tr ',' '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//' 2>/dev/null); then
-        if [[ -n "$san_domains" ]]; then
-            cert_domains="$san_domains"
+    local san_output
+    if san_output=$(sudo openssl x509 -text -noout -in "$cert_path" 2>/dev/null | grep -A1 "Subject Alternative Name" 2>/dev/null); then
+        local san_line=$(echo "$san_output" | tail -1)
+        if [[ -n "$san_line" ]]; then
+            # Extract DNS names from SAN
+            local san_domains=$(echo "$san_line" | grep -o 'DNS:[^,]*' | sed 's/DNS://g' | tr ',' '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//')
+            if [[ -n "$san_domains" ]]; then
+                cert_domains="$san_domains"
+                print_status "Found SAN domains: $(echo "$san_domains" | tr '\n' ', ' | sed 's/, $//')"
+            fi
         fi
     fi
     
     # If no SAN found, try to get CN from subject
     if [[ -z "$cert_domains" ]]; then
         local cn_domain
-        if cn_domain=$(sudo openssl x509 -subject -noout -in "$cert_path" 2>/dev/null | sed -n 's/.*CN=\([^,/]*\).*/\1/p' 2>/dev/null); then
+        if cn_domain=$(sudo openssl x509 -subject -noout -in "$cert_path" 2>/dev/null | sed -n 's/.*CN=\([^,/]*\).*/\1/p'); then
             if [[ -n "$cn_domain" ]]; then
                 cert_domains="$cn_domain"
+                print_status "Found CN domain: $cn_domain"
             fi
         fi
     fi
@@ -167,26 +202,25 @@ validate_ssl_certificate() {
         return 1
     fi
     
-    print_status "Certificate covers domains: $(echo "$cert_domains" | tr '\n' ', ' | sed 's/, $//')"
-    
     # Check if our domain is in the certificate
-    local domain_found=false
     while IFS= read -r cert_domain; do
         if [[ -n "$cert_domain" ]]; then
             # Remove any whitespace
             cert_domain=$(echo "$cert_domain" | tr -d '[:space:]')
+            
+            print_status "Checking certificate domain: '$cert_domain' against target: '$domain'"
             
             # Handle wildcard certificates
             if [[ "$cert_domain" == "*."* ]]; then
                 local wildcard_base="${cert_domain#*.}"
                 if [[ "$domain" == *".$wildcard_base" ]] || [[ "$domain" == "$wildcard_base" ]]; then
                     domain_found=true
-                    print_status "Domain matches wildcard certificate: $cert_domain"
+                    print_success "Domain matches wildcard certificate: $cert_domain"
                     break
                 fi
             elif [[ "$cert_domain" == "$domain" ]]; then
                 domain_found=true
-                print_status "Domain matches certificate: $cert_domain"
+                print_success "Domain matches certificate: $cert_domain"
                 break
             fi
         fi
@@ -202,28 +236,85 @@ validate_ssl_certificate() {
     fi
 }
 
+# Function to scan all Let's Encrypt certificates
+scan_letsencrypt_certificates() {
+    local domain="$1"
+    
+    print_status "Scanning all Let's Encrypt certificates..."
+    
+    local letsencrypt_dir="/etc/letsencrypt/live"
+    
+    if [[ ! -d "$letsencrypt_dir" ]]; then
+        print_status "Let's Encrypt directory not found: $letsencrypt_dir"
+        return 1
+    fi
+    
+    # List all certificate directories
+    local cert_dirs
+    if cert_dirs=$(sudo find "$letsencrypt_dir" -maxdepth 1 -type d -name "*" 2>/dev/null | grep -v "^$letsencrypt_dir$"); then
+        print_status "Found Let's Encrypt certificate directories:"
+        
+        while IFS= read -r cert_dir; do
+            if [[ -n "$cert_dir" ]]; then
+                local cert_name=$(basename "$cert_dir")
+                print_status "  - $cert_name"
+                
+                local fullchain_path="$cert_dir/fullchain.pem"
+                local privkey_path="$cert_dir/privkey.pem"
+                
+                if [[ -f "$fullchain_path" ]] && [[ -f "$privkey_path" ]]; then
+                    print_status "Checking certificate: $cert_name"
+                    
+                    if validate_ssl_certificate "$domain" "$fullchain_path" "$privkey_path"; then
+                        print_success "Valid certificate found: $cert_name"
+                        SSL_CERT_PATH="$fullchain_path"
+                        SSL_KEY_PATH="$privkey_path"
+                        return 0
+                    else
+                        print_status "Certificate $cert_name does not match domain $domain"
+                    fi
+                else
+                    print_warning "Missing certificate files in: $cert_dir"
+                fi
+            fi
+        done <<< "$cert_dirs"
+    else
+        print_status "No certificate directories found in $letsencrypt_dir"
+    fi
+    
+    return 1
+}
+
 # Function to check for existing SSL certificates
 check_existing_ssl() {
     local domain="$1"
     
     print_status "Checking for existing SSL certificates for $domain..."
     
-    # Primary Let's Encrypt location (most common)
-    local letsencrypt_cert="/etc/letsencrypt/live/$domain/fullchain.pem"
-    local letsencrypt_key="/etc/letsencrypt/live/$domain/privkey.pem"
+    # First, try the direct Let's Encrypt path for the domain
+    local direct_cert="/etc/letsencrypt/live/$domain/fullchain.pem"
+    local direct_key="/etc/letsencrypt/live/$domain/privkey.pem"
     
-    # Check Let's Encrypt first (most likely location)
-    if [[ -f "$letsencrypt_cert" ]] && [[ -f "$letsencrypt_key" ]]; then
-        print_status "Found Let's Encrypt certificate for $domain"
-        if validate_ssl_certificate "$domain" "$letsencrypt_cert" "$letsencrypt_key"; then
-            SSL_CERT_PATH="$letsencrypt_cert"
-            SSL_KEY_PATH="$letsencrypt_key"
+    if [[ -f "$direct_cert" ]] && [[ -f "$direct_key" ]]; then
+        print_status "Found direct Let's Encrypt certificate for $domain"
+        if validate_ssl_certificate "$domain" "$direct_cert" "$direct_key"; then
+            SSL_CERT_PATH="$direct_cert"
+            SSL_KEY_PATH="$direct_key"
             EXISTING_SSL=true
             return 0
         fi
     fi
     
+    # If direct path doesn't work, scan all Let's Encrypt certificates
+    print_status "Direct path not found, scanning all Let's Encrypt certificates..."
+    if scan_letsencrypt_certificates "$domain"; then
+        EXISTING_SSL=true
+        return 0
+    fi
+    
     # Alternative certificate locations
+    print_status "Checking alternative certificate locations..."
+    
     local cert_locations=(
         "/etc/ssl/certs/$domain.crt"
         "/etc/ssl/certs/$domain.pem"
