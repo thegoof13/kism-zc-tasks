@@ -832,7 +832,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                                   <div>
                                     <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
                                       {group.name}
-                                    </div>
+                                    </h4>
                                     <div className="flex items-center space-x-3 text-xs text-neutral-500 dark:text-neutral-400">
                                       <span>{group.completedDisplayMode.replace('-', ' ')}</span>
                                       {group.enableDueDates && (
