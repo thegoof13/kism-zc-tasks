@@ -175,9 +175,9 @@ export function PasswordModal({
           {/* Security Note */}
           {isSettingPassword && (
             <div className="p-3 bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-lg">
-              <p className="text-warning-700 dark:text-warning-400 text-xs">
-                <strong>Security Note:</strong> Password is stored in plain text on the server. 
-                Do not use a password you use elsewhere.
+              <p className="text-warning-700 dark:text-warning-300 text-xs">
+                <strong>Security Notice:</strong> Passwords are stored in plain text on the server for simplicity. 
+                Do not use passwords that you use for other important accounts.
               </p>
             </div>
           )}
