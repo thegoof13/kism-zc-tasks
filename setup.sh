@@ -4,6 +4,7 @@
 # This script automates the deployment of ZenTasks on Ubuntu with Nginx
 # Compatible with LXC containers and traditional Ubuntu installations
 # Now includes Kiosk Portal support with secure random paths
+# Enhanced with SSL certificate validation
 
 set -e
 
@@ -28,6 +29,9 @@ SSL_CONFIG_DIR="/etc/letsencrypt/cloudflare"
 IS_LXC_CONTAINER=false
 KIOSK_PATH=""
 ENABLE_KIOSK=false
+EXISTING_SSL=false
+SSL_CERT_PATH=""
+SSL_KEY_PATH=""
 
 # Function to print colored output
 print_status() {
@@ -87,6 +91,146 @@ generate_random_string() {
     openssl rand -hex 8
 }
 
+# Function to validate SSL certificate
+validate_ssl_certificate() {
+    local domain="$1"
+    local cert_path="$2"
+    local key_path="$3"
+    
+    print_status "Validating SSL certificate for $domain..."
+    
+    # Check if certificate files exist
+    if [[ ! -f "$cert_path" ]]; then
+        print_warning "Certificate file not found: $cert_path"
+        return 1
+    fi
+    
+    if [[ ! -f "$key_path" ]]; then
+        print_warning "Private key file not found: $key_path"
+        return 1
+    fi
+    
+    # Check certificate expiry
+    local expiry_date
+    if ! expiry_date=$(openssl x509 -enddate -noout -in "$cert_path" 2>/dev/null | cut -d= -f2); then
+        print_warning "Failed to read certificate expiry date"
+        return 1
+    fi
+    
+    local expiry_epoch
+    if ! expiry_epoch=$(date -d "$expiry_date" +%s 2>/dev/null); then
+        print_warning "Failed to parse certificate expiry date: $expiry_date"
+        return 1
+    fi
+    
+    local current_epoch=$(date +%s)
+    local days_until_expiry=$(( (expiry_epoch - current_epoch) / 86400 ))
+    
+    if [[ $days_until_expiry -le 0 ]]; then
+        print_warning "Certificate has expired ($days_until_expiry days ago)"
+        return 1
+    fi
+    
+    if [[ $days_until_expiry -le 30 ]]; then
+        print_warning "Certificate expires soon (in $days_until_expiry days)"
+        print_warning "Consider renewing before deployment"
+    else
+        print_success "Certificate is valid (expires in $days_until_expiry days)"
+    fi
+    
+    # Check if certificate matches domain
+    local cert_domains
+    if ! cert_domains=$(openssl x509 -text -noout -in "$cert_path" 2>/dev/null | grep -A1 "Subject Alternative Name" | tail -1 | sed 's/DNS://g' | tr ',' '\n' | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//' 2>/dev/null); then
+        # Fallback to CN if SAN is not available
+        if ! cert_domains=$(openssl x509 -subject -noout -in "$cert_path" 2>/dev/null | sed 's/.*CN=\([^,]*\).*/\1/' 2>/dev/null); then
+            print_warning "Failed to extract domains from certificate"
+            return 1
+        fi
+    fi
+    
+    # Check if our domain is in the certificate
+    local domain_found=false
+    while IFS= read -r cert_domain; do
+        if [[ -n "$cert_domain" ]]; then
+            # Handle wildcard certificates
+            if [[ "$cert_domain" == "*."* ]]; then
+                local wildcard_base="${cert_domain#*.}"
+                if [[ "$domain" == *".$wildcard_base" ]] || [[ "$domain" == "$wildcard_base" ]]; then
+                    domain_found=true
+                    break
+                fi
+            elif [[ "$cert_domain" == "$domain" ]]; then
+                domain_found=true
+                break
+            fi
+        fi
+    done <<< "$cert_domains"
+    
+    if [[ "$domain_found" == true ]]; then
+        print_success "Certificate is valid for domain: $domain"
+        return 0
+    else
+        print_warning "Certificate does not cover domain: $domain"
+        print_warning "Certificate covers: $(echo "$cert_domains" | tr '\n' ', ' | sed 's/, $//')"
+        return 1
+    fi
+}
+
+# Function to check for existing SSL certificates
+check_existing_ssl() {
+    local domain="$1"
+    
+    print_status "Checking for existing SSL certificates for $domain..."
+    
+    # Common SSL certificate locations
+    local cert_locations=(
+        "/etc/letsencrypt/live/$domain/fullchain.pem"
+        "/etc/ssl/certs/$domain.crt"
+        "/etc/ssl/certs/$domain.pem"
+        "/etc/nginx/ssl/$domain.crt"
+        "/etc/nginx/ssl/$domain.pem"
+        "/usr/local/etc/ssl/certs/$domain.crt"
+        "/usr/local/etc/ssl/certs/$domain.pem"
+    )
+    
+    local key_locations=(
+        "/etc/letsencrypt/live/$domain/privkey.pem"
+        "/etc/ssl/private/$domain.key"
+        "/etc/nginx/ssl/$domain.key"
+        "/usr/local/etc/ssl/private/$domain.key"
+    )
+    
+    # Check each certificate location
+    for cert_path in "${cert_locations[@]}"; do
+        if [[ -f "$cert_path" ]]; then
+            print_status "Found certificate at: $cert_path"
+            
+            # Find corresponding private key
+            for key_path in "${key_locations[@]}"; do
+                if [[ -f "$key_path" ]]; then
+                    print_status "Found private key at: $key_path"
+                    
+                    # Validate the certificate
+                    if validate_ssl_certificate "$domain" "$cert_path" "$key_path"; then
+                        print_success "Valid SSL certificate found!"
+                        SSL_CERT_PATH="$cert_path"
+                        SSL_KEY_PATH="$key_path"
+                        EXISTING_SSL=true
+                        return 0
+                    else
+                        print_warning "Certificate validation failed for $cert_path"
+                    fi
+                fi
+            done
+            
+            print_warning "No matching private key found for certificate: $cert_path"
+        fi
+    done
+    
+    print_status "No valid existing SSL certificates found for $domain"
+    return 1
+}
+
 # Function to get user input
 get_user_input() {
     echo -e "${BLUE}=== ZenTasks Deployment Configuration ===${NC}"
@@ -98,24 +242,45 @@ get_user_input() {
         exit 1
     fi
     
-    read -p "Enter your email for SSL certificate (optional): " EMAIL
-    
-    if [[ -n "$EMAIL" ]]; then
-        read -p "Do you want to set up SSL with Let's Encrypt using Cloudflare DNS? (y/n): " ssl_choice
-        if [[ "$ssl_choice" =~ ^[Yy]$ ]]; then
+    # Check for existing SSL certificates first
+    if check_existing_ssl "$DOMAIN"; then
+        print_success "Existing valid SSL certificate found for $DOMAIN"
+        print_status "Certificate: $SSL_CERT_PATH"
+        print_status "Private Key: $SSL_KEY_PATH"
+        
+        read -p "Do you want to use the existing SSL certificate? (y/n): " use_existing_ssl
+        if [[ "$use_existing_ssl" =~ ^[Yy]$ ]]; then
             USE_SSL=true
-            
-            echo
-            print_status "Cloudflare DNS SSL Configuration"
-            print_warning "You need a Cloudflare API token with Zone:Read and DNS:Edit permissions"
-            print_warning "Create one at: https://dash.cloudflare.com/profile/api-tokens"
-            echo
-            
-            read -s -p "Enter your Cloudflare API token: " CLOUDFLARE_API_TOKEN
-            echo
-            if [[ -z "$CLOUDFLARE_API_TOKEN" ]]; then
-                print_error "Cloudflare API token is required for DNS SSL"
-                exit 1
+            print_success "Will use existing SSL certificate"
+        else
+            print_status "Will proceed with new SSL certificate setup"
+            EXISTING_SSL=false
+        fi
+    else
+        print_status "No valid existing SSL certificate found"
+    fi
+    
+    # Only ask for SSL setup if no existing certificate is being used
+    if [[ "$EXISTING_SSL" == false ]]; then
+        read -p "Enter your email for SSL certificate (optional): " EMAIL
+        
+        if [[ -n "$EMAIL" ]]; then
+            read -p "Do you want to set up SSL with Let's Encrypt using Cloudflare DNS? (y/n): " ssl_choice
+            if [[ "$ssl_choice" =~ ^[Yy]$ ]]; then
+                USE_SSL=true
+                
+                echo
+                print_status "Cloudflare DNS SSL Configuration"
+                print_warning "You need a Cloudflare API token with Zone:Read and DNS:Edit permissions"
+                print_warning "Create one at: https://dash.cloudflare.com/profile/api-tokens"
+                echo
+                
+                read -s -p "Enter your Cloudflare API token: " CLOUDFLARE_API_TOKEN
+                echo
+                if [[ -z "$CLOUDFLARE_API_TOKEN" ]]; then
+                    print_error "Cloudflare API token is required for DNS SSL"
+                    exit 1
+                fi
             fi
         fi
     fi
@@ -134,14 +299,19 @@ get_user_input() {
     print_status "Domain: $DOMAIN"
     print_status "Email: ${EMAIL:-'Not provided'}"
     print_status "SSL: ${USE_SSL}"
+    if [[ "$USE_SSL" == true ]]; then
+        if [[ "$EXISTING_SSL" == true ]]; then
+            print_status "SSL Method: Using existing certificate"
+            print_status "Certificate: $SSL_CERT_PATH"
+        else
+            print_status "SSL Method: New Let's Encrypt with Cloudflare DNS"
+        fi
+    fi
     print_status "Kiosk Portal: ${ENABLE_KIOSK}"
     if [[ "$ENABLE_KIOSK" == true ]]; then
         print_status "Kiosk URL: https://$DOMAIN/kiosk/$KIOSK_PATH/"
     fi
     print_status "Container Environment: ${IS_LXC_CONTAINER}"
-    if [[ "$USE_SSL" == true ]]; then
-        print_status "SSL Method: Cloudflare DNS Challenge (API Token)"
-    fi
     echo
     
     read -p "Continue with deployment? (y/n): " confirm
@@ -201,7 +371,7 @@ install_pm2() {
 
 # Function to install Certbot with Cloudflare plugin (Ubuntu 24.04 compatible)
 install_certbot() {
-    if [[ "$USE_SSL" == true ]]; then
+    if [[ "$USE_SSL" == true ]] && [[ "$EXISTING_SSL" == false ]]; then
         print_status "Installing Certbot with Cloudflare DNS plugin..."
         
         # Check Ubuntu version
@@ -271,6 +441,8 @@ EOF
         fi
         
         print_success "Certbot with Cloudflare plugin installed successfully"
+    else
+        print_status "Skipping Certbot installation (using existing SSL or no SSL)"
     fi
 }
 
@@ -474,9 +646,9 @@ EOF
     listen 443 ssl http2;
     server_name $DOMAIN;
     
-    # SSL configuration (will be updated after certificate generation)
-    ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
-    ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
+    # SSL configuration
+    ssl_certificate $SSL_CERT_PATH;
+    ssl_certificate_key $SSL_KEY_PATH;
     ssl_session_timeout 1d;
     ssl_session_cache shared:MozTLS:10m;
     ssl_session_tickets off;
@@ -605,7 +777,7 @@ EOF
 
 # Function to setup Cloudflare credentials
 setup_cloudflare_credentials() {
-    if [[ "$USE_SSL" == true ]]; then
+    if [[ "$USE_SSL" == true ]] && [[ "$EXISTING_SSL" == false ]]; then
         print_status "Setting up Cloudflare credentials..."
         
         # Create SSL config directory
@@ -628,7 +800,7 @@ EOF
 
 # Function to setup SSL with Let's Encrypt using Cloudflare DNS
 setup_ssl() {
-    if [[ "$USE_SSL" == true ]]; then
+    if [[ "$USE_SSL" == true ]] && [[ "$EXISTING_SSL" == false ]]; then
         print_status "Setting up SSL certificate with Let's Encrypt using Cloudflare DNS..."
         
         # Use our custom certbot wrapper
@@ -666,6 +838,10 @@ setup_ssl() {
             
             print_success "SSL certificate obtained successfully"
             
+            # Update SSL paths to use new certificate
+            SSL_CERT_PATH="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+            SSL_KEY_PATH="/etc/letsencrypt/live/$DOMAIN/privkey.pem"
+            
             # Update Nginx configuration for SSL
             update_nginx_ssl_config
             
@@ -680,6 +856,10 @@ setup_ssl() {
             print_warning "Continuing without SSL..."
             USE_SSL=false
         fi
+    elif [[ "$USE_SSL" == true ]] && [[ "$EXISTING_SSL" == true ]]; then
+        print_success "Using existing SSL certificate"
+        print_status "Certificate: $SSL_CERT_PATH"
+        print_status "Private Key: $SSL_KEY_PATH"
     fi
 }
 
@@ -687,9 +867,9 @@ setup_ssl() {
 update_nginx_ssl_config() {
     print_status "Updating Nginx configuration for SSL..."
     
-    # Replace the temporary SSL certificate paths with the real ones
-    sudo sed -i "s|ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;|ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;|g" /etc/nginx/sites-available/zentasks
-    sudo sed -i "s|ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;|ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;|g" /etc/nginx/sites-available/zentasks
+    # Replace the SSL certificate paths with the real ones
+    sudo sed -i "s|ssl_certificate .*;|ssl_certificate $SSL_CERT_PATH;|g" /etc/nginx/sites-available/zentasks
+    sudo sed -i "s|ssl_certificate_key .*;|ssl_certificate_key $SSL_KEY_PATH;|g" /etc/nginx/sites-available/zentasks
     
     # Test and reload Nginx
     sudo nginx -t && sudo systemctl reload nginx
@@ -699,10 +879,11 @@ update_nginx_ssl_config() {
 
 # Function to create SSL renewal script
 setup_ssl_renewal_cron() {
-    print_status "Setting up SSL certificate renewal..."
-    
-    # Create renewal script
-    cat > /tmp/ssl-renewal.sh << EOF
+    if [[ "$EXISTING_SSL" == false ]]; then
+        print_status "Setting up SSL certificate renewal..."
+        
+        # Create renewal script
+        cat > /tmp/ssl-renewal.sh << EOF
 #!/bin/bash
 
 # ZenTasks SSL Certificate Renewal Script
@@ -804,15 +985,18 @@ mkdir -p \$(dirname "\$LOG_FILE")
 # Run main function
 main
 EOF
-    
-    # Install renewal script
-    sudo mv /tmp/ssl-renewal.sh /usr/local/bin/zentasks-ssl-renewal.sh
-    sudo chmod +x /usr/local/bin/zentasks-ssl-renewal.sh
-    
-    # Add to crontab for weekly renewal check (Monday at 3 AM)
-    (sudo crontab -l 2>/dev/null | grep -v "zentasks-ssl-renewal"; echo "0 3 * * 1 /usr/local/bin/zentasks-ssl-renewal.sh") | sudo crontab -
-    
-    print_success "SSL renewal script created and scheduled for weekly checks"
+        
+        # Install renewal script
+        sudo mv /tmp/ssl-renewal.sh /usr/local/bin/zentasks-ssl-renewal.sh
+        sudo chmod +x /usr/local/bin/zentasks-ssl-renewal.sh
+        
+        # Add to crontab for weekly renewal check (Monday at 3 AM)
+        (sudo crontab -l 2>/dev/null | grep -v "zentasks-ssl-renewal"; echo "0 3 * * 1 /usr/local/bin/zentasks-ssl-renewal.sh") | sudo crontab -
+        
+        print_success "SSL renewal script created and scheduled for weekly checks"
+    else
+        print_status "Skipping SSL renewal setup (using existing certificate)"
+    fi
 }
 
 # Function to configure firewall
@@ -961,32 +1145,42 @@ display_final_info() {
     fi
     if [[ "$USE_SSL" == true ]]; then
         print_status "SSL certificate management:"
-        echo "  Manual renewal check: sudo /usr/local/bin/zentasks-ssl-renewal.sh"
-        echo "  View SSL renewal logs: sudo tail -f /var/log/zentasks/ssl-renewal.log"
-        echo "  Certificate location: /etc/letsencrypt/live/$DOMAIN/"
-        echo "  Cloudflare credentials: $SSL_CONFIG_DIR/cloudflare.ini"
-        echo "  Certbot command: /usr/local/bin/certbot-cloudflare (virtual environment wrapper)"
-        echo "  Test certbot: /usr/local/bin/certbot-cloudflare --version"
-        echo
-        print_success "SSL certificate will be checked weekly on Mondays at 3 AM"
-        print_success "Renewal will occur automatically if certificate expires within 21 days"
+        if [[ "$EXISTING_SSL" == true ]]; then
+            echo "  Using existing SSL certificate: $SSL_CERT_PATH"
+            echo "  Private key: $SSL_KEY_PATH"
+            echo "  Note: Automatic renewal not configured for existing certificates"
+        else
+            echo "  Manual renewal check: sudo /usr/local/bin/zentasks-ssl-renewal.sh"
+            echo "  View SSL renewal logs: sudo tail -f /var/log/zentasks/ssl-renewal.log"
+            echo "  Certificate location: /etc/letsencrypt/live/$DOMAIN/"
+            echo "  Cloudflare credentials: $SSL_CONFIG_DIR/cloudflare.ini"
+            echo "  Certbot command: /usr/local/bin/certbot-cloudflare (virtual environment wrapper)"
+            echo "  Test certbot: /usr/local/bin/certbot-cloudflare --version"
+            echo
+            print_success "SSL certificate will be checked weekly on Mondays at 3 AM"
+            print_success "Renewal will occur automatically if certificate expires within 21 days"
+        fi
         echo
         print_status "SSL Configuration Notes:"
-        echo "  - Using Cloudflare API token (no email required)"
-        echo "  - DNS challenge method for validation"
-        echo "  - 60-second DNS propagation wait time"
         echo "  - HTTP traffic automatically redirects to HTTPS"
+        if [[ "$EXISTING_SSL" == false ]]; then
+            echo "  - Using Cloudflare API token (no email required)"
+            echo "  - DNS challenge method for validation"
+            echo "  - 60-second DNS propagation wait time"
+        fi
         echo
     fi
     print_warning "Please ensure your domain DNS points to this server's IP address"
-    if [[ "$USE_SSL" == true ]]; then
+    if [[ "$USE_SSL" == true ]] && [[ "$EXISTING_SSL" == false ]]; then
         print_warning "Make sure your domain is managed by Cloudflare for DNS challenges to work"
         print_warning "Verify your API token has Zone:Read and DNS:Edit permissions"
     fi
     if [[ "$IS_LXC_CONTAINER" == true ]]; then
         print_warning "Running in LXC container - some system features may be limited"
         print_warning "Firewall configuration should be handled on the host system"
-        print_warning "Certbot installed in isolated virtual environment for PEP 668 compliance"
+        if [[ "$EXISTING_SSL" == false ]]; then
+            print_warning "Certbot installed in isolated virtual environment for PEP 668 compliance"
+        fi
     fi
     echo
 }
@@ -998,7 +1192,7 @@ main() {
     echo "║                    ZenTasks Deployment                      ║"
     echo "║         Ubuntu Setup Script (LXC Compatible)               ║"
     echo "║              PEP 668 Compliant (Ubuntu 24.04)              ║"
-    echo "║            Fixed Cloudflare API Token Support              ║"
+    echo "║            Enhanced SSL Certificate Detection               ║"
     echo "║              Now with Kiosk Portal Support                 ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
