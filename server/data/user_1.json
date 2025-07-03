@@ -101,6 +101,18 @@
       "isCollapsed": false,
       "order": 3,
       "createdAt": "2025-07-01T12:24:37.489Z"
+    },
+    {
+      "name": "Due Tasks",
+      "color": "#99003d",
+      "icon": "Briefcase",
+      "completedDisplayMode": "grey-drop",
+      "enableDueDates": true,
+      "sortByDueDate": true,
+      "isCollapsed": false,
+      "id": "1751501941004",
+      "createdAt": "2025-07-03T00:19:01.004Z",
+      "order": 4
     }
   ],
   "profiles": [
