@@ -48,6 +48,7 @@ export interface UserProfile {
   avatar: string;
   isActive: boolean;
   createdAt: Date;
+  isTaskCompetitor?: boolean; // New field for competition opt-in
 }
 
 export interface HistoryEntry {

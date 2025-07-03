@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, Users, FolderOpen, History, Brain, Palette, Bell, Archive, Plus, Edit, Trash2, Save, Calendar, Type } from 'lucide-react';
+import { X, Settings, Users, FolderOpen, History, Brain, Palette, Bell, Archive, Plus, Edit, Trash2, Save, Calendar, Type, Trophy } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { getIconComponent, getAvailableIcons } from '../utils/icons';
 import { AIQueryModal } from './AIQueryModal';
@@ -261,6 +261,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               color: '#6366F1',
               avatar: '👤',
               isActive: false,
+              isTaskCompetitor: false,
             };
             dispatch({ type: 'ADD_PROFILE', profile: newProfile });
           }}
@@ -290,11 +291,20 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     {profile.avatar}
                   </div>
                   <div>
-                    <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
-                      {profile.name}
-                    </h4>
+                    <div className="flex items-center space-x-2">
+                      <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
+                        {profile.name}
+                      </h4>
+                      {profile.isTaskCompetitor && (
+                        <div className="flex items-center space-x-1 px-2 py-1 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 text-xs rounded-full">
+                          <Trophy className="w-3 h-3" />
+                          <span>Competitor</span>
+                        </div>
+                      )}
+                    </div>
                     <p className="text-xs text-neutral-500 dark:text-neutral-400">
                       {profile.id === state.activeProfileId ? 'Active' : 'Inactive'}
+                      {profile.isTaskCompetitor && ' • Participating in task competition'}
                     </p>
                   </div>
                 </div>
@@ -732,6 +742,7 @@ function ProfileEditForm({
   const [name, setName] = useState(profile.name);
   const [color, setColor] = useState(profile.color);
   const [avatar, setAvatar] = useState(profile.avatar);
+  const [isTaskCompetitor, setIsTaskCompetitor] = useState(profile.isTaskCompetitor || false);
   const [avatarType, setAvatarType] = useState<'emoji' | 'text'>(
     // Detect if current avatar is likely an emoji or text
     /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(profile.avatar) ? 'emoji' : 'text'
@@ -739,7 +750,7 @@ function ProfileEditForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({ name, color, avatar });
+    onSave({ name, color, avatar, isTaskCompetitor });
   };
 
   const commonEmojis = ['👤', '👨', '👩', '🧑', '👶', '👴', '👵', '🙋‍♂️', '🙋‍♀️', '💼', '👨‍💻', '👩‍💻', '🎓', '👨‍🎓', '👩‍🎓'];
@@ -874,6 +885,29 @@ function ProfileEditForm({
               {name}
             </span>
           </div>
+        </div>
+      </div>
+
+      {/* Task Competitor Checkbox */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+          <div>
+            <div className="flex items-center space-x-2">
+              <Trophy className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+              <label className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                Task Competitor
+              </label>
+            </div>
+            <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+              Participate in task completion rankings and compete with other profiles
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            checked={isTaskCompetitor}
+            onChange={(e) => setIsTaskCompetitor(e.target.checked)}
+            className="w-4 h-4 text-yellow-500 bg-yellow-100 border-yellow-300 rounded focus:ring-yellow-500"
+          />
         </div>
       </div>
 

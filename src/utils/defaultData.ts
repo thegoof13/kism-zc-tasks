@@ -59,6 +59,7 @@ export const defaultProfiles: UserProfile[] = [
     avatar: '👤',
     isActive: true,
     createdAt: new Date(),
+    isTaskCompetitor: true, // Default to participating in competition
   },
 ];
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, Users, Calendar, Target, Award, Clock, Crown, RefreshCw, CheckCircle, Eye } from 'lucide-react';
+import { TrendingUp, Users, Calendar, Target, Award, Clock, Crown, RefreshCw, CheckCircle, Eye, Trophy, Medal, Star } from 'lucide-react';
 import { HistoryEntry, Task, UserProfile } from '../types';
 
 interface HistoryAnalyticsProps {
@@ -96,6 +96,35 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
   }).sort((a, b) => b.completions - a.completions);
 
   const topCollaborator = collaborativeProfileStats.find(stat => stat.completions > 0);
+
+  // Calculate Task Competitor stats (all tasks for competitors)
+  const taskCompetitors = profiles.filter(profile => profile.isTaskCompetitor);
+  
+  const competitorStats = taskCompetitors.map(profile => {
+    const profileCompletions = completedActions.filter(entry => 
+      entry.profileId === profile.id
+    ).length;
+    
+    const profileUnchecked = uncheckedActions.filter(entry => 
+      entry.profileId === profile.id
+    ).length;
+    
+    return {
+      profile,
+      completions: profileCompletions,
+      unchecked: profileUnchecked,
+      accuracy: profileCompletions > 0 ? 
+        Math.max(0, ((profileCompletions - profileUnchecked) / profileCompletions * 100)) : 0
+    };
+  }).sort((a, b) => {
+    // Sort by completions first, then by accuracy
+    if (b.completions !== a.completions) {
+      return b.completions - a.completions;
+    }
+    return b.accuracy - a.accuracy;
+  });
+
+  const topCompetitor = competitorStats.find(stat => stat.completions > 0);
 
   // Calculate task completion patterns
   const taskCompletionStats = tasks.map(task => {
@@ -332,6 +361,131 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
         </div>
       )}
 
+      {/* Top Competitor - Only show if there are competitors AND activity */}
+      {taskCompetitors.length > 0 && topCompetitor && (
+        <div className="card p-6">
+          <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
+            <Trophy className="w-5 h-5 mr-2 text-orange-500" />
+            Top Completer (Last 14 Days)
+          </h4>
+          <div className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 rounded-lg p-4 mb-4">
+            <p className="text-sm text-orange-700 dark:text-orange-300 flex items-center">
+              <Trophy className="w-4 h-4 mr-2" />
+              Based on all task completions by profiles marked as "Task Competitors"
+            </p>
+            <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+              {taskCompetitors.length} competitor{taskCompetitors.length !== 1 ? 's' : ''} • 
+              {completedActions.filter(action => taskCompetitors.some(c => c.id === action.profileId)).length} total completion{completedActions.filter(action => taskCompetitors.some(c => c.id === action.profileId)).length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-2xl shadow-lg">
+                  {topCompetitor.profile.avatar}
+                </div>
+                <div className="absolute -top-1 -right-1 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center shadow-md">
+                  <Trophy className="w-3 h-3 text-white" />
+                </div>
+              </div>
+              <div>
+                <h5 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">
+                  {topCompetitor.profile.name}
+                </h5>
+                <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">
+                  🥇 Task Champion
+                </p>
+                <div className="flex items-center space-x-4 mt-2">
+                  <div className="flex items-center space-x-1">
+                    <Target className="w-4 h-4 text-success-500" />
+                    <span className="text-sm font-medium text-success-600 dark:text-success-400">
+                      {topCompetitor.completions} tasks completed
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Award className="w-4 h-4 text-accent-500" />
+                    <span className="text-sm font-medium text-accent-600 dark:text-accent-400">
+                      {Math.round(topCompetitor.accuracy)}% accuracy
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-4xl font-bold text-orange-500 mb-1">
+                #1
+              </div>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                Rank
+              </p>
+            </div>
+          </div>
+          
+          {/* Competition Leaderboard */}
+          {competitorStats.length > 1 && competitorStats.filter(stat => stat.completions > 0).length > 1 && (
+            <div className="mt-6 pt-4 border-t border-neutral-200 dark:border-neutral-700">
+              <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">
+                Competition Leaderboard
+              </p>
+              <div className="space-y-2">
+                {competitorStats.filter(stat => stat.completions > 0).slice(1, 4).map((stat, index) => {
+                  const rank = index + 2;
+                  const medalIcon = rank === 2 ? Medal : rank === 3 ? Star : Trophy;
+                  const medalColor = rank === 2 ? 'text-gray-500' : rank === 3 ? 'text-amber-600' : 'text-neutral-500';
+                  
+                  return (
+                    <div key={stat.profile.id} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center text-lg">
+                          {stat.profile.avatar}
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <p className="font-medium text-neutral-900 dark:text-neutral-100">
+                              {stat.profile.name}
+                            </p>
+                            {React.createElement(medalIcon, { className: `w-4 h-4 ${medalColor}` })}
+                          </div>
+                          <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                            {stat.completions} tasks • {Math.round(stat.accuracy)}% accuracy
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-neutral-600 dark:text-neutral-400">
+                          #{rank}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* No Competitors Message */}
+      {taskCompetitors.length === 0 && profiles.length > 1 && (
+        <div className="card p-6">
+          <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex items-center">
+            <Trophy className="w-5 h-5 mr-2 text-neutral-400" />
+            Top Completer (Last 14 Days)
+          </h4>
+          <div className="text-center py-8">
+            <Trophy className="w-16 h-16 mx-auto mb-4 text-neutral-300 dark:text-neutral-600" />
+            <h5 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">
+              No Task Competitors Yet
+            </h5>
+            <p className="text-neutral-600 dark:text-neutral-400 max-w-md mx-auto">
+              Enable "Task Competitor" in profile settings to participate in task completion rankings. 
+              Only profiles marked as competitors will appear in the leaderboard.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Most Consistent Tasks */}
       {mostConsistentTasks.length > 0 && (
         <div className="card p-6">
@@ -495,9 +649,17 @@ function RecentActivitySection({
                     <p className="font-medium text-neutral-900 dark:text-neutral-100">
                       {entry.taskTitle}
                     </p>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-400">
-                      Completed by {profile?.name || 'Unknown'} • {isToday ? 'Today' : 'Yesterday'}
-                    </p>
+                    <div className="flex items-center space-x-2">
+                      <p className="text-xs text-neutral-600 dark:text-neutral-400">
+                        Completed by {profile?.name || 'Unknown'} • {isToday ? 'Today' : 'Yesterday'}
+                      </p>
+                      {profile?.isTaskCompetitor && (
+                        <div className="flex items-center space-x-1 px-1 py-0.5 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 text-xs rounded">
+                          <Trophy className="w-2 h-2" />
+                          <span>Competitor</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <span className="text-xs text-neutral-500 dark:text-neutral-400">
