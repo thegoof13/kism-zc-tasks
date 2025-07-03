@@ -409,7 +409,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'RESET_RECURRING_TASKS': {
       const updatedTasks = state.tasks.map(task => {
-        if (task.isCompleted && task.completedAt && shouldResetTask(task.completedAt, task.recurrence)) {
+        if (task.isCompleted && task.completedAt && shouldResetTask(task.completedAt, task.recurrence, task.recurrenceFromDate)) {
           return {
             ...task,
             isCompleted: false,
@@ -462,6 +462,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             createdAt: new Date(task.createdAt),
             completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
             dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
+            recurrenceFromDate: task.recurrenceFromDate ? new Date(task.recurrenceFromDate) : undefined,
           }));
         }
         

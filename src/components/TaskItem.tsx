@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Check, Clock, Edit, Trash2, RefreshCw, X, Calendar, AlertTriangle, ChevronLeft } from 'lucide-react';
 import { Task, CompletedDisplayMode } from '../types';
 import { useApp } from '../contexts/AppContext';
-import { getRecurrenceLabel } from '../utils/recurrence';
+import { getRecurrenceLabel, getResetDateDescription } from '../utils/recurrence';
 import { NotificationService } from '../utils/notifications';
 
 interface TaskItemProps {
@@ -198,6 +198,19 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
 
   const dueDateInfo = getDueDateInfo();
 
+  // Get recurrence reset info
+  const getRecurrenceInfo = () => {
+    if (task.recurrence === 'daily') {
+      return getRecurrenceLabel(task.recurrence);
+    }
+    
+    if (task.recurrenceFromDate) {
+      return getResetDateDescription(task.recurrence, new Date(task.recurrenceFromDate));
+    }
+    
+    return getRecurrenceLabel(task.recurrence);
+  };
+
   return (
     <div 
       ref={taskRef}
@@ -313,7 +326,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
               <div className="flex items-center space-x-1 px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-700 rounded-full">
                 <Clock className="w-2.5 h-2.5 text-neutral-500 dark:text-neutral-400" />
                 <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
-                  {getRecurrenceLabel(task.recurrence)}
+                  {getRecurrenceInfo()}
                 </span>
               </div>
 
@@ -389,7 +402,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
               <div className="flex items-center space-x-1 px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-700 rounded-full">
                 <Clock className="w-2.5 h-2.5 text-neutral-500 dark:text-neutral-400" />
                 <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
-                  {getRecurrenceLabel(task.recurrence)}
+                  {getRecurrenceInfo()}
                 </span>
               </div>
 

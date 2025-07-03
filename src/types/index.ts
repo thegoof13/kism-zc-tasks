@@ -26,6 +26,7 @@ export interface Task {
   profiles: string[];
   order: number;
   dueDate?: Date;
+  recurrenceFromDate?: Date; // New field for when recurrence starts
 }
 
 export interface TaskGroup {

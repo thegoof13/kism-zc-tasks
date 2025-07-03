@@ -18,9 +18,14 @@ export function getRecurrenceLabel(recurrence: RecurrenceType): string {
   return labels[recurrence];
 }
 
-export function shouldResetTask(lastCompleted: Date, recurrence: RecurrenceType): boolean {
+export function shouldResetTask(lastCompleted: Date, recurrence: RecurrenceType, recurrenceFromDate?: Date): boolean {
   const now = new Date();
   const lastCompletedDate = new Date(lastCompleted);
+  
+  // If there's a recurrence from date and we haven't reached it yet, don't reset
+  if (recurrenceFromDate && now < recurrenceFromDate) {
+    return false;
+  }
   
   switch (recurrence) {
     case 'breakfast':
@@ -248,5 +253,109 @@ export function getNextDueDateDescription(currentDueDate: Date, recurrence: Recu
     return `In ${diffDays} days (${formatDate(nextDue)})`;
   } else {
     return formatDate(nextDue);
+  }
+}
+
+/**
+ * Calculate the next reset date based on recurrence pattern and from date
+ */
+export function calculateNextResetDate(recurrence: RecurrenceType, fromDate: Date): Date {
+  const nextReset = new Date(fromDate);
+
+  switch (recurrence) {
+    case 'breakfast':
+    case 'lunch':
+    case 'dinner':
+    case 'daily':
+      nextReset.setDate(nextReset.getDate() + 1);
+      break;
+    
+    case 'work-daily':
+      // Move to next work day
+      do {
+        nextReset.setDate(nextReset.getDate() + 1);
+      } while (nextReset.getDay() === 0 || nextReset.getDay() === 6);
+      break;
+    
+    case 'weekend-daily':
+      // Move to next weekend day
+      do {
+        nextReset.setDate(nextReset.getDate() + 1);
+      } while (nextReset.getDay() !== 0 && nextReset.getDay() !== 6);
+      break;
+    
+    case 'weekly':
+      nextReset.setDate(nextReset.getDate() + 7);
+      break;
+    
+    case 'fortnightly':
+      nextReset.setDate(nextReset.getDate() + 14);
+      break;
+    
+    case 'monthly':
+      const currentMonth = nextReset.getMonth();
+      nextReset.setMonth(currentMonth + 1);
+      if (nextReset.getMonth() !== (currentMonth + 1) % 12) {
+        nextReset.setDate(0);
+      }
+      break;
+    
+    case 'quarterly':
+      const currentQuarterMonth = nextReset.getMonth();
+      nextReset.setMonth(currentQuarterMonth + 3);
+      if (nextReset.getMonth() !== (currentQuarterMonth + 3) % 12) {
+        nextReset.setDate(0);
+      }
+      break;
+    
+    case 'half-yearly':
+      const currentHalfMonth = nextReset.getMonth();
+      nextReset.setMonth(currentHalfMonth + 6);
+      if (nextReset.getMonth() !== (currentHalfMonth + 6) % 12) {
+        nextReset.setDate(0);
+      }
+      break;
+    
+    case 'yearly':
+      nextReset.setFullYear(nextReset.getFullYear() + 1);
+      if (nextReset.getMonth() !== fromDate.getMonth()) {
+        nextReset.setDate(0);
+      }
+      break;
+  }
+
+  return nextReset;
+}
+
+/**
+ * Get a human-readable description of when the task will reset
+ */
+export function getResetDateDescription(recurrence: RecurrenceType, fromDate: Date): string {
+  if (recurrence === 'daily') {
+    return 'Resets daily';
+  }
+
+  const nextReset = calculateNextResetDate(recurrence, fromDate);
+  const now = new Date();
+  const diffTime = nextReset.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+    });
+  };
+
+  if (diffDays <= 0) {
+    return 'Ready to reset';
+  } else if (diffDays === 1) {
+    return `Resets tomorrow (${formatDate(nextReset)})`;
+  } else if (diffDays <= 7) {
+    return `Resets in ${diffDays} days (${formatDate(nextReset)})`;
+  } else {
+    return `Resets on ${formatDate(nextReset)}`;
   }
 }

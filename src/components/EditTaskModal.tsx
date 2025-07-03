@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Save, Calendar } from 'lucide-react';
+import { X, Save, Calendar, Clock } from 'lucide-react';
 import { Task, RecurrenceType } from '../types';
 import { useApp } from '../contexts/AppContext';
 import { getRecurrenceLabel } from '../utils/recurrence';
@@ -34,9 +34,13 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
   const [dueDate, setDueDate] = useState(
     task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 16) : ''
   );
+  const [recurrenceFromDate, setRecurrenceFromDate] = useState(
+    task.recurrenceFromDate ? new Date(task.recurrenceFromDate).toISOString().slice(0, 16) : ''
+  );
 
   const selectedGroup = state.groups.find(g => g.id === groupId);
   const showDueDate = selectedGroup?.enableDueDates;
+  const showRecurrenceFromDate = recurrence !== 'daily';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +60,14 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
     } else if (!showDueDate) {
       // Remove due date if group doesn't support it
       updates.dueDate = undefined;
+    }
+
+    // Handle recurrence from date
+    if (showRecurrenceFromDate && recurrenceFromDate) {
+      updates.recurrenceFromDate = new Date(recurrenceFromDate);
+    } else if (!showRecurrenceFromDate) {
+      // Remove recurrence from date if daily
+      updates.recurrenceFromDate = undefined;
     }
 
     dispatch({
@@ -133,6 +145,46 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
               </select>
             </div>
 
+            {/* Recurrence */}
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                Recurrence
+              </label>
+              <select
+                value={recurrence}
+                onChange={(e) => setRecurrence(e.target.value as RecurrenceType)}
+                className="w-full px-3 py-2 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all duration-200"
+              >
+                {recurrenceOptions.map(option => (
+                  <option key={option} value={option}>
+                    {getRecurrenceLabel(option)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Recurrence From Date (conditional) */}
+            {showRecurrenceFromDate && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                  <div className="flex items-center space-x-1.5">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Recurrence From Date</span>
+                  </div>
+                </label>
+                <input
+                  type="datetime-local"
+                  value={recurrenceFromDate}
+                  onChange={(e) => setRecurrenceFromDate(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all duration-200"
+                  min={new Date().toISOString().slice(0, 16)}
+                />
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                  When should this task start recurring? Leave empty to start immediately.
+                </p>
+              </div>
+            )}
+
             {/* Due Date (conditional) */}
             {showDueDate && (
               <div>
@@ -154,24 +206,6 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
                 </p>
               </div>
             )}
-
-            {/* Recurrence */}
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-                Recurrence
-              </label>
-              <select
-                value={recurrence}
-                onChange={(e) => setRecurrence(e.target.value as RecurrenceType)}
-                className="w-full px-3 py-2 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all duration-200"
-              >
-                {recurrenceOptions.map(option => (
-                  <option key={option} value={option}>
-                    {getRecurrenceLabel(option)}
-                  </option>
-                ))}
-              </select>
-            </div>
 
             {/* Profile Selection - Compact */}
             <div>
