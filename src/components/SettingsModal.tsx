@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, Users, FolderOpen, History, Brain, Palette, Bell, Archive, Plus, Edit, Trash2, Save, Calendar, Type, Trophy, Lock, Shield } from 'lucide-react';
+import { X, Settings, Users, FolderOpen, History, Brain, Palette, Bell, Archive, Plus, Edit, Trash2, Save, Calendar, Type, Trophy, Lock, Shield, ExternalLink } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { getIconComponent, getAvailableIcons } from '../utils/icons';
 import { AIQueryModal } from './AIQueryModal';
@@ -35,6 +35,16 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
   const [passwordModalType, setPasswordModalType] = useState<'set' | 'remove'>('set');
 
   if (!isOpen) return null;
+
+  const handleOpenProfileInNewTab = (profileId: string) => {
+    // Create a new URL with the profile parameter
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set('profile', profileId);
+    currentUrl.searchParams.set('bypass_pin', 'true');
+    
+    // Open in new tab
+    window.open(currentUrl.toString(), '_blank');
+  };
 
   const renderSecuritySettings = () => (
     <div className="space-y-6">
@@ -159,12 +169,23 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                     {profile.name}
                   </span>
                 </div>
-                <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  profile.pin 
-                    ? 'bg-success-100 dark:bg-success-900/20 text-success-700 dark:text-success-400'
-                    : 'bg-neutral-200 dark:bg-neutral-600 text-neutral-700 dark:text-neutral-300'
-                }`}>
-                  {profile.pin ? 'PIN Protected' : 'No PIN'}
+                <div className="flex items-center space-x-2">
+                  <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    profile.pin 
+                      ? 'bg-success-100 dark:bg-success-900/20 text-success-700 dark:text-success-400'
+                      : 'bg-neutral-200 dark:bg-neutral-600 text-neutral-700 dark:text-neutral-300'
+                  }`}>
+                    {profile.pin ? 'PIN Protected' : 'No PIN'}
+                  </div>
+                  {profile.pin && (
+                    <button
+                      onClick={() => handleOpenProfileInNewTab(profile.id)}
+                      className="p-1 rounded hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors duration-200"
+                      title={`Open ${profile.name} in new tab (bypass PIN)`}
+                    >
+                      <ExternalLink className="w-4 h-4 text-primary-500" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -180,6 +201,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                 <p className="text-xs text-blue-700 dark:text-blue-300">
                   When a profile has a PIN set, users must enter the correct PIN to access that profile. 
                   The browser remembers the selected profile, bypassing PIN requirements for subsequent visits.
+                  Click the <ExternalLink className="w-3 h-3 inline mx-1" /> icon to open a PIN-protected profile in a new tab without entering the PIN.
                 </p>
               </div>
             </div>
@@ -475,6 +497,15 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
+                  {profile.pin && (
+                    <button
+                      onClick={() => handleOpenProfileInNewTab(profile.id)}
+                      className="p-2 rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors duration-200"
+                      title={`Open ${profile.name} in new tab (bypass PIN)`}
+                    >
+                      <ExternalLink className="w-4 h-4 text-primary-500" />
+                    </button>
+                  )}
                   <button
                     onClick={() => setEditingProfile(profile.id)}
                     className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"

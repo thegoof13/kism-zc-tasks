@@ -40,8 +40,30 @@ function AppContent() {
     enableNotifications: state.settings.enableNotifications,
   });
 
-  // Check if user needs to select a profile on app load
+  // Check URL parameters for profile bypass
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const profileParam = urlParams.get('profile');
+    const bypassPin = urlParams.get('bypass_pin') === 'true';
+    
+    if (profileParam && bypassPin && !state.loading) {
+      // Check if the profile exists
+      const profile = state.profiles.find(p => p.id === profileParam);
+      if (profile) {
+        // Set the profile directly, bypassing PIN requirements
+        dispatch({ type: 'SET_ACTIVE_PROFILE', profileId: profileParam });
+        
+        // Clean up URL parameters
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('profile');
+        newUrl.searchParams.delete('bypass_pin');
+        window.history.replaceState({}, '', newUrl.toString());
+        
+        return; // Don't show profile selection
+      }
+    }
+    
+    // Normal profile selection logic
     if (!state.loading && state.profiles.length > 0) {
       const savedProfileId = localStorage.getItem('zentasks_active_profile');
       const hasValidSavedProfile = savedProfileId && state.profiles.some(p => p.id === savedProfileId);
@@ -51,7 +73,7 @@ function AppContent() {
         setShowProfileSelection(true);
       }
     }
-  }, [state.loading, state.profiles, state.activeProfileId]);
+  }, [state.loading, state.profiles, state.activeProfileId, dispatch]);
 
   // Check if settings password is set
   useEffect(() => {
