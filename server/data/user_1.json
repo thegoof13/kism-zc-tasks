@@ -130,7 +130,8 @@
       "avatar": "GK",
       "isActive": false,
       "id": "1751507199210",
-      "createdAt": "2025-07-03T01:46:39.210Z"
+      "createdAt": "2025-07-03T01:46:39.210Z",
+      "isTaskCompetitor": true
     },
     {
       "name": "New Profile",
