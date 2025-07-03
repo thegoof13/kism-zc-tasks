@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Calendar, Clock } from 'lucide-react';
+import { X, Plus, Calendar, Clock, Bell, BellOff } from 'lucide-react';
 import { RecurrenceType } from '../types';
 import { useApp } from '../contexts/AppContext';
 import { getRecurrenceLabel } from '../utils/recurrence';
@@ -47,6 +47,7 @@ export function AddTaskModal({ isOpen, onClose, initialGroupId }: AddTaskModalPr
   const [selectedProfiles, setSelectedProfiles] = useState<string[]>([state.activeProfileId]);
   const [dueDate, setDueDate] = useState('');
   const [recurrenceFromDate, setRecurrenceFromDate] = useState('');
+  const [enableNotifications, setEnableNotifications] = useState<boolean | undefined>(undefined);
   
   // Recurrence config state
   const [selectedMeals, setSelectedMeals] = useState<('breakfast' | 'lunch' | 'dinner' | 'nightcap')[]>(['breakfast']);
@@ -57,6 +58,20 @@ export function AddTaskModal({ isOpen, onClose, initialGroupId }: AddTaskModalPr
   const showRecurrenceFromDate = recurrence !== 'daily';
   const showMealConfig = recurrence === 'meals';
   const showDayConfig = recurrence === 'days';
+  
+  // Show notifications option only for non-due-date tasks
+  const showNotifications = !showDueDate;
+  
+  // Get the effective notification setting (task-level or group default)
+  const effectiveNotifications = enableNotifications ?? selectedGroup?.defaultNotifications ?? false;
+
+  // Update notification default when group changes
+  React.useEffect(() => {
+    if (enableNotifications === undefined) {
+      // Only auto-update if user hasn't explicitly set it
+      setEnableNotifications(undefined);
+    }
+  }, [groupId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,6 +103,11 @@ export function AddTaskModal({ isOpen, onClose, initialGroupId }: AddTaskModalPr
       taskData.recurrenceFromDate = new Date(recurrenceFromDate);
     }
 
+    // Add notifications setting (only for non-due-date tasks)
+    if (showNotifications && enableNotifications !== undefined) {
+      taskData.enableNotifications = enableNotifications;
+    }
+
     dispatch({
       type: 'ADD_TASK',
       task: taskData,
@@ -100,6 +120,7 @@ export function AddTaskModal({ isOpen, onClose, initialGroupId }: AddTaskModalPr
     setSelectedProfiles([state.activeProfileId]);
     setDueDate('');
     setRecurrenceFromDate('');
+    setEnableNotifications(undefined);
     setSelectedMeals(['breakfast']);
     setSelectedDays([1, 2, 3, 4, 5]);
     onClose();
@@ -360,6 +381,58 @@ export function AddTaskModal({ isOpen, onClose, initialGroupId }: AddTaskModalPr
                 <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                   Notifications at 25% time remaining and on due date
                 </p>
+              </div>
+            )}
+
+            {/* Notifications (conditional - only for non-due-date tasks) */}
+            {showNotifications && (
+              <div>
+                <label className="flex items-center justify-between p-3 rounded-lg border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700 cursor-pointer transition-all duration-200">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                      effectiveNotifications 
+                        ? 'bg-primary-100 dark:bg-primary-900/20' 
+                        : 'bg-neutral-100 dark:bg-neutral-700'
+                    }`}>
+                      {effectiveNotifications ? (
+                        <Bell className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                      ) : (
+                        <BellOff className="w-4 h-4 text-neutral-500 dark:text-neutral-400" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                        Enable Notifications
+                      </p>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                        {enableNotifications === undefined 
+                          ? `Group default: ${selectedGroup?.defaultNotifications ? 'On' : 'Off'}`
+                          : 'Notify at 10% before task reset'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {enableNotifications !== undefined && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setEnableNotifications(undefined);
+                        }}
+                        className="text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                      >
+                        Reset
+                      </button>
+                    )}
+                    <input
+                      type="checkbox"
+                      checked={effectiveNotifications}
+                      onChange={(e) => setEnableNotifications(e.target.checked)}
+                      className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                    />
+                  </div>
+                </label>
               </div>
             )}
 

@@ -12,6 +12,7 @@ export const defaultGroups: TaskGroup[] = [
     createdAt: new Date(),
     enableDueDates: false,
     sortByDueDate: false,
+    defaultNotifications: false, // Notifications disabled by default
   },
   {
     id: 'work',
@@ -24,6 +25,7 @@ export const defaultGroups: TaskGroup[] = [
     createdAt: new Date(),
     enableDueDates: true,
     sortByDueDate: true,
+    defaultNotifications: false, // Due dates handle notifications
   },
   {
     id: 'health',
@@ -36,6 +38,7 @@ export const defaultGroups: TaskGroup[] = [
     createdAt: new Date(),
     enableDueDates: false,
     sortByDueDate: false,
+    defaultNotifications: true, // Health tasks benefit from notifications
   },
   {
     id: 'household',
@@ -48,6 +51,7 @@ export const defaultGroups: TaskGroup[] = [
     createdAt: new Date(),
     enableDueDates: true,
     sortByDueDate: true,
+    defaultNotifications: false, // Due dates handle notifications
   },
 ];
 
@@ -93,26 +97,31 @@ export const sampleTasks: Task[] = [
     createdAt: new Date(),
     profiles: ['default'],
     order: 0,
+    enableNotifications: false, // Personal tasks default to no notifications
   },
   {
     id: 'task-2',
     title: 'Check emails',
     groupId: 'work',
-    recurrence: 'work-daily',
+    recurrence: 'days',
+    recurrenceConfig: { days: [1, 2, 3, 4, 5] }, // Weekdays
     isCompleted: false,
     createdAt: new Date(),
     profiles: ['default'],
     order: 0,
+    enableNotifications: false, // Work group has due dates
   },
   {
     id: 'task-3',
     title: 'Take vitamins',
     groupId: 'health',
-    recurrence: 'breakfast',
+    recurrence: 'meals',
+    recurrenceConfig: { meals: ['breakfast'] },
     isCompleted: false,
     createdAt: new Date(),
     profiles: ['default'],
     order: 0,
+    enableNotifications: true, // Health tasks benefit from notifications
   },
   {
     id: 'task-4',
@@ -123,6 +132,7 @@ export const sampleTasks: Task[] = [
     createdAt: new Date(),
     profiles: ['default'],
     order: 0,
+    enableNotifications: false, // Household group has due dates
   },
   {
     id: 'task-5',
@@ -135,5 +145,6 @@ export const sampleTasks: Task[] = [
     createdAt: new Date(),
     profiles: ['default'],
     order: 1,
+    enableNotifications: true, // Health tasks benefit from notifications
   },
 ];

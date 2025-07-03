@@ -29,8 +29,8 @@ export class NotificationService {
 
     try {
       const notification = new Notification(title, {
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
+        icon: '/image.png',
+        badge: '/image.png',
         ...options,
       });
 
@@ -122,6 +122,138 @@ export class NotificationService {
       return 'text-warning-600 dark:text-warning-400'; // Due soon
     } else {
       return 'text-neutral-600 dark:text-neutral-400'; // Normal
+    }
+  }
+
+  // NEW: Task recurrence notification methods
+  static getTimeUntilReset(task: any, recurrenceFromDate?: Date): { totalHours: number; remainingHours: number; progress: number } {
+    const now = new Date();
+    const startDate = recurrenceFromDate || task.createdAt;
+    
+    let resetDate = new Date(startDate);
+    
+    // Calculate next reset date based on recurrence type
+    switch (task.recurrence) {
+      case 'meals':
+        if (task.recurrenceConfig?.meals) {
+          // Find the next meal time
+          const currentHour = now.getHours();
+          const mealHours = {
+            breakfast: 6,
+            lunch: 11,
+            dinner: 17,
+            nightcap: 21
+          };
+          
+          let nextMealHour = 24; // Default to next day
+          for (const meal of task.recurrenceConfig.meals) {
+            const mealHour = mealHours[meal];
+            if (mealHour > currentHour) {
+              nextMealHour = Math.min(nextMealHour, mealHour);
+            }
+          }
+          
+          if (nextMealHour === 24) {
+            // No more meals today, find first meal tomorrow
+            const firstMealTomorrow = Math.min(...task.recurrenceConfig.meals.map(m => mealHours[m]));
+            resetDate = new Date(now);
+            resetDate.setDate(resetDate.getDate() + 1);
+            resetDate.setHours(firstMealTomorrow, 0, 0, 0);
+          } else {
+            resetDate = new Date(now);
+            resetDate.setHours(nextMealHour, 0, 0, 0);
+          }
+        }
+        break;
+        
+      case 'days':
+        if (task.recurrenceConfig?.days) {
+          // Find next selected day
+          const currentDay = now.getDay();
+          let nextDay = task.recurrenceConfig.days.find(day => day > currentDay);
+          
+          if (nextDay === undefined) {
+            // No more days this week, find first day next week
+            nextDay = Math.min(...task.recurrenceConfig.days);
+            resetDate = new Date(now);
+            resetDate.setDate(resetDate.getDate() + (7 - currentDay + nextDay));
+          } else {
+            resetDate = new Date(now);
+            resetDate.setDate(resetDate.getDate() + (nextDay - currentDay));
+          }
+          resetDate.setHours(0, 0, 0, 0);
+        }
+        break;
+        
+      case 'daily':
+        resetDate = new Date(now);
+        resetDate.setDate(resetDate.getDate() + 1);
+        resetDate.setHours(0, 0, 0, 0);
+        break;
+        
+      case 'weekly':
+        resetDate = new Date(startDate);
+        resetDate.setDate(resetDate.getDate() + 7);
+        break;
+        
+      case 'fortnightly':
+        resetDate = new Date(startDate);
+        resetDate.setDate(resetDate.getDate() + 14);
+        break;
+        
+      case 'monthly':
+        resetDate = new Date(startDate);
+        resetDate.setMonth(resetDate.getMonth() + 1);
+        break;
+        
+      case 'quarterly':
+        resetDate = new Date(startDate);
+        resetDate.setMonth(resetDate.getMonth() + 3);
+        break;
+        
+      case 'half-yearly':
+        resetDate = new Date(startDate);
+        resetDate.setMonth(resetDate.getMonth() + 6);
+        break;
+        
+      case 'yearly':
+        resetDate = new Date(startDate);
+        resetDate.setFullYear(resetDate.getFullYear() + 1);
+        break;
+    }
+    
+    const totalTime = resetDate.getTime() - startDate.getTime();
+    const elapsed = now.getTime() - startDate.getTime();
+    const remaining = resetDate.getTime() - now.getTime();
+    
+    const totalHours = totalTime / (1000 * 60 * 60);
+    const remainingHours = Math.max(0, remaining / (1000 * 60 * 60));
+    const progress = Math.min(1, Math.max(0, elapsed / totalTime));
+    
+    return { totalHours, remainingHours, progress };
+  }
+
+  static shouldNotifyTaskReset(task: any, recurrenceFromDate?: Date): boolean {
+    if (task.isCompleted) return false; // Don't notify for completed tasks
+    
+    const { progress } = this.getTimeUntilReset(task, recurrenceFromDate);
+    
+    // Notify when 90% of time has passed (10% remaining)
+    return progress >= 0.9 && progress < 0.95;
+  }
+
+  static formatTimeUntilReset(task: any, recurrenceFromDate?: Date): string {
+    const { remainingHours } = this.getTimeUntilReset(task, recurrenceFromDate);
+    
+    if (remainingHours < 1) {
+      const minutes = Math.ceil(remainingHours * 60);
+      return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
+    } else if (remainingHours < 24) {
+      const hours = Math.ceil(remainingHours);
+      return `${hours} hour${hours !== 1 ? 's' : ''}`;
+    } else {
+      const days = Math.ceil(remainingHours / 24);
+      return `${days} day${days !== 1 ? 's' : ''}`;
     }
   }
 }

@@ -13,6 +13,7 @@ export function useNotifications({ tasks, groups, enableNotifications }: UseNoti
     if (!enableNotifications) return;
 
     const checkNotifications = () => {
+      // Check due date notifications for tasks with due dates
       const dueDateGroups = groups.filter(group => group.enableDueDates);
       
       dueDateGroups.forEach(group => {
@@ -63,6 +64,33 @@ export function useNotifications({ tasks, groups, enableNotifications }: UseNoti
             );
           }
         });
+      });
+
+      // NEW: Check recurrence reset notifications for tasks with notifications enabled
+      const notificationTasks = tasks.filter(task => {
+        // Skip tasks with due dates (handled above)
+        if (task.dueDate) return false;
+        
+        // Check if notifications are enabled for this task
+        const group = groups.find(g => g.id === task.groupId);
+        const hasNotifications = task.enableNotifications ?? group?.defaultNotifications ?? false;
+        
+        return hasNotifications && !task.isCompleted;
+      });
+
+      notificationTasks.forEach(task => {
+        if (NotificationService.shouldNotifyTaskReset(task, task.recurrenceFromDate)) {
+          const timeRemaining = NotificationService.formatTimeUntilReset(task, task.recurrenceFromDate);
+          const group = groups.find(g => g.id === task.groupId);
+          
+          NotificationService.showNotification(
+            `Task Reset Soon: ${task.title}`,
+            {
+              body: `This task will reset in ${timeRemaining} (${group?.name || 'Unknown'} group)`,
+              tag: `task-reset-${task.id}`,
+            }
+          );
+        }
       });
     };
 

@@ -28,6 +28,7 @@ export interface Task {
   order: number;
   dueDate?: Date;
   recurrenceFromDate?: Date;
+  enableNotifications?: boolean; // New field for task-level notifications
 }
 
 export interface TaskGroup {
@@ -41,6 +42,7 @@ export interface TaskGroup {
   createdAt: Date;
   enableDueDates: boolean;
   sortByDueDate: boolean;
+  defaultNotifications?: boolean; // New field for group-level notification default
 }
 
 export interface UserProfile {

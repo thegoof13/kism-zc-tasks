@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Check, Clock, Edit, Trash2, RefreshCw, X, Calendar, AlertTriangle, ChevronLeft } from 'lucide-react';
+import { Check, Clock, Edit, Trash2, RefreshCw, X, Calendar, AlertTriangle, ChevronLeft, Bell } from 'lucide-react';
 import { Task, CompletedDisplayMode } from '../types';
 import { useApp } from '../contexts/AppContext';
 import { getRecurrenceLabel, getResetDateDescription } from '../utils/recurrence';
@@ -25,10 +25,15 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
   
   const activeProfile = state.profiles.find(p => p.id === state.activeProfileId);
   const completedByProfile = task.completedBy ? state.profiles.find(p => p.id === task.completedBy) : null;
+  const taskGroup = state.groups.find(g => g.id === task.groupId);
 
   // Check profile permissions
   const canEdit = activeProfile?.permissions?.canEditTasks ?? true;
   const canDelete = activeProfile?.permissions?.canDeleteTasks ?? true;
+
+  // Check if notifications are enabled for this task
+  const hasNotifications = task.enableNotifications ?? taskGroup?.defaultNotifications ?? false;
+  const showNotificationIndicator = hasNotifications && !task.dueDate; // Only show for non-due-date tasks
 
   const handleToggle = () => {
     // Only allow checking (completing) tasks, not unchecking
@@ -295,13 +300,20 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
           {/* Desktop Layout (md and up) - Everything in one row */}
           <div className="hidden md:flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <h4 className={`font-medium truncate text-sm ${
-                task.isCompleted 
-                  ? 'line-through text-neutral-500 dark:text-neutral-400' 
-                  : 'text-neutral-900 dark:text-neutral-100'
-              }`}>
-                {task.title}
-              </h4>
+              <div className="flex items-center space-x-2">
+                <h4 className={`font-medium truncate text-sm ${
+                  task.isCompleted 
+                    ? 'line-through text-neutral-500 dark:text-neutral-400' 
+                    : 'text-neutral-900 dark:text-neutral-100'
+                }`}>
+                  {task.title}
+                </h4>
+                
+                {/* Notification Indicator - Desktop */}
+                {showNotificationIndicator && (
+                  <Bell className="w-3 h-3 text-primary-500 flex-shrink-0" title="Notifications enabled" />
+                )}
+              </div>
               
               {/* Due Date Display - Desktop */}
               {dueDateInfo && (
@@ -361,13 +373,20 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate }: TaskItemPro
           <div className="md:hidden">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <h4 className={`font-medium truncate text-sm ${
-                  task.isCompleted 
-                    ? 'line-through text-neutral-500 dark:text-neutral-400' 
-                    : 'text-neutral-900 dark:text-neutral-100'
-                }`}>
-                  {task.title}
-                </h4>
+                <div className="flex items-center space-x-2">
+                  <h4 className={`font-medium truncate text-sm ${
+                    task.isCompleted 
+                      ? 'line-through text-neutral-500 dark:text-neutral-400' 
+                      : 'text-neutral-900 dark:text-neutral-100'
+                  }`}>
+                    {task.title}
+                  </h4>
+                  
+                  {/* Notification Indicator - Mobile */}
+                  {showNotificationIndicator && (
+                    <Bell className="w-3 h-3 text-primary-500 flex-shrink-0" title="Notifications enabled" />
+                  )}
+                </div>
               </div>
               
               {/* Mobile Swipe Indicator */}
