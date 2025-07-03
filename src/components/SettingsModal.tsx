@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Settings, Users, History, Brain, Shield, User, Plus, Edit, Trash2, Trophy, Crown, Eye, ExternalLink, Lock, Unlock, CheckCircle, AlertCircle, Bell, Calendar, Palette, Monitor, Sun, Moon, Key, Save, Cancel } from 'lucide-react';
+import { X, Settings, Users, History, Brain, Shield, User, Plus, Edit, Trash2, Trophy, Crown, Eye, ExternalLink, Lock, Unlock, CheckCircle, AlertCircle, Bell, Calendar, Palette, Monitor, Sun, Moon, Key, Save, Ambulance as Cancel } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { HistoryAnalytics } from './HistoryAnalytics';
