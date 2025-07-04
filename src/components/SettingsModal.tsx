@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Save, Palette, Users, Settings as SettingsIcon, Brain, Eye, EyeOff } from 'lucide-react';
+import { X, Save, Palette, Users, Settings as SettingsIcon, Brain, Eye, EyeOff, Plus, Edit, Trash2, GripVertical } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { TaskGroup, UserProfile, AISettings } from '../types';
 import { getAvailableIcons } from '../utils/icons';
@@ -132,6 +132,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
     }
 
     setEditingGroup(null);
+    setNewGroupName('');
   };
 
   const deleteGroup = (groupId: string) => {
@@ -209,6 +210,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
     }
 
     setEditingProfile(null);
+    setNewProfileName('');
   };
 
   const deleteProfile = (profileId: string) => {
@@ -400,15 +402,19 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                       onClick={startAddingGroup}
                       className="btn-primary"
                     >
+                      <Plus className="w-4 h-4 mr-2" />
                       Add Group
                     </button>
                   </div>
                   
                   <div className="grid gap-4">
-                    {state.groups.map(group => (
+                    {state.groups
+                      .sort((a, b) => a.order - b.order)
+                      .map(group => (
                       <div key={group.id} className="card p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
+                            <GripVertical className="w-4 h-4 text-neutral-400 cursor-move" />
                             <div 
                               className="w-4 h-4 rounded-full"
                               style={{ backgroundColor: group.color }}
@@ -427,15 +433,17 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                           <div className="flex items-center space-x-2">
                             <button
                               onClick={() => startEditingGroup(group)}
-                              className="btn-secondary text-sm"
+                              className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+                              title="Edit group"
                             >
-                              Edit
+                              <Edit className="w-4 h-4 text-neutral-500" />
                             </button>
                             <button
                               onClick={() => deleteGroup(group.id)}
-                              className="text-error-600 hover:text-error-700 text-sm"
+                              className="p-2 rounded-lg hover:bg-error-100 dark:hover:bg-error-900/20 transition-colors duration-200"
+                              title="Delete group"
                             >
-                              Delete
+                              <Trash2 className="w-4 h-4 text-error-500" />
                             </button>
                           </div>
                         </div>
@@ -560,7 +568,10 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                             {editingGroup ? 'Update Group' : 'Add Group'}
                           </button>
                           <button
-                            onClick={() => setEditingGroup(null)}
+                            onClick={() => {
+                              setEditingGroup(null);
+                              setNewGroupName('');
+                            }}
                             className="btn-secondary"
                           >
                             Cancel
@@ -582,15 +593,19 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                       onClick={startAddingProfile}
                       className="btn-primary"
                     >
+                      <Plus className="w-4 h-4 mr-2" />
                       Add Profile
                     </button>
                   </div>
                   
                   <div className="grid gap-4">
-                    {state.profiles.map(profile => (
+                    {state.profiles
+                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                      .map(profile => (
                       <div key={profile.id} className="card p-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
+                            <GripVertical className="w-4 h-4 text-neutral-400 cursor-move" />
                             <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center text-lg">
                               {profile.avatar}
                             </div>
@@ -623,16 +638,18 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                           <div className="flex items-center space-x-2">
                             <button
                               onClick={() => startEditingProfile(profile)}
-                              className="btn-secondary text-sm"
+                              className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+                              title="Edit profile"
                             >
-                              Edit
+                              <Edit className="w-4 h-4 text-neutral-500" />
                             </button>
                             {state.profiles.length > 1 && (
                               <button
                                 onClick={() => deleteProfile(profile.id)}
-                                className="text-error-600 hover:text-error-700 text-sm"
+                                className="p-2 rounded-lg hover:bg-error-100 dark:hover:bg-error-900/20 transition-colors duration-200"
+                                title="Delete profile"
                               >
-                                Delete
+                                <Trash2 className="w-4 h-4 text-error-500" />
                               </button>
                             )}
                           </div>
@@ -821,7 +838,10 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                             {editingProfile ? 'Update Profile' : 'Add Profile'}
                           </button>
                           <button
-                            onClick={() => setEditingProfile(null)}
+                            onClick={() => {
+                              setEditingProfile(null);
+                              setNewProfileName('');
+                            }}
                             className="btn-secondary"
                           >
                             Cancel
