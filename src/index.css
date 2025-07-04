@@ -111,25 +111,6 @@
   .dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     background-color: transparent;
   }
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-
-  /* Prevent text selection during swipe gestures */
-  .no-select {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-  }
-
-  /* Smooth swipe animations */
-  .swipe-container {
-    touch-action: pan-y;
-  }
 
   /* Task update status animations */
   .task-update-pending {
@@ -158,6 +139,88 @@
     50% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
     75% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0.3); }
     100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  }
+
+  /* API Status Banner Animation */
+  @keyframes slide-down {
+    from {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .animate-slide-down {
+    animation: slide-down 0.3s ease-out;
+  }
+
+  /* Mobile optimizations for very small screens */
+  @media (max-width: 480px) {
+    /* Zoom out content on very small screens */
+    html {
+      font-size: 14px;
+    }
+    
+    /* Reduce padding on cards */
+    .card {
+      @apply p-3;
+    }
+    
+    /* Smaller task items */
+    .task-item {
+      @apply p-2;
+    }
+    
+    /* Hide recurrence clock icon on very small screens */
+    .recurrence-clock {
+      display: none;
+    }
+    
+    /* Smaller badges */
+    .badge-small {
+      @apply px-1 py-0.5 text-xs;
+    }
+  }
+
+  @media (max-width: 360px) {
+    /* Even more aggressive scaling for very small screens */
+    html {
+      font-size: 13px;
+    }
+    
+    /* Reduce spacing further */
+    .space-compact {
+      @apply space-x-1 space-y-1;
+    }
+  }
+
+  /* Extra small breakpoint for very small screens */
+  @media (min-width: 360px) {
+    .xs\:block {
+      display: block;
+    }
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Prevent text selection during swipe gestures */
+  .no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+
+  /* Smooth swipe animations */
+  .swipe-container {
+    touch-action: pan-y;
   }
 
   /* Mobile optimizations for very small screens */

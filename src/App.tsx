@@ -8,6 +8,7 @@ import { EditTaskModal } from './components/EditTaskModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ProfileSelectionModal } from './components/ProfileSelectionModal';
 import { PasswordModal } from './components/PasswordModal';
+import { ApiStatusBanner, useApiStatus } from './components/ApiStatusBanner';
 import { Task } from './types';
 import { useNotifications } from './hooks/useNotifications';
 
@@ -24,6 +25,7 @@ function LoadingSpinner() {
 
 function AppContent() {
   const { state, dispatch } = useApp();
+  const { showBanner, dismissBanner } = useApiStatus();
   const [showAddTask, setShowAddTask] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showEditTask, setShowEditTask] = useState(false);
@@ -175,91 +177,100 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      <Header 
-        onOpenSettings={handleOpenSettings}
-        onOpenProfileSelection={() => setShowProfileSelection(true)}
+      {/* API Status Banner */}
+      <ApiStatusBanner 
+        isVisible={showBanner} 
+        onDismiss={dismissBanner} 
       />
       
-      <main className="max-w-4xl mx-auto px-4 py-4">
-        {/* Welcome Message */}
-        {activeProfileTasks.length === 0 && (
-          <div className="text-center py-12 mb-6">
-            <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Plus className="w-8 h-8 text-white" />
+      {/* Adjust header position when banner is visible */}
+      <div className={showBanner ? 'pt-16' : ''}>
+        <Header 
+          onOpenSettings={handleOpenSettings}
+          onOpenProfileSelection={() => setShowProfileSelection(true)}
+        />
+        
+        <main className="max-w-4xl mx-auto px-4 py-4">
+          {/* Welcome Message */}
+          {activeProfileTasks.length === 0 && (
+            <div className="text-center py-12 mb-6">
+              <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Plus className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
+                Welcome to ZenTasks
+              </h2>
+              <p className="text-neutral-600 dark:text-neutral-400 mb-6 max-w-md mx-auto">
+                {isViewOnlyMode 
+                  ? 'You are in view-only mode. You can see tasks but cannot modify them.'
+                  : 'Start organizing your life with smart recurring tasks. Create your first task to get started.'
+                }
+              </p>
+              {canCreateTasks && (
+                <button
+                  onClick={() => handleAddTask()}
+                  className="btn-primary"
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  Create Your First Task
+                </button>
+              )}
             </div>
-            <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
-              Welcome to ZenTasks
-            </h2>
-            <p className="text-neutral-600 dark:text-neutral-400 mb-6 max-w-md mx-auto">
-              {isViewOnlyMode 
-                ? 'You are in view-only mode. You can see tasks but cannot modify them.'
-                : 'Start organizing your life with smart recurring tasks. Create your first task to get started.'
-              }
-            </p>
-            {canCreateTasks && (
-              <button
-                onClick={() => handleAddTask()}
-                className="btn-primary"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Create Your First Task
-              </button>
-            )}
-          </div>
-        )}
+          )}
 
-        {/* Task Groups - Reduced spacing */}
-        <div className="space-y-3">
-          {sortedGroups.map(group => {
-            const groupTasks = state.tasks.filter(task => task.groupId === group.id);
-            
-            return (
-              <TaskGroup
-                key={group.id}
-                group={group}
-                tasks={groupTasks}
-                onAddTask={handleAddTask}
-                onEditGroup={handleEditGroup}
-                onEditTask={handleEditTask}
-              />
+          {/* Task Groups - Reduced spacing */}
+          <div className="space-y-3">
+            {sortedGroups.map(group => {
+              const groupTasks = state.tasks.filter(task => task.groupId === group.id);
+              
+              return (
+                <TaskGroup
+                  key={group.id}
+                  group={group}
+                  tasks={groupTasks}
+                  onAddTask={handleAddTask}
+                  onEditGroup={handleEditGroup}
+                  onEditTask={handleEditTask}
+                />
+              );
+            })}
+          </div>
+
+          {/* Empty State for Groups */}
+          {activeProfileTasks.length > 0 && sortedGroups.every(group => {
+            const groupTasks = state.tasks.filter(task => 
+              task.groupId === group.id && task.profiles.includes(state.activeProfileId)
             );
-          })}
-        </div>
+            return groupTasks.length === 0;
+          }) && (
+            <div className="text-center py-12">
+              <p className="text-neutral-500 dark:text-neutral-400 mb-4">
+                No tasks assigned to your profile
+              </p>
+              {canCreateTasks && (
+                <button
+                  onClick={() => handleAddTask()}
+                  className="btn-primary"
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  Add Task
+                </button>
+              )}
+            </div>
+          )}
+        </main>
 
-        {/* Empty State for Groups */}
-        {activeProfileTasks.length > 0 && sortedGroups.every(group => {
-          const groupTasks = state.tasks.filter(task => 
-            task.groupId === group.id && task.profiles.includes(state.activeProfileId)
-          );
-          return groupTasks.length === 0;
-        }) && (
-          <div className="text-center py-12">
-            <p className="text-neutral-500 dark:text-neutral-400 mb-4">
-              No tasks assigned to your profile
-            </p>
-            {canCreateTasks && (
-              <button
-                onClick={() => handleAddTask()}
-                className="btn-primary"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Add Task
-              </button>
-            )}
-          </div>
+        {/* Floating Action Button - Only show if not in view only mode */}
+        {activeProfileTasks.length > 0 && canCreateTasks && (
+          <button
+            onClick={() => handleAddTask()}
+            className="floating-action-btn"
+            aria-label="Add new task"
+          >
+            <Plus className="w-6 h-6" />
+          </button>
         )}
-      </main>
-
-      {/* Floating Action Button - Only show if not in view only mode */}
-      {activeProfileTasks.length > 0 && canCreateTasks && (
-        <button
-          onClick={() => handleAddTask()}
-          className="floating-action-btn"
-          aria-label="Add new task"
-        >
-          <Plus className="w-6 h-6" />
-        </button>
-      )}
+      </div>
 
       {/* Modals */}
       {canCreateTasks && (
