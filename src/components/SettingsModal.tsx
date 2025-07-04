@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { X, Settings, User, Shield, Brain, History, ExternalLink, Edit, Plus, Trash2, Save, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, Save, Palette, Users, Settings as SettingsIcon, Brain, Eye, EyeOff, GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
+import { TaskGroup, UserProfile, AISettings } from '../types';
+import { getAvailableIcons } from '../utils/icons';
 import { AIQueryModal } from './AIQueryModal';
-import { HistoryAnalytics } from './HistoryAnalytics';
 import { PasswordModal } from './PasswordModal';
-import { getIconComponent, getAvailableIcons } from '../utils/icons';
+import { HistoryAnalytics } from './HistoryAnalytics';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -13,38 +14,12 @@ interface SettingsModalProps {
   isSettingsPasswordSet: boolean;
 }
 
-type SettingsTab = 'general' | 'profiles' | 'groups' | 'security' | 'ai' | 'history';
+type SettingsTab = 'general' | 'groups' | 'profiles' | 'ai' | 'analytics';
 
-interface EditingProfile {
-  id?: string;
-  name: string;
-  avatar: string;
-  color: string;
-  isTaskCompetitor: boolean;
-  pin: string;
-  permissions: {
-    canEditTasks: boolean;
-    canCreateTasks: boolean;
-    canDeleteTasks: boolean;
-  };
-  mealTimes: {
-    breakfast: string;
-    lunch: string;
-    dinner: string;
-    nightcap: string;
-  };
-  viewOnlyMode: boolean;
-}
-
-interface EditingGroup {
-  id?: string;
-  name: string;
-  color: string;
-  icon: string;
-  completedDisplayMode: 'grey-out' | 'grey-drop' | 'separate-completed';
-  enableDueDates: boolean;
-  sortByDueDate: boolean;
-  defaultNotifications: boolean;
+interface DragItem {
+  id: string;
+  index: number;
+  type: 'group' | 'profile';
 }
 
 export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettingsPasswordSet }: SettingsModalProps) {
@@ -52,226 +27,198 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [showAIModal, setShowAIModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [passwordModalConfig, setPasswordModalConfig] = useState<{
-    title: string;
-    description: string;
-    onSuccess: () => void;
-    expectedPassword?: string;
-    onPasswordSet?: (password: string) => void;
-    isSettingPassword?: boolean;
-  } | null>(null);
+  const [passwordModalType, setPasswordModalType] = useState<'set' | 'remove'>('set');
 
-  // Edit states
-  const [editingProfile, setEditingProfile] = useState<EditingProfile | null>(null);
-  const [editingGroup, setEditingGroup] = useState<EditingGroup | null>(null);
-  const [showPinField, setShowPinField] = useState(false);
+  // Drag and drop state
+  const [draggedItem, setDraggedItem] = useState<DragItem | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const dragCounter = useRef(0);
+
+  // Sort groups and profiles by order
+  const sortedGroups = [...state.groups].sort((a, b) => (a.order || 0) - (b.order || 0));
+  const sortedProfiles = [...state.profiles].sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  // Drag handlers for groups
+  const handleGroupDragStart = (e: React.DragEvent, group: TaskGroup, index: number) => {
+    setDraggedItem({ id: group.id, index, type: 'group' });
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.currentTarget.outerHTML);
+    e.currentTarget.style.opacity = '0.5';
+  };
+
+  const handleGroupDragEnd = (e: React.DragEvent) => {
+    e.currentTarget.style.opacity = '1';
+    setDraggedItem(null);
+    setDragOverIndex(null);
+    dragCounter.current = 0;
+  };
+
+  const handleGroupDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+
+  const handleGroupDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current++;
+  };
+
+  const handleGroupDragLeave = (e: React.DragEvent) => {
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setDragOverIndex(null);
+    }
+  };
+
+  const handleGroupDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (!draggedItem || draggedItem.type !== 'group') return;
+    
+    const dragIndex = draggedItem.index;
+    if (dragIndex === dropIndex) return;
+
+    const newGroups = [...sortedGroups];
+    const [draggedGroup] = newGroups.splice(dragIndex, 1);
+    newGroups.splice(dropIndex, 0, draggedGroup);
+
+    const reorderedGroupIds = newGroups.map(group => group.id);
+    dispatch({ type: 'REORDER_GROUPS', groupIds: reorderedGroupIds });
+
+    setDraggedItem(null);
+    setDragOverIndex(null);
+    dragCounter.current = 0;
+  };
+
+  // Drag handlers for profiles
+  const handleProfileDragStart = (e: React.DragEvent, profile: UserProfile, index: number) => {
+    setDraggedItem({ id: profile.id, index, type: 'profile' });
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.currentTarget.outerHTML);
+    e.currentTarget.style.opacity = '0.5';
+  };
+
+  const handleProfileDragEnd = (e: React.DragEvent) => {
+    e.currentTarget.style.opacity = '1';
+    setDraggedItem(null);
+    setDragOverIndex(null);
+    dragCounter.current = 0;
+  };
+
+  const handleProfileDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+
+  const handleProfileDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounter.current++;
+  };
+
+  const handleProfileDragLeave = (e: React.DragEvent) => {
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setDragOverIndex(null);
+    }
+  };
+
+  const handleProfileDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (!draggedItem || draggedItem.type !== 'profile') return;
+    
+    const dragIndex = draggedItem.index;
+    if (dragIndex === dropIndex) return;
+
+    const newProfiles = [...sortedProfiles];
+    const [draggedProfile] = newProfiles.splice(dragIndex, 1);
+    newProfiles.splice(dropIndex, 0, draggedProfile);
+
+    const reorderedProfileIds = newProfiles.map(profile => profile.id);
+    dispatch({ type: 'REORDER_PROFILES', profileIds: reorderedProfileIds });
+
+    setDraggedItem(null);
+    setDragOverIndex(null);
+    dragCounter.current = 0;
+  };
+
+  // Arrow button handlers for groups
+  const moveGroupUp = (index: number) => {
+    if (index === 0) return;
+    const newGroups = [...sortedGroups];
+    [newGroups[index - 1], newGroups[index]] = [newGroups[index], newGroups[index - 1]];
+    const reorderedGroupIds = newGroups.map(group => group.id);
+    dispatch({ type: 'REORDER_GROUPS', groupIds: reorderedGroupIds });
+  };
+
+  const moveGroupDown = (index: number) => {
+    if (index === sortedGroups.length - 1) return;
+    const newGroups = [...sortedGroups];
+    [newGroups[index], newGroups[index + 1]] = [newGroups[index + 1], newGroups[index]];
+    const reorderedGroupIds = newGroups.map(group => group.id);
+    dispatch({ type: 'REORDER_GROUPS', groupIds: reorderedGroupIds });
+  };
+
+  // Arrow button handlers for profiles
+  const moveProfileUp = (index: number) => {
+    if (index === 0) return;
+    const newProfiles = [...sortedProfiles];
+    [newProfiles[index - 1], newProfiles[index]] = [newProfiles[index], newProfiles[index - 1]];
+    const reorderedProfileIds = newProfiles.map(profile => profile.id);
+    dispatch({ type: 'REORDER_PROFILES', profileIds: reorderedProfileIds });
+  };
+
+  const moveProfileDown = (index: number) => {
+    if (index === sortedProfiles.length - 1) return;
+    const newProfiles = [...sortedProfiles];
+    [newProfiles[index], newProfiles[index + 1]] = [newProfiles[index + 1], newProfiles[index]];
+    const reorderedProfileIds = newProfiles.map(profile => profile.id);
+    dispatch({ type: 'REORDER_PROFILES', profileIds: reorderedProfileIds });
+  };
+
+  const handleUpdateSettings = (updates: Partial<typeof state.settings>) => {
+    dispatch({ type: 'UPDATE_SETTINGS', updates });
+  };
+
+  const handleSetPassword = () => {
+    setPasswordModalType('set');
+    setShowPasswordModal(true);
+  };
+
+  const handleRemovePassword = () => {
+    setPasswordModalType('remove');
+    setShowPasswordModal(true);
+  };
+
+  const handlePasswordSuccess = (password?: string) => {
+    if (passwordModalType === 'set' && password) {
+      onSetSettingsPassword(password);
+    } else if (passwordModalType === 'remove') {
+      onSetSettingsPassword('');
+    }
+    setShowPasswordModal(false);
+  };
 
   if (!isOpen) return null;
 
-  const handleOpenProfileInNewTab = (profile: any) => {
-    const url = new URL(window.location.href);
-    url.searchParams.set('profile', profile.id);
-    url.searchParams.set('bypass_pin', 'true');
-    window.open(url.toString(), '_blank');
-  };
-
-  const handleUpdateAISettings = (updates: Partial<typeof state.settings.ai>) => {
-    dispatch({
-      type: 'UPDATE_SETTINGS',
-      updates: {
-        ai: { ...state.settings.ai, ...updates }
-      }
-    });
-  };
-
-  // Profile editing functions
-  const handleEditProfile = (profile: any) => {
-    setEditingProfile({
-      id: profile.id,
-      name: profile.name,
-      avatar: profile.avatar,
-      color: profile.color,
-      isTaskCompetitor: profile.isTaskCompetitor || false,
-      pin: profile.pin || '',
-      permissions: profile.permissions || {
-        canEditTasks: true,
-        canCreateTasks: true,
-        canDeleteTasks: true,
-      },
-      mealTimes: profile.mealTimes || {
-        breakfast: '07:00',
-        lunch: '12:00',
-        dinner: '18:00',
-        nightcap: '21:00',
-      },
-      viewOnlyMode: profile.viewOnlyMode || false,
-    });
-    setShowPinField(!!profile.pin);
-  };
-
-  const handleAddProfile = () => {
-    setEditingProfile({
-      name: '',
-      avatar: '👤',
-      color: '#6366F1',
-      isTaskCompetitor: false,
-      pin: '',
-      permissions: {
-        canEditTasks: true,
-        canCreateTasks: true,
-        canDeleteTasks: true,
-      },
-      mealTimes: {
-        breakfast: '07:00',
-        lunch: '12:00',
-        dinner: '18:00',
-        nightcap: '21:00',
-      },
-      viewOnlyMode: false,
-    });
-    setShowPinField(false);
-  };
-
-  const handleSaveProfile = () => {
-    if (!editingProfile || !editingProfile.name.trim()) return;
-
-    const profileData = {
-      name: editingProfile.name.trim(),
-      avatar: editingProfile.avatar,
-      color: editingProfile.color,
-      isTaskCompetitor: editingProfile.isTaskCompetitor,
-      pin: showPinField && editingProfile.pin ? editingProfile.pin : undefined,
-      permissions: editingProfile.permissions,
-      mealTimes: editingProfile.mealTimes,
-      viewOnlyMode: editingProfile.viewOnlyMode,
-      isActive: true,
-    };
-
-    if (editingProfile.id) {
-      dispatch({
-        type: 'UPDATE_PROFILE',
-        profileId: editingProfile.id,
-        updates: profileData,
-      });
-    } else {
-      dispatch({
-        type: 'ADD_PROFILE',
-        profile: profileData,
-      });
-    }
-
-    setEditingProfile(null);
-    setShowPinField(false);
-  };
-
-  const handleDeleteProfile = (profileId: string) => {
-    if (state.profiles.length <= 1) {
-      alert('Cannot delete the last profile');
-      return;
-    }
-    
-    if (window.confirm('Are you sure you want to delete this profile? This action cannot be undone.')) {
-      dispatch({
-        type: 'DELETE_PROFILE',
-        profileId,
-      });
-    }
-  };
-
-  // Group editing functions
-  const handleEditGroup = (group: any) => {
-    setEditingGroup({
-      id: group.id,
-      name: group.name,
-      color: group.color,
-      icon: group.icon,
-      completedDisplayMode: group.completedDisplayMode,
-      enableDueDates: group.enableDueDates || false,
-      sortByDueDate: group.sortByDueDate || false,
-      defaultNotifications: group.defaultNotifications || false,
-    });
-  };
-
-  const handleAddGroup = () => {
-    setEditingGroup({
-      name: '',
-      color: '#6366F1',
-      icon: 'User',
-      completedDisplayMode: 'grey-out',
-      enableDueDates: false,
-      sortByDueDate: false,
-      defaultNotifications: false,
-    });
-  };
-
-  const handleSaveGroup = () => {
-    if (!editingGroup || !editingGroup.name.trim()) return;
-
-    const groupData = {
-      name: editingGroup.name.trim(),
-      color: editingGroup.color,
-      icon: editingGroup.icon,
-      completedDisplayMode: editingGroup.completedDisplayMode,
-      enableDueDates: editingGroup.enableDueDates,
-      sortByDueDate: editingGroup.sortByDueDate,
-      defaultNotifications: editingGroup.defaultNotifications,
-      isCollapsed: false,
-    };
-
-    if (editingGroup.id) {
-      dispatch({
-        type: 'UPDATE_GROUP',
-        groupId: editingGroup.id,
-        updates: groupData,
-      });
-    } else {
-      dispatch({
-        type: 'ADD_GROUP',
-        group: groupData,
-      });
-    }
-
-    setEditingGroup(null);
-  };
-
-  const handleDeleteGroup = (groupId: string) => {
-    const tasksInGroup = state.tasks.filter(task => task.groupId === groupId);
-    if (tasksInGroup.length > 0) {
-      alert(`Cannot delete group with ${tasksInGroup.length} task(s). Please move or delete the tasks first.`);
-      return;
-    }
-    
-    if (window.confirm('Are you sure you want to delete this group?')) {
-      dispatch({
-        type: 'DELETE_GROUP',
-        groupId,
-      });
-    }
-  };
-
-  const tabs = [
-    { id: 'general' as const, label: 'General', icon: Settings },
-    { id: 'profiles' as const, label: 'Profiles', icon: User },
-    { id: 'groups' as const, label: 'Groups', icon: Settings },
-    { id: 'security' as const, label: 'Security', icon: Shield },
-    { id: 'ai' as const, label: 'AI Assistant', icon: Brain },
-    { id: 'history' as const, label: 'History', icon: History },
-  ];
-
-  const availableIcons = getAvailableIcons();
-  const avatarOptions = ['👤', '👨', '👩', '🧑', '👶', '👴', '👵', '🙋‍♂️', '🙋‍♀️', '💼', '🎓', '👨‍💻', '👩‍💻', '🏃‍♂️', '🏃‍♀️'];
-
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-2">
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
         
-        <div className="relative w-full max-w-4xl bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in max-h-[95vh] overflow-hidden settings-modal">
+        <div className="relative w-full max-w-4xl mx-4 bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in max-h-[90vh] overflow-hidden settings-modal">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-700">
-            <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
-              Settings
-            </h2>
+          <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/20 rounded-full flex items-center justify-center">
+                <SettingsIcon className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+              </div>
+              <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                Settings
+              </h2>
+            </div>
             <button
               onClick={onClose}
               className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
@@ -280,54 +227,52 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
             </button>
           </div>
 
-          <div className="flex h-[calc(95vh-80px)]">
-            {/* Sidebar - Responsive width and content */}
-            <div className="w-12 sm:w-16 md:w-48 border-r border-neutral-200 dark:border-neutral-700 p-2 md:p-3">
+          <div className="flex h-[calc(90vh-80px)]">
+            {/* Sidebar */}
+            <div className="w-48 border-r border-neutral-200 dark:border-neutral-700 p-4">
               <nav className="space-y-1">
-                {tabs.map(tab => {
-                  const Icon = tab.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center justify-center md:justify-start space-x-0 md:space-x-2 px-2 md:px-3 py-2 text-left rounded-lg transition-colors duration-200 ${
-                        activeTab === tab.id
-                          ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                          : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700'
-                      }`}
-                      title={tab.label} // Tooltip for small screens
-                    >
-                      <Icon className="w-4 h-4 flex-shrink-0" />
-                      {/* Hide text on small screens, show on md and up */}
-                      <span className="hidden md:block text-sm font-medium">{tab.label}</span>
-                    </button>
-                  );
-                })}
+                {[
+                  { id: 'general', label: 'General', icon: SettingsIcon },
+                  { id: 'groups', label: 'Task Groups', icon: Palette },
+                  { id: 'profiles', label: 'Profiles', icon: Users },
+                  { id: 'ai', label: 'AI Assistant', icon: Brain },
+                  { id: 'analytics', label: 'Analytics', icon: Eye },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as SettingsTab)}
+                    className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors duration-200 ${
+                      activeTab === tab.id
+                        ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
+                        : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700'
+                    }`}
+                  >
+                    <tab.icon className="w-4 h-4" />
+                    <span className="text-sm font-medium">{tab.label}</span>
+                  </button>
+                ))}
               </nav>
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto p-6">
               {activeTab === 'general' && (
-                <div className="p-4 md:p-6 space-y-6">
+                <div className="space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
                       General Settings
                     </h3>
                     
                     <div className="space-y-4">
-                      {/* Theme */}
+                      {/* Theme Setting */}
                       <div>
                         <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                           Theme
                         </label>
                         <select
                           value={state.settings.theme}
-                          onChange={(e) => dispatch({
-                            type: 'UPDATE_SETTINGS',
-                            updates: { theme: e.target.value as any }
-                          })}
-                          className="input-primary max-w-xs"
+                          onChange={(e) => handleUpdateSettings({ theme: e.target.value as any })}
+                          className="input-primary"
                         >
                           <option value="light">Light</option>
                           <option value="dark">Dark</option>
@@ -341,14 +286,11 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                           <input
                             type="checkbox"
                             checked={state.settings.showCompletedCount}
-                            onChange={(e) => dispatch({
-                              type: 'UPDATE_SETTINGS',
-                              updates: { showCompletedCount: e.target.checked }
-                            })}
+                            onChange={(e) => handleUpdateSettings({ showCompletedCount: e.target.checked })}
                             className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
                           />
                           <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                            Show completed count in header
+                            Show completed task count in header
                           </span>
                         </label>
                       </div>
@@ -359,10 +301,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                           <input
                             type="checkbox"
                             checked={state.settings.enableNotifications}
-                            onChange={(e) => dispatch({
-                              type: 'UPDATE_SETTINGS',
-                              updates: { enableNotifications: e.target.checked }
-                            })}
+                            onChange={(e) => handleUpdateSettings({ enableNotifications: e.target.checked })}
                             className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
                           />
                           <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
@@ -377,315 +316,382 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                           <input
                             type="checkbox"
                             checked={state.settings.showTopCollaborator}
-                            onChange={(e) => dispatch({
-                              type: 'UPDATE_SETTINGS',
-                              updates: { showTopCollaborator: e.target.checked }
-                            })}
+                            onChange={(e) => handleUpdateSettings({ showTopCollaborator: e.target.checked })}
                             className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
                           />
                           <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                            Show Top Collaborator in trophy popup
+                            Show top collaborator in trophy modal
                           </span>
                         </label>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
-              {activeTab === 'profiles' && (
-                <div className="p-4 md:p-6 space-y-6">
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                        User Profiles
-                      </h3>
-                      <button
-                        onClick={handleAddProfile}
-                        className="btn-primary text-sm"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Profile
-                      </button>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      {state.profiles.map(profile => (
-                        <div key={profile.id} className="card p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <span className="text-2xl">{profile.avatar}</span>
-                              <div>
-                                <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
-                                  {profile.name}
-                                </h4>
-                                <div className="flex items-center space-x-3 text-xs text-neutral-500 dark:text-neutral-400">
-                                  <span>{profile.isTaskCompetitor ? 'Task Competitor' : 'Regular User'}</span>
-                                  {profile.pin && (
-                                    <span className="px-2 py-1 bg-warning-100 dark:bg-warning-900/20 text-warning-700 dark:text-warning-400 rounded-full">
-                                      PIN Protected
-                                    </span>
-                                  )}
-                                  {profile.viewOnlyMode && (
-                                    <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-full">
-                                      View Only Disabled
-                                    </span>
-                                  )}
-                                </div>
+                      {/* Settings Password */}
+                      <div>
+                        <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                          Settings Password Protection
+                        </label>
+                        <div className="flex items-center space-x-3">
+                          {isSettingsPasswordSet ? (
+                            <>
+                              <div className="flex items-center space-x-2 px-3 py-2 bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800 rounded-lg">
+                                <div className="w-2 h-2 bg-success-500 rounded-full"></div>
+                                <span className="text-sm text-success-700 dark:text-success-400">
+                                  Password protection enabled
+                                </span>
                               </div>
-                            </div>
-                            
-                            <div className="flex items-center space-x-2">
-                              <button 
-                                onClick={() => handleEditProfile(profile)}
+                              <button
+                                onClick={handleRemovePassword}
                                 className="btn-secondary text-sm"
                               >
-                                <Edit className="w-4 h-4 mr-1" />
-                                Edit
+                                Remove Password
                               </button>
-                              {state.profiles.length > 1 && (
-                                <button 
-                                  onClick={() => handleDeleteProfile(profile.id)}
-                                  className="p-2 text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20 rounded-lg transition-colors duration-200"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-center space-x-2 px-3 py-2 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg">
+                                <div className="w-2 h-2 bg-neutral-400 rounded-full"></div>
+                                <span className="text-sm text-neutral-600 dark:text-neutral-400">
+                                  No password protection
+                                </span>
+                              </div>
+                              <button
+                                onClick={handleSetPassword}
+                                className="btn-primary text-sm"
+                              >
+                                Set Password
+                              </button>
+                            </>
+                          )}
                         </div>
-                      ))}
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
 
               {activeTab === 'groups' && (
-                <div className="p-4 md:p-6 space-y-6">
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                        Task Groups
-                      </h3>
-                      <button
-                        onClick={handleAddGroup}
-                        className="btn-primary text-sm"
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                      Task Groups
+                    </h3>
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                      Drag to reorder • {sortedGroups.length} groups
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {sortedGroups.map((group, index) => (
+                      <div
+                        key={group.id}
+                        draggable
+                        onDragStart={(e) => handleGroupDragStart(e, group, index)}
+                        onDragEnd={handleGroupDragEnd}
+                        onDragOver={(e) => handleGroupDragOver(e, index)}
+                        onDragEnter={handleGroupDragEnter}
+                        onDragLeave={handleGroupDragLeave}
+                        onDrop={(e) => handleGroupDrop(e, index)}
+                        className={`group flex items-center space-x-3 p-4 rounded-lg border transition-all duration-200 cursor-move ${
+                          draggedItem?.id === group.id
+                            ? 'border-primary-300 dark:border-primary-600 bg-primary-50 dark:bg-primary-900/20'
+                            : dragOverIndex === index && draggedItem?.type === 'group'
+                              ? 'border-primary-300 dark:border-primary-600 bg-primary-50 dark:bg-primary-900/10 border-dashed'
+                              : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-600'
+                        }`}
                       >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Group
-                      </button>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      {state.groups.map(group => {
-                        const IconComponent = getIconComponent(group.icon);
-                        return (
-                          <div key={group.id} className="card p-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <div className="flex items-center space-x-2">
-                                  <div 
-                                    className="w-4 h-4 rounded-full"
-                                    style={{ backgroundColor: group.color }}
-                                  />
-                                  <IconComponent className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
-                                </div>
-                                <div>
-                                  <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
-                                    {group.name}
-                                  </h4>
-                                  <div className="flex items-center space-x-3 text-xs text-neutral-500 dark:text-neutral-400">
-                                    <span>{group.completedDisplayMode.replace('-', ' ')}</span>
-                                    {group.enableDueDates && (
-                                      <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 rounded-full">
-                                        Due Dates
-                                      </span>
-                                    )}
-                                    {group.defaultNotifications && (
-                                      <span className="px-2 py-1 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-full">
-                                        Notifications
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              
-                              <div className="flex items-center space-x-2">
-                                <button 
-                                  onClick={() => handleEditGroup(group)}
-                                  className="btn-secondary text-sm"
-                                >
-                                  <Edit className="w-4 h-4 mr-1" />
-                                  Edit
-                                </button>
-                                <button 
-                                  onClick={() => handleDeleteGroup(group.id)}
-                                  className="p-2 text-error-600 hover:bg-error-50 dark:hover:bg-error-900/20 rounded-lg transition-colors duration-200"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
+                        {/* Drag Handle */}
+                        <div className="flex items-center space-x-2">
+                          <GripVertical className="w-4 h-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-300" />
+                          <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 min-w-[20px]">
+                            {index + 1}
+                          </span>
+                        </div>
+
+                        {/* Group Info */}
+                        <div className="flex items-center space-x-3 flex-1">
+                          <div 
+                            className="w-4 h-4 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: group.color }}
+                          />
+                          <div className="flex-1">
+                            <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
+                              {group.name}
+                            </h4>
+                            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                              {state.tasks.filter(t => t.groupId === group.id).length} tasks
+                              {group.enableDueDates && ' • Due dates enabled'}
+                            </p>
                           </div>
-                        );
-                      })}
-                    </div>
+                        </div>
+
+                        {/* Arrow Controls */}
+                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveGroupUp(index);
+                            }}
+                            disabled={index === 0}
+                            className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Move up"
+                          >
+                            <ChevronUp className="w-4 h-4 text-neutral-500" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveGroupDown(index);
+                            }}
+                            disabled={index === sortedGroups.length - 1}
+                            className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Move down"
+                          >
+                            <ChevronDown className="w-4 h-4 text-neutral-500" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                      Reordering Groups
+                    </h4>
+                    <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                      <li>• <strong>Drag & Drop:</strong> Click and drag any group to reorder</li>
+                      <li>• <strong>Arrow Buttons:</strong> Use up/down arrows on hover</li>
+                      <li>• <strong>Order Numbers:</strong> Show current position in the list</li>
+                      <li>• Groups appear in this order throughout the application</li>
+                    </ul>
                   </div>
                 </div>
               )}
 
-              {activeTab === 'security' && (
-                <div className="p-4 md:p-6 space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
-                      Security Settings
+              {activeTab === 'profiles' && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                      User Profiles
                     </h3>
-                    
-                    <div className="space-y-6">
-                      {/* Settings Password */}
-                      <div className="card p-4">
-                        <h4 className="font-medium text-neutral-900 dark:text-neutral-100 mb-2">
-                          Settings Password
-                        </h4>
-                        <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
-                          Protect access to settings with a password
-                        </p>
-                        <button
-                          onClick={() => {
-                            setPasswordModalConfig({
-                              title: isSettingsPasswordSet ? 'Change Settings Password' : 'Set Settings Password',
-                              description: isSettingsPasswordSet 
-                                ? 'Enter a new password to protect settings access.'
-                                : 'Set a password to protect access to settings.',
-                              onSuccess: () => setShowPasswordModal(false),
-                              onPasswordSet: onSetSettingsPassword,
-                              isSettingPassword: true,
-                            });
-                            setShowPasswordModal(true);
-                          }}
-                          className="btn-secondary text-sm"
-                        >
-                          {isSettingsPasswordSet ? 'Change Password' : 'Set Password'}
-                        </button>
-                      </div>
-
-                      {/* Profile Security */}
-                      <div className="card p-4">
-                        <h4 className="font-medium text-neutral-900 dark:text-neutral-100 mb-2">
-                          Profile Security
-                        </h4>
-                        <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
-                          PIN-protected profiles and bypass options
-                        </p>
-                        
-                        <div className="space-y-3">
-                          {state.profiles.filter(p => p.pin).map(profile => (
-                            <div key={profile.id} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
-                              <div className="flex items-center space-x-3">
-                                <span className="text-lg">{profile.avatar}</span>
-                                <div>
-                                  <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                                    {profile.name}
-                                  </p>
-                                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                                    PIN Protected
-                                  </p>
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => handleOpenProfileInNewTab(profile)}
-                                className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/40 transition-colors duration-200"
-                                title={`Open ${profile.name} in new tab (bypass PIN)`}
-                              >
-                                <ExternalLink className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ))}
-                          
-                          {state.profiles.filter(p => p.pin).length === 0 && (
-                            <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                              No PIN-protected profiles found
-                            </p>
-                          )}
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                      Drag to reorder • {sortedProfiles.length} profiles
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {sortedProfiles.map((profile, index) => (
+                      <div
+                        key={profile.id}
+                        draggable
+                        onDragStart={(e) => handleProfileDragStart(e, profile, index)}
+                        onDragEnd={handleProfileDragEnd}
+                        onDragOver={(e) => handleProfileDragOver(e, index)}
+                        onDragEnter={handleProfileDragEnter}
+                        onDragLeave={handleProfileDragLeave}
+                        onDrop={(e) => handleProfileDrop(e, index)}
+                        className={`group flex items-center space-x-3 p-4 rounded-lg border transition-all duration-200 cursor-move ${
+                          draggedItem?.id === profile.id
+                            ? 'border-primary-300 dark:border-primary-600 bg-primary-50 dark:bg-primary-900/20'
+                            : dragOverIndex === index && draggedItem?.type === 'profile'
+                              ? 'border-primary-300 dark:border-primary-600 bg-primary-50 dark:bg-primary-900/10 border-dashed'
+                              : 'border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-600'
+                        }`}
+                      >
+                        {/* Drag Handle */}
+                        <div className="flex items-center space-x-2">
+                          <GripVertical className="w-4 h-4 text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-300" />
+                          <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 min-w-[20px]">
+                            {index + 1}
+                          </span>
                         </div>
 
-                        {state.profiles.filter(p => p.pin).length > 0 && (
-                          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                            <p className="text-sm text-blue-700 dark:text-blue-300">
-                              <strong>PIN Bypass:</strong> Use the external link button to open a profile in a new tab without entering the PIN. 
-                              This is useful for administrative access or when PINs are forgotten.
+                        {/* Profile Info */}
+                        <div className="flex items-center space-x-3 flex-1">
+                          <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center text-lg">
+                            {profile.avatar}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2">
+                              <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
+                                {profile.name}
+                              </h4>
+                              {profile.id === state.activeProfileId && (
+                                <span className="px-2 py-1 bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 text-xs rounded-full font-medium">
+                                  Active
+                                </span>
+                              )}
+                              {profile.isTaskCompetitor && (
+                                <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400 text-xs rounded-full font-medium">
+                                  Competitor
+                                </span>
+                              )}
+                              {profile.pin && profile.pin.trim().length > 0 && (
+                                <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 text-xs rounded-full font-medium">
+                                  PIN Protected
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                              {state.tasks.filter(t => t.profiles.includes(profile.id)).length} tasks assigned
                             </p>
                           </div>
-                        )}
+                        </div>
+
+                        {/* Arrow Controls */}
+                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveProfileUp(index);
+                            }}
+                            disabled={index === 0}
+                            className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Move up"
+                          >
+                            <ChevronUp className="w-4 h-4 text-neutral-500" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveProfileDown(index);
+                            }}
+                            disabled={index === sortedProfiles.length - 1}
+                            className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Move down"
+                          >
+                            <ChevronDown className="w-4 h-4 text-neutral-500" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    ))}
+                  </div>
+
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <h4 className="font-medium text-green-900 dark:text-green-100 mb-2">
+                      Reordering Profiles
+                    </h4>
+                    <ul className="text-sm text-green-800 dark:text-green-200 space-y-1">
+                      <li>• <strong>Drag & Drop:</strong> Click and drag any profile to reorder</li>
+                      <li>• <strong>Arrow Buttons:</strong> Use up/down arrows on hover</li>
+                      <li>• <strong>Order Numbers:</strong> Show current position in the list</li>
+                      <li>• Profiles appear in this order in selection screens</li>
+                    </ul>
                   </div>
                 </div>
               )}
 
               {activeTab === 'ai' && (
-                <div className="p-4 md:p-6 space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
                       AI Assistant
                     </h3>
-                    
-                    <div className="space-y-4">
-                      <div className="card p-4">
-                        <div className="flex items-center justify-between mb-4">
-                          <div>
-                            <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
-                              AI Configuration
-                            </h4>
-                            <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                              {state.settings.ai.enabled 
-                                ? `Using ${state.settings.ai.provider} (${state.settings.ai.model})`
-                                : 'AI assistant is disabled'
-                              }
-                            </p>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() => setShowAIModal(true)}
-                              className="btn-primary text-sm"
-                            >
-                              <span className="hidden sm:inline">Open AI Assistant</span>
-                              <span className="sm:hidden">Open AI</span>
-                            </button>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-3">
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                              Provider
-                            </label>
-                            <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                              {state.settings.ai.provider || 'Not configured'}
-                            </p>
-                          </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                              Status
-                            </label>
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              state.settings.ai.enabled && state.settings.ai.apiKey
-                                ? 'bg-success-100 dark:bg-success-900/20 text-success-700 dark:text-success-400'
-                                : 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400'
-                            }`}>
-                              {state.settings.ai.enabled && state.settings.ai.apiKey ? 'Configured' : 'Not configured'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
+                    <button
+                      onClick={() => setShowAIModal(true)}
+                      className="btn-primary"
+                      disabled={!state.settings.ai.enabled || !state.settings.ai.apiKey}
+                    >
+                      <Brain className="w-4 h-4 mr-2" />
+                      Open AI Assistant
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* Enable AI */}
+                    <div>
+                      <label className="flex items-center space-x-3">
+                        <input
+                          type="checkbox"
+                          checked={state.settings.ai.enabled}
+                          onChange={(e) => handleUpdateSettings({ 
+                            ai: { ...state.settings.ai, enabled: e.target.checked }
+                          })}
+                          className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                        />
+                        <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                          Enable AI Assistant
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* AI Provider */}
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                        AI Provider
+                      </label>
+                      <select
+                        value={state.settings.ai.provider}
+                        onChange={(e) => handleUpdateSettings({ 
+                          ai: { ...state.settings.ai, provider: e.target.value as any }
+                        })}
+                        className="input-primary"
+                      >
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic (Claude)</option>
+                        <option value="gemini">Google Gemini</option>
+                      </select>
+                    </div>
+
+                    {/* AI Model */}
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                        Model
+                      </label>
+                      <select
+                        value={state.settings.ai.model}
+                        onChange={(e) => handleUpdateSettings({ 
+                          ai: { ...state.settings.ai, model: e.target.value }
+                        })}
+                        className="input-primary"
+                      >
+                        {state.settings.ai.provider === 'openai' && (
+                          <>
+                            <option value="gpt-4">GPT-4</option>
+                            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                          </>
+                        )}
+                        {state.settings.ai.provider === 'anthropic' && (
+                          <>
+                            <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                            <option value="claude-3-sonnet-20240229">Claude 3 Sonnet</option>
+                            <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+                          </>
+                        )}
+                        {state.settings.ai.provider === 'gemini' && (
+                          <>
+                            <option value="gemini-pro">Gemini Pro</option>
+                            <option value="gemini-pro-vision">Gemini Pro Vision</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+
+                    {/* API Key */}
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                        API Key
+                      </label>
+                      <input
+                        type="password"
+                        value={state.settings.ai.apiKey}
+                        onChange={(e) => handleUpdateSettings({ 
+                          ai: { ...state.settings.ai, apiKey: e.target.value }
+                        })}
+                        placeholder="Enter your API key..."
+                        className="input-primary"
+                      />
                     </div>
                   </div>
                 </div>
               )}
 
-              {activeTab === 'history' && (
-                <div className="p-4 md:p-6">
+              {activeTab === 'analytics' && (
+                <div className="space-y-6">
+                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                    Task Analytics
+                  </h3>
+                  
                   <HistoryAnalytics 
                     history={state.history}
                     tasks={state.tasks}
@@ -698,411 +704,6 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
         </div>
       </div>
 
-      {/* Profile Edit Modal */}
-      {editingProfile && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-2">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setEditingProfile(null)} />
-          
-          <div className="relative w-full max-w-md bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in max-h-[95vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-700">
-              <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                {editingProfile.id ? 'Edit Profile' : 'Add Profile'}
-              </h3>
-              <button
-                onClick={() => setEditingProfile(null)}
-                className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
-              >
-                <X className="w-5 h-5 text-neutral-500" />
-              </button>
-            </div>
-
-            <div className="p-4 space-y-4">
-              {/* Name */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={editingProfile.name}
-                  onChange={(e) => setEditingProfile(prev => prev ? { ...prev, name: e.target.value } : null)}
-                  className="input-primary"
-                  placeholder="Profile name"
-                />
-              </div>
-
-              {/* Avatar */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                  Avatar
-                </label>
-                <div className="grid grid-cols-8 gap-2">
-                  {avatarOptions.map(avatar => (
-                    <button
-                      key={avatar}
-                      onClick={() => setEditingProfile(prev => prev ? { ...prev, avatar } : null)}
-                      className={`p-2 rounded-lg border-2 transition-colors duration-200 ${
-                        editingProfile.avatar === avatar
-                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                          : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
-                      }`}
-                    >
-                      <span className="text-lg">{avatar}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Color */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                  Color
-                </label>
-                <input
-                  type="color"
-                  value={editingProfile.color}
-                  onChange={(e) => setEditingProfile(prev => prev ? { ...prev, color: e.target.value } : null)}
-                  className="w-full h-10 rounded-lg border border-neutral-300 dark:border-neutral-600"
-                />
-              </div>
-
-              {/* Task Competitor */}
-              <div>
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={editingProfile.isTaskCompetitor}
-                    onChange={(e) => setEditingProfile(prev => prev ? { ...prev, isTaskCompetitor: e.target.checked } : null)}
-                    className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                  />
-                  <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                    Task Competitor
-                  </span>
-                </label>
-              </div>
-
-              {/* PIN Protection */}
-              <div>
-                <label className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                    PIN Protection
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowPinField(!showPinField)}
-                    className="p-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
-                  >
-                    {showPinField ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </label>
-                {showPinField && (
-                  <input
-                    type="text"
-                    value={editingProfile.pin}
-                    onChange={(e) => setEditingProfile(prev => prev ? { ...prev, pin: e.target.value } : null)}
-                    className="input-primary mt-2"
-                    placeholder="Enter PIN (4+ characters)"
-                    minLength={4}
-                  />
-                )}
-              </div>
-
-              {/* View Only Mode Disabled */}
-              <div>
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={editingProfile.viewOnlyMode}
-                    onChange={(e) => setEditingProfile(prev => prev ? { ...prev, viewOnlyMode: e.target.checked } : null)}
-                    className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                  />
-                  <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                    Disable View Only Mode
-                  </span>
-                </label>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 ml-7">
-                  When enabled, this profile cannot be accessed in view-only mode
-                </p>
-              </div>
-
-              {/* Permissions */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                  Permissions
-                </label>
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={editingProfile.permissions.canCreateTasks}
-                      onChange={(e) => setEditingProfile(prev => prev ? {
-                        ...prev,
-                        permissions: { ...prev.permissions, canCreateTasks: e.target.checked }
-                      } : null)}
-                      className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                    />
-                    <span className="text-sm text-neutral-700 dark:text-neutral-300">Can create tasks</span>
-                  </label>
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={editingProfile.permissions.canEditTasks}
-                      onChange={(e) => setEditingProfile(prev => prev ? {
-                        ...prev,
-                        permissions: { ...prev.permissions, canEditTasks: e.target.checked }
-                      } : null)}
-                      className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                    />
-                    <span className="text-sm text-neutral-700 dark:text-neutral-300">Can edit tasks</span>
-                  </label>
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={editingProfile.permissions.canDeleteTasks}
-                      onChange={(e) => setEditingProfile(prev => prev ? {
-                        ...prev,
-                        permissions: { ...prev.permissions, canDeleteTasks: e.target.checked }
-                      } : null)}
-                      className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                    />
-                    <span className="text-sm text-neutral-700 dark:text-neutral-300">Can delete tasks</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Meal Times */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                  Meal Times
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">Breakfast</label>
-                    <input
-                      type="time"
-                      value={editingProfile.mealTimes.breakfast}
-                      onChange={(e) => setEditingProfile(prev => prev ? {
-                        ...prev,
-                        mealTimes: { ...prev.mealTimes, breakfast: e.target.value }
-                      } : null)}
-                      className="w-full px-2 py-1 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">Lunch</label>
-                    <input
-                      type="time"
-                      value={editingProfile.mealTimes.lunch}
-                      onChange={(e) => setEditingProfile(prev => prev ? {
-                        ...prev,
-                        mealTimes: { ...prev.mealTimes, lunch: e.target.value }
-                      } : null)}
-                      className="w-full px-2 py-1 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">Dinner</label>
-                    <input
-                      type="time"
-                      value={editingProfile.mealTimes.dinner}
-                      onChange={(e) => setEditingProfile(prev => prev ? {
-                        ...prev,
-                        mealTimes: { ...prev.mealTimes, dinner: e.target.value }
-                      } : null)}
-                      className="w-full px-2 py-1 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">Night Cap</label>
-                    <input
-                      type="time"
-                      value={editingProfile.mealTimes.nightcap}
-                      onChange={(e) => setEditingProfile(prev => prev ? {
-                        ...prev,
-                        mealTimes: { ...prev.mealTimes, nightcap: e.target.value }
-                      } : null)}
-                      className="w-full px-2 py-1 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex space-x-3 p-4 border-t border-neutral-200 dark:border-neutral-700">
-              <button
-                onClick={() => setEditingProfile(null)}
-                className="flex-1 btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveProfile}
-                className="flex-1 btn-primary"
-                disabled={!editingProfile.name.trim()}
-              >
-                <Save className="w-4 h-4 mr-2" />
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Group Edit Modal */}
-      {editingGroup && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-2">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setEditingGroup(null)} />
-          
-          <div className="relative w-full max-w-md bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in max-h-[95vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-700">
-              <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                {editingGroup.id ? 'Edit Group' : 'Add Group'}
-              </h3>
-              <button
-                onClick={() => setEditingGroup(null)}
-                className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
-              >
-                <X className="w-5 h-5 text-neutral-500" />
-              </button>
-            </div>
-
-            <div className="p-4 space-y-4">
-              {/* Name */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={editingGroup.name}
-                  onChange={(e) => setEditingGroup(prev => prev ? { ...prev, name: e.target.value } : null)}
-                  className="input-primary"
-                  placeholder="Group name"
-                />
-              </div>
-
-              {/* Icon */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                  Icon
-                </label>
-                <div className="grid grid-cols-6 gap-2">
-                  {availableIcons.map(({ name, component: IconComponent }) => (
-                    <button
-                      key={name}
-                      onClick={() => setEditingGroup(prev => prev ? { ...prev, icon: name } : null)}
-                      className={`p-2 rounded-lg border-2 transition-colors duration-200 ${
-                        editingGroup.icon === name
-                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                          : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
-                      }`}
-                    >
-                      <IconComponent className="w-5 h-5" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Color */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                  Color
-                </label>
-                <input
-                  type="color"
-                  value={editingGroup.color}
-                  onChange={(e) => setEditingGroup(prev => prev ? { ...prev, color: e.target.value } : null)}
-                  className="w-full h-10 rounded-lg border border-neutral-300 dark:border-neutral-600"
-                />
-              </div>
-
-              {/* Completed Display Mode */}
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                  Completed Tasks Display
-                </label>
-                <select
-                  value={editingGroup.completedDisplayMode}
-                  onChange={(e) => setEditingGroup(prev => prev ? { ...prev, completedDisplayMode: e.target.value as any } : null)}
-                  className="input-primary"
-                >
-                  <option value="grey-out">Grey out completed tasks</option>
-                  <option value="grey-drop">Grey out and move to bottom</option>
-                  <option value="separate-completed">Separate completed section</option>
-                </select>
-              </div>
-
-              {/* Due Dates */}
-              <div>
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={editingGroup.enableDueDates}
-                    onChange={(e) => setEditingGroup(prev => prev ? { ...prev, enableDueDates: e.target.checked } : null)}
-                    className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                  />
-                  <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                    Enable due dates
-                  </span>
-                </label>
-              </div>
-
-              {/* Sort by Due Date */}
-              {editingGroup.enableDueDates && (
-                <div>
-                  <label className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={editingGroup.sortByDueDate}
-                      onChange={(e) => setEditingGroup(prev => prev ? { ...prev, sortByDueDate: e.target.checked } : null)}
-                      className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                    />
-                    <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                      Sort by due date
-                    </span>
-                  </label>
-                </div>
-              )}
-
-              {/* Default Notifications */}
-              <div>
-                <label className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    checked={editingGroup.defaultNotifications}
-                    onChange={(e) => setEditingGroup(prev => prev ? { ...prev, defaultNotifications: e.target.checked } : null)}
-                    className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                  />
-                  <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                    Enable notifications by default for new tasks
-                  </span>
-                </label>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 ml-7">
-                  Only applies to tasks without due dates
-                </p>
-              </div>
-            </div>
-
-            <div className="flex space-x-3 p-4 border-t border-neutral-200 dark:border-neutral-700">
-              <button
-                onClick={() => setEditingGroup(null)}
-                className="flex-1 btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveGroup}
-                className="flex-1 btn-primary"
-                disabled={!editingGroup.name.trim()}
-              >
-                <Save className="w-4 h-4 mr-2" />
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* AI Modal */}
       <AIQueryModal
         isOpen={showAIModal}
@@ -1112,25 +713,25 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
         profiles={state.profiles}
         groups={state.groups}
         aiSettings={state.settings.ai}
-        onUpdateSettings={handleUpdateAISettings}
+        onUpdateSettings={(updates) => handleUpdateSettings({ ai: { ...state.settings.ai, ...updates } })}
       />
 
       {/* Password Modal */}
-      {passwordModalConfig && (
-        <PasswordModal
-          isOpen={showPasswordModal}
-          onClose={() => {
-            setShowPasswordModal(false);
-            setPasswordModalConfig(null);
-          }}
-          onSuccess={passwordModalConfig.onSuccess}
-          title={passwordModalConfig.title}
-          description={passwordModalConfig.description}
-          expectedPassword={passwordModalConfig.expectedPassword}
-          onPasswordSet={passwordModalConfig.onPasswordSet}
-          isSettingPassword={passwordModalConfig.isSettingPassword}
-        />
-      )}
+      <PasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        onSuccess={handlePasswordSuccess}
+        title={passwordModalType === 'set' ? 'Set Settings Password' : 'Remove Settings Password'}
+        description={
+          passwordModalType === 'set' 
+            ? 'Set a password to protect access to settings. This password will be required to open settings in the future.'
+            : 'Enter your current settings password to remove password protection.'
+        }
+        placeholder={passwordModalType === 'set' ? 'Enter new password...' : 'Enter current password...'}
+        expectedPassword={passwordModalType === 'remove' ? state.settings.settingsPassword : undefined}
+        onPasswordSet={passwordModalType === 'set' ? handlePasswordSuccess : undefined}
+        isSettingPassword={passwordModalType === 'set'}
+      />
     </>
   );
 }
