@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Users, Palette, History, Brain, Shield, Eye, EyeOff, Plus, Edit, Trash2, GripVertical, Save, Cancel, ChevronDown, ChevronUp, Bell, BellOff } from 'lucide-react';
+import { X, Settings, Users, Palette, History, Brain, Shield, Eye, EyeOff, Plus, Edit, Trash2, GripVertical, Save, Ambulance as Cancel, ChevronDown, ChevronUp, Bell, BellOff } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { TaskGroup, UserProfile } from '../types';
 import { getIconComponent, getAvailableIcons } from '../utils/icons';
