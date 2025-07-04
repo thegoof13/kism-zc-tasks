@@ -11,6 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const DATA_DIR = path.join(__dirname, 'data');
 const AI_LOG_FILE = path.join(DATA_DIR, 'ai_queries.log');
+const ACTIVITY_LOG_FILE = path.join(DATA_DIR, 'activity.log');
 
 // Middleware
 app.use(cors({
@@ -46,29 +47,116 @@ async function ensureDataDir() {
   }
 }
 
-// Helper function to read JSON file
+// Activity logging function
+async function logActivity(entry) {
+  try {
+    const timestamp = new Date().toISOString();
+    const logLine = `[${timestamp}] ${JSON.stringify(entry)}\n`;
+    await fs.appendFile(ACTIVITY_LOG_FILE, logLine, 'utf8');
+    console.log('Activity logged:', entry.action, entry.taskTitle || 'System');
+  } catch (error) {
+    console.error('Error writing to activity log:', error);
+  }
+}
+
+// Helper function to read JSON file with error handling and validation
 async function readJsonFile(filename) {
   try {
     const filePath = path.join(DATA_DIR, filename);
+    console.log('Reading file:', filePath);
+    
     const data = await fs.readFile(filePath, 'utf8');
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    
+    console.log('Successfully read JSON file:', filename);
+    console.log('Data keys:', Object.keys(parsed));
+    console.log('Tasks count:', parsed.tasks?.length || 0);
+    console.log('Groups count:', parsed.groups?.length || 0);
+    console.log('Profiles count:', parsed.profiles?.length || 0);
+    console.log('History count:', parsed.history?.length || 0);
+    
+    return parsed;
   } catch (error) {
     if (error.code === 'ENOENT') {
+      console.log('File does not exist:', filename);
       return null; // File doesn't exist
     }
-    console.error('Error reading JSON file:', error);
+    console.error('Error reading JSON file:', filename, error);
     throw error;
   }
 }
 
-// Helper function to write JSON file
+// Helper function to write JSON file with validation and backup
 async function writeJsonFile(filename, data) {
   try {
     const filePath = path.join(DATA_DIR, filename);
-    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
-    console.log('Saved data to:', filePath);
+    const backupPath = `${filePath}.backup`;
+    
+    console.log('Writing to file:', filePath);
+    console.log('Data to save - Tasks:', data.tasks?.length || 0);
+    console.log('Data to save - Groups:', data.groups?.length || 0);
+    console.log('Data to save - Profiles:', data.profiles?.length || 0);
+    console.log('Data to save - History:', data.history?.length || 0);
+    
+    // Validate data structure
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid data structure - must be an object');
+    }
+    
+    // Ensure required arrays exist
+    const validatedData = {
+      tasks: Array.isArray(data.tasks) ? data.tasks : [],
+      groups: Array.isArray(data.groups) ? data.groups : [],
+      profiles: Array.isArray(data.profiles) ? data.profiles : [],
+      history: Array.isArray(data.history) ? data.history : [],
+      settings: data.settings || {},
+      activeProfileId: data.activeProfileId || '',
+      ...data
+    };
+    
+    // Create backup of existing file if it exists
+    try {
+      await fs.access(filePath);
+      await fs.copyFile(filePath, backupPath);
+      console.log('Created backup:', backupPath);
+    } catch (backupError) {
+      // File doesn't exist yet, no backup needed
+      console.log('No existing file to backup');
+    }
+    
+    // Write the new data
+    const jsonString = JSON.stringify(validatedData, null, 2);
+    await fs.writeFile(filePath, jsonString, 'utf8');
+    
+    // Verify the write was successful by reading it back
+    const verification = await fs.readFile(filePath, 'utf8');
+    const verifiedData = JSON.parse(verification);
+    
+    console.log('Successfully saved and verified file:', filePath);
+    console.log('Verified - Tasks:', verifiedData.tasks?.length || 0);
+    console.log('Verified - Groups:', verifiedData.groups?.length || 0);
+    console.log('Verified - Profiles:', verifiedData.profiles?.length || 0);
+    console.log('Verified - History:', verifiedData.history?.length || 0);
+    
+    // Log the save operation
+    await logActivity({
+      action: 'data_saved',
+      timestamp: new Date().toISOString(),
+      userId: filename.replace('user_', '').replace('.json', ''),
+      details: `Saved ${verifiedData.tasks?.length || 0} tasks, ${verifiedData.groups?.length || 0} groups, ${verifiedData.profiles?.length || 0} profiles, ${verifiedData.history?.length || 0} history entries`
+    });
+    
   } catch (error) {
-    console.error('Error writing JSON file:', error);
+    console.error('Error writing JSON file:', filename, error);
+    
+    // Log the error
+    await logActivity({
+      action: 'data_save_error',
+      timestamp: new Date().toISOString(),
+      userId: filename.replace('user_', '').replace('.json', ''),
+      details: `Failed to save data: ${error.message}`
+    });
+    
     throw error;
   }
 }
@@ -157,6 +245,9 @@ function getDefaultUserData() {
         isCollapsed: false,
         order: 0,
         createdAt: now,
+        enableDueDates: false,
+        sortByDueDate: false,
+        defaultNotifications: false,
       },
       {
         id: 'work',
@@ -167,6 +258,9 @@ function getDefaultUserData() {
         isCollapsed: false,
         order: 1,
         createdAt: now,
+        enableDueDates: true,
+        sortByDueDate: true,
+        defaultNotifications: false,
       },
       {
         id: 'health',
@@ -177,6 +271,9 @@ function getDefaultUserData() {
         isCollapsed: false,
         order: 2,
         createdAt: now,
+        enableDueDates: false,
+        sortByDueDate: false,
+        defaultNotifications: true,
       },
       {
         id: 'household',
@@ -187,6 +284,9 @@ function getDefaultUserData() {
         isCollapsed: false,
         order: 3,
         createdAt: now,
+        enableDueDates: true,
+        sortByDueDate: true,
+        defaultNotifications: false,
       },
     ],
     profiles: [
@@ -197,6 +297,18 @@ function getDefaultUserData() {
         avatar: '👤',
         isActive: true,
         createdAt: now,
+        isTaskCompetitor: true,
+        permissions: {
+          canEditTasks: true,
+          canCreateTasks: true,
+          canDeleteTasks: true,
+        },
+        mealTimes: {
+          breakfast: '07:00',
+          lunch: '12:00',
+          dinner: '18:00',
+          nightcap: '21:00',
+        },
       },
     ],
     history: [],
@@ -206,6 +318,7 @@ function getDefaultUserData() {
       enableNotifications: false,
       autoArchiveCompleted: false,
       archiveDays: 30,
+      showTopCollaborator: true,
       ai: {
         apiKey: '',
         provider: 'openai',
@@ -215,6 +328,39 @@ function getDefaultUserData() {
     },
     activeProfileId: 'default',
   };
+}
+
+// Load activity log and merge with history
+async function loadActivityLog() {
+  try {
+    const logData = await fs.readFile(ACTIVITY_LOG_FILE, 'utf8');
+    const logEntries = logData.split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        try {
+          const match = line.match(/^\[(.*?)\] (.*)$/);
+          if (match) {
+            const entry = JSON.parse(match[2]);
+            entry.timestamp = match[1];
+            return entry;
+          }
+          return null;
+        } catch {
+          return null;
+        }
+      })
+      .filter(entry => entry !== null);
+    
+    console.log(`Loaded ${logEntries.length} activity log entries`);
+    return logEntries;
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      console.log('No activity log file found, starting fresh');
+      return [];
+    }
+    console.error('Error reading activity log:', error);
+    return [];
+  }
 }
 
 // Routes
@@ -230,9 +376,42 @@ app.get('/api/data/:userId', async (req, res) => {
       console.log('Creating default data for user:', userId);
       userData = getDefaultUserData();
       await writeJsonFile(filename, userData);
+      
+      // Log the creation
+      await logActivity({
+        action: 'user_created',
+        timestamp: new Date().toISOString(),
+        userId: userId,
+        details: 'Created new user with default data'
+      });
     }
     
+    // Load activity log and merge with history
+    const activityLog = await loadActivityLog();
+    
+    // Merge activity log with existing history, avoiding duplicates
+    const existingHistoryIds = new Set(userData.history?.map(h => h.id) || []);
+    const newLogEntries = activityLog
+      .filter(entry => !existingHistoryIds.has(entry.id))
+      .map(entry => ({
+        id: entry.id || `log-${Date.now()}-${Math.random()}`,
+        taskId: entry.taskId || 'system',
+        profileId: entry.profileId || 'system',
+        action: entry.action,
+        timestamp: new Date(entry.timestamp),
+        taskTitle: entry.taskTitle || 'System Action',
+        profileName: entry.profileName || 'System',
+        details: entry.details || ''
+      }));
+    
+    // Combine and sort by timestamp (newest first)
+    const combinedHistory = [...(userData.history || []), ...newLogEntries]
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    userData.history = combinedHistory;
+    
     console.log('Sending user data for:', userId);
+    console.log('Total history entries:', userData.history.length);
     res.json(userData);
   } catch (error) {
     console.error('Error reading user data:', error);
@@ -247,14 +426,60 @@ app.post('/api/data/:userId', async (req, res) => {
     const userData = req.body;
     const filename = getUserDataFile(userId);
     
+    console.log('Received save request for user:', userId);
+    console.log('Data received - Tasks:', userData.tasks?.length || 0);
+    console.log('Data received - Groups:', userData.groups?.length || 0);
+    console.log('Data received - Profiles:', userData.profiles?.length || 0);
+    console.log('Data received - History:', userData.history?.length || 0);
+    
     // Remove loading flag before saving
-    const { loading, ...dataToSave } = userData;
+    const { loading, taskUpdateStatuses, ...dataToSave } = userData;
+    
+    // Log any new history entries to the activity log
+    if (userData.history && Array.isArray(userData.history)) {
+      // Get existing data to compare
+      const existingData = await readJsonFile(filename);
+      const existingHistoryIds = new Set(existingData?.history?.map(h => h.id) || []);
+      
+      // Find new history entries
+      const newHistoryEntries = userData.history.filter(entry => 
+        !existingHistoryIds.has(entry.id)
+      );
+      
+      // Log each new history entry to activity log
+      for (const entry of newHistoryEntries) {
+        await logActivity({
+          id: entry.id,
+          action: entry.action,
+          taskId: entry.taskId,
+          profileId: entry.profileId,
+          timestamp: entry.timestamp,
+          taskTitle: entry.taskTitle,
+          profileName: entry.profileName,
+          details: entry.details,
+          userId: userId
+        });
+      }
+      
+      if (newHistoryEntries.length > 0) {
+        console.log(`Logged ${newHistoryEntries.length} new history entries to activity log`);
+      }
+    }
     
     await writeJsonFile(filename, dataToSave);
-    console.log('Saved user data for:', userId);
+    console.log('Successfully saved user data for:', userId);
     res.json({ success: true });
   } catch (error) {
     console.error('Error saving user data:', error);
+    
+    // Log the save error
+    await logActivity({
+      action: 'save_error',
+      timestamp: new Date().toISOString(),
+      userId: userId,
+      details: `Failed to save user data: ${error.message}`
+    });
+    
     res.status(500).json({ error: 'Failed to save user data' });
   }
 });
@@ -313,13 +538,24 @@ app.get('/api/ai/logs', async (req, res) => {
   }
 });
 
+// Get activity log
+app.get('/api/activity/logs', async (req, res) => {
+  try {
+    const activityLog = await loadActivityLog();
+    res.json(activityLog.slice(-200)); // Return last 200 entries
+  } catch (error) {
+    console.error('Error reading activity logs:', error);
+    res.status(500).json({ error: 'Failed to read activity logs' });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
     dataDir: DATA_DIR,
-    features: ['tasks', 'ai-logging'],
+    features: ['tasks', 'ai-logging', 'activity-logging'],
     environment: process.env.NODE_ENV || 'development'
   });
 });
@@ -334,10 +570,19 @@ app.use((error, req, res, next) => {
 async function startServer() {
   try {
     await ensureDataDir();
+    
+    // Initialize activity log
+    await logActivity({
+      action: 'server_started',
+      timestamp: new Date().toISOString(),
+      details: `FocusFlow server started on port ${PORT}`
+    });
+    
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 FocusFlow server running on port ${PORT}`);
       console.log(`📁 Data directory: ${DATA_DIR}`);
       console.log(`🤖 AI logging enabled: ${AI_LOG_FILE}`);
+      console.log(`📊 Activity logging enabled: ${ACTIVITY_LOG_FILE}`);
       console.log(`🌐 API available at: http://localhost:${PORT}/api`);
       console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
       
