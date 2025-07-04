@@ -1,5 +1,5 @@
-# Example Nginx configuration for ZenTasks
-# Place this in /etc/nginx/sites-available/zentasks and symlink to sites-enabled
+# Example Nginx configuration for FocusFlow
+# Place this in /etc/nginx/sites-available/focusflow and symlink to sites-enabled
 
 server {
     listen 80;
@@ -45,7 +45,7 @@ server {
     
     # Static files - serve from built frontend
     location / {
-        root /path/to/zentasks/dist;  # Replace with your actual path
+        root /path/to/focusflow/dist;  # Replace with your actual path
         try_files $uri $uri/ /index.html;
         
         # Cache static assets

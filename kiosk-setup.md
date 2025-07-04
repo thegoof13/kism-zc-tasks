@@ -1,8 +1,8 @@
-# ZenTasks Kiosk Portal Setup Guide
+# FocusFlow Kiosk Portal Setup Guide
 
 ## Overview
 
-The ZenTasks Kiosk Portal is a tablet-optimized interface designed for public-facing installations. It provides a touch-friendly, dark-themed interface that connects to your existing ZenTasks API.
+The FocusFlow Kiosk Portal is a tablet-optimized interface designed for public-facing installations. It provides a touch-friendly, dark-themed interface that connects to your existing FocusFlow API.
 
 ## Features
 
@@ -31,7 +31,7 @@ The ZenTasks Kiosk Portal is a tablet-optimized interface designed for public-fa
 
 ### Option 1: Direct File Access
 
-1. **Download the kiosk.html file** to your ZenTasks server
+1. **Download the kiosk.html file** to your FocusFlow server
 2. **Place it in your web root** (same directory as your main application)
 3. **Access via secure URL**: `https://yourdomain.com/kiosk.html`
 
@@ -41,20 +41,20 @@ The ZenTasks Kiosk Portal is a tablet-optimized interface designed for public-fa
    ```bash
    # Generate a random 16-character string
    RANDOM_PATH=$(openssl rand -hex 8)
-   sudo mkdir -p /var/www/zentasks/kiosk_$RANDOM_PATH
+   sudo mkdir -p /var/www/focusflow/kiosk_$RANDOM_PATH
    ```
 
 2. **Copy the kiosk file**:
    ```bash
-   sudo cp kiosk.html /var/www/zentasks/kiosk_$RANDOM_PATH/index.html
-   sudo chown -R zentasks:zentasks /var/www/zentasks/kiosk_$RANDOM_PATH
+   sudo cp kiosk.html /var/www/focusflow/kiosk_$RANDOM_PATH/index.html
+   sudo chown -R focusflow:focusflow /var/www/focusflow/kiosk_$RANDOM_PATH
    ```
 
 3. **Configure Nginx** to serve the kiosk:
    ```nginx
    # Add to your existing Nginx config
    location /kiosk_$RANDOM_PATH/ {
-       root /var/www/zentasks;
+       root /var/www/focusflow;
        try_files $uri $uri/ /kiosk_$RANDOM_PATH/index.html;
        
        # Cache static assets
@@ -69,12 +69,12 @@ The ZenTasks Kiosk Portal is a tablet-optimized interface designed for public-fa
 
 ### Option 3: Nginx Integration
 
-Add to your existing ZenTasks Nginx configuration:
+Add to your existing FocusFlow Nginx configuration:
 
 ```nginx
 # Kiosk Portal
 location /kiosk/ {
-    alias /var/www/zentasks/kiosk/;
+    alias /var/www/focusflow/kiosk/;
     try_files $uri $uri/ /kiosk/index.html;
     
     # Security headers for kiosk
@@ -131,7 +131,7 @@ For optimal kiosk experience:
 ### For Administrators
 
 1. **Monitor Usage** - Check server logs for API calls
-2. **Update Tasks** - Use the main ZenTasks interface to manage tasks
+2. **Update Tasks** - Use the main FocusFlow interface to manage tasks
 3. **Add Profiles** - Create new profiles in the main application
 4. **Security** - Use random URLs and monitor access logs
 
@@ -164,7 +164,7 @@ For optimal kiosk experience:
 2. **Profiles Not Loading**
    ```
    Check: User data exists, profiles are configured
-   Solution: Create profiles in main ZenTasks application
+   Solution: Create profiles in main FocusFlow application
    ```
 
 3. **Tasks Not Updating**
@@ -205,7 +205,7 @@ For optimal kiosk experience:
 
 ### Updates
 
-When updating ZenTasks:
+When updating FocusFlow:
 1. **Backup Kiosk File** - Save your customized version
 2. **Test API Compatibility** - Verify kiosk still works with new API
 3. **Update Configuration** - Adjust settings if needed

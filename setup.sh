@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# ZenTasks Ubuntu Deployment Setup Script (LXC Compatible)
-# This script automates the deployment of ZenTasks on Ubuntu with Nginx
+# FocusFlow Ubuntu Deployment Setup Script (LXC Compatible)
+# This script automates the deployment of FocusFlow on Ubuntu with Nginx
 # Compatible with LXC containers and traditional Ubuntu installations
 # Now includes Kiosk Portal support with secure random paths
 # Enhanced SSL detection with comprehensive debugging
@@ -16,9 +16,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-APP_NAME="zentasks"
-APP_USER="zentasks"
-APP_DIR="/var/www/zentasks"
+APP_NAME="focusflow"
+APP_USER="focusflow"
+APP_DIR="/var/www/focusflow"
 NODE_VERSION="18"
 DOMAIN=""
 EMAIL=""
@@ -401,10 +401,10 @@ check_existing_ssl() {
 
 # Function to get user input
 get_user_input() {
-    echo -e "${BLUE}=== ZenTasks Deployment Configuration ===${NC}"
+    echo -e "${BLUE}=== FocusFlow Deployment Configuration ===${NC}"
     echo
     
-    read -p "Enter your domain name (e.g., zentasks.example.com): " DOMAIN
+    read -p "Enter your domain name (e.g., focusflow.example.com): " DOMAIN
     if [[ -z "$DOMAIN" ]]; then
         print_error "Domain name is required"
         exit 1
@@ -726,13 +726,13 @@ build_application() {
 create_env_file() {
     print_status "Creating environment configuration..."
     
-    cat > /tmp/zentasks.env << EOF
+    cat > /tmp/focusflow.env << EOF
 NODE_ENV=production
 PORT=3001
 FRONTEND_URL=http${USE_SSL:+s}://$DOMAIN
 EOF
     
-    sudo mv /tmp/zentasks.env $APP_DIR/.env
+    sudo mv /tmp/focusflow.env $APP_DIR/.env
     sudo chown $APP_USER:$APP_USER $APP_DIR/.env
     
     print_success "Environment file created"
@@ -746,7 +746,7 @@ create_pm2_config() {
     cat > /tmp/ecosystem.config.cjs << 'EOF'
 module.exports = {
   apps: [{
-    name: 'zentasks',
+    name: 'focusflow',
     script: 'server/index.js',
     instances: 1,
     autorestart: true,
@@ -756,9 +756,9 @@ module.exports = {
       NODE_ENV: 'production',
       PORT: 3001
     },
-    error_file: '/var/log/zentasks/error.log',
-    out_file: '/var/log/zentasks/out.log',
-    log_file: '/var/log/zentasks/combined.log',
+    error_file: '/var/log/focusflow/error.log',
+    out_file: '/var/log/focusflow/out.log',
+    log_file: '/var/log/focusflow/combined.log',
     time: true
   }]
 }
@@ -768,8 +768,8 @@ EOF
     sudo chown $APP_USER:$APP_USER $APP_DIR/ecosystem.config.cjs
     
     # Create log directory
-    sudo mkdir -p /var/log/zentasks
-    sudo chown $APP_USER:$APP_USER /var/log/zentasks
+    sudo mkdir -p /var/log/focusflow
+    sudo chown $APP_USER:$APP_USER /var/log/focusflow
     
     print_success "PM2 configuration created (ecosystem.config.cjs)"
 }
@@ -793,7 +793,7 @@ configure_nginx() {
     print_status "Configuring Nginx..."
     
     # Create Nginx configuration with HTTP to HTTPS redirect and Kiosk support
-    cat > /tmp/zentasks.nginx << EOF
+    cat > /tmp/focusflow.nginx << EOF
 # HTTP server - redirect all traffic to HTTPS
 server {
     listen 80;
@@ -808,24 +808,24 @@ server {
 EOF
 
     if [[ "$USE_SSL" == true ]]; then
-        cat >> /tmp/zentasks.nginx << EOF
+        cat >> /tmp/focusflow.nginx << EOF
     listen 443 ssl http2;
     server_name $DOMAIN;
     
     # SSL configuration
 EOF
         if [[ -n "$EXISTING_SSL_CERT" ]]; then
-            cat >> /tmp/zentasks.nginx << EOF
+            cat >> /tmp/focusflow.nginx << EOF
     ssl_certificate $EXISTING_SSL_CERT;
     ssl_certificate_key $EXISTING_SSL_KEY;
 EOF
         else
-            cat >> /tmp/zentasks.nginx << EOF
+            cat >> /tmp/focusflow.nginx << EOF
     ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
 EOF
         fi
-        cat >> /tmp/zentasks.nginx << EOF
+        cat >> /tmp/focusflow.nginx << EOF
     ssl_session_timeout 1d;
     ssl_session_cache shared:MozTLS:10m;
     ssl_session_tickets off;
@@ -839,13 +839,13 @@ EOF
     add_header Strict-Transport-Security "max-age=63072000" always;
 EOF
     else
-        cat >> /tmp/zentasks.nginx << EOF
+        cat >> /tmp/focusflow.nginx << EOF
     listen 80;
     server_name $DOMAIN;
 EOF
     fi
 
-    cat >> /tmp/zentasks.nginx << EOF
+    cat >> /tmp/focusflow.nginx << EOF
     
     # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -862,7 +862,7 @@ EOF
 
     # Add Kiosk Portal configuration if enabled
     if [[ "$ENABLE_KIOSK" == true ]]; then
-        cat >> /tmp/zentasks.nginx << EOF
+        cat >> /tmp/focusflow.nginx << EOF
     
     # Kiosk Portal - Secure random path
     location /kiosk/$KIOSK_PATH/ {
@@ -888,7 +888,7 @@ EOF
 EOF
     fi
 
-    cat >> /tmp/zentasks.nginx << EOF
+    cat >> /tmp/focusflow.nginx << EOF
     
     # API routes - proxy to Node.js backend
     location /api/ {
@@ -934,8 +934,8 @@ EOF
 EOF
     
     # Install Nginx configuration
-    sudo mv /tmp/zentasks.nginx /etc/nginx/sites-available/zentasks
-    sudo ln -sf /etc/nginx/sites-available/zentasks /etc/nginx/sites-enabled/
+    sudo mv /tmp/focusflow.nginx /etc/nginx/sites-available/focusflow
+    sudo ln -sf /etc/nginx/sites-available/focusflow /etc/nginx/sites-enabled/
     
     # Remove default site
     sudo rm -f /etc/nginx/sites-enabled/default
@@ -1038,8 +1038,8 @@ update_nginx_ssl_config() {
         print_status "Updating Nginx configuration for SSL..."
         
         # Replace the temporary SSL certificate paths with the real ones
-        sudo sed -i "s|ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;|ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;|g" /etc/nginx/sites-available/zentasks
-        sudo sed -i "s|ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;|ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;|g" /etc/nginx/sites-available/zentasks
+        sudo sed -i "s|ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;|ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;|g" /etc/nginx/sites-available/focusflow
+        sudo sed -i "s|ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;|ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;|g" /etc/nginx/sites-available/focusflow
         
         # Test and reload Nginx
         sudo nginx -t && sudo systemctl reload nginx
@@ -1056,11 +1056,11 @@ setup_ssl_renewal_cron() {
     cat > /tmp/ssl-renewal.sh << EOF
 #!/bin/bash
 
-# ZenTasks SSL Certificate Renewal Script
+# FocusFlow SSL Certificate Renewal Script
 # Checks if certificate expires within 21 days and renews if needed
 
 DOMAIN="$DOMAIN"
-LOG_FILE="/var/log/zentasks/ssl-renewal.log"
+LOG_FILE="/var/log/focusflow/ssl-renewal.log"
 CLOUDFLARE_CREDS="$SSL_CONFIG_DIR/cloudflare.ini"
 CERTBOT_CMD="/usr/local/bin/certbot-cloudflare"
 
@@ -1157,11 +1157,11 @@ main
 EOF
     
     # Install renewal script
-    sudo mv /tmp/ssl-renewal.sh /usr/local/bin/zentasks-ssl-renewal.sh
-    sudo chmod +x /usr/local/bin/zentasks-ssl-renewal.sh
+    sudo mv /tmp/ssl-renewal.sh /usr/local/bin/focusflow-ssl-renewal.sh
+    sudo chmod +x /usr/local/bin/focusflow-ssl-renewal.sh
     
     # Add to crontab for weekly renewal check (Monday at 3 AM)
-    (sudo crontab -l 2>/dev/null | grep -v "zentasks-ssl-renewal"; echo "0 3 * * 1 /usr/local/bin/zentasks-ssl-renewal.sh") | sudo crontab -
+    (sudo crontab -l 2>/dev/null | grep -v "focusflow-ssl-renewal"; echo "0 3 * * 1 /usr/local/bin/focusflow-ssl-renewal.sh") | sudo crontab -
     
     print_success "SSL renewal script created and scheduled for weekly checks"
 }
@@ -1186,9 +1186,9 @@ configure_firewall() {
 create_systemd_service() {
     print_status "Creating systemd service for PM2..."
     
-    cat > /tmp/zentasks.service << EOF
+    cat > /tmp/focusflow.service << EOF
 [Unit]
-Description=ZenTasks Application
+Description=FocusFlow Application
 After=network.target
 
 [Service]
@@ -1205,9 +1205,9 @@ RestartSec=10
 WantedBy=multi-user.target
 EOF
     
-    sudo mv /tmp/zentasks.service /etc/systemd/system/
+    sudo mv /tmp/focusflow.service /etc/systemd/system/
     sudo systemctl daemon-reload
-    sudo systemctl enable zentasks
+    sudo systemctl enable focusflow
     
     print_success "Systemd service created"
 }
@@ -1216,31 +1216,31 @@ EOF
 create_backup_script() {
     print_status "Creating backup script..."
     
-    cat > /tmp/backup-zentasks.sh << 'EOF'
+    cat > /tmp/backup-focusflow.sh << 'EOF'
 #!/bin/bash
 
-# ZenTasks Backup Script
-BACKUP_DIR="/var/backups/zentasks"
-APP_DIR="/var/www/zentasks"
+# FocusFlow Backup Script
+BACKUP_DIR="/var/backups/focusflow"
+APP_DIR="/var/www/focusflow"
 DATE=$(date +%Y%m%d_%H%M%S)
 
 # Create backup directory
 mkdir -p $BACKUP_DIR
 
 # Backup data
-tar -czf $BACKUP_DIR/zentasks-data-$DATE.tar.gz -C $APP_DIR server/data
+tar -czf $BACKUP_DIR/focusflow-data-$DATE.tar.gz -C $APP_DIR server/data
 
 # Keep only last 7 days of backups
-find $BACKUP_DIR -name "zentasks-data-*.tar.gz" -mtime +7 -delete
+find $BACKUP_DIR -name "focusflow-data-*.tar.gz" -mtime +7 -delete
 
-echo "Backup completed: $BACKUP_DIR/zentasks-data-$DATE.tar.gz"
+echo "Backup completed: $BACKUP_DIR/focusflow-data-$DATE.tar.gz"
 EOF
     
-    sudo mv /tmp/backup-zentasks.sh /usr/local/bin/
-    sudo chmod +x /usr/local/bin/backup-zentasks.sh
+    sudo mv /tmp/backup-focusflow.sh /usr/local/bin/
+    sudo chmod +x /usr/local/bin/backup-focusflow.sh
     
     # Add to crontab for daily backups
-    (sudo crontab -l 2>/dev/null | grep -v "backup-zentasks"; echo "0 2 * * * /usr/local/bin/backup-zentasks.sh") | sudo crontab -
+    (sudo crontab -l 2>/dev/null | grep -v "backup-focusflow"; echo "0 2 * * * /usr/local/bin/backup-focusflow.sh") | sudo crontab -
     
     print_success "Backup script created and scheduled"
 }
@@ -1252,7 +1252,7 @@ save_kiosk_config() {
         
         # Create kiosk config file for future reference
         cat > /tmp/kiosk-config.txt << EOF
-# ZenTasks Kiosk Portal Configuration
+# FocusFlow Kiosk Portal Configuration
 # Generated on: $(date)
 
 KIOSK_ENABLED=true
@@ -1282,7 +1282,7 @@ EOF
 # Function to display final information
 display_final_info() {
     echo
-    echo -e "${GREEN}=== ZenTasks Deployment Complete ===${NC}"
+    echo -e "${GREEN}=== FocusFlow Deployment Complete ===${NC}"
     echo
     print_success "Application URL: http${USE_SSL:+s}://$DOMAIN"
     if [[ "$ENABLE_KIOSK" == true ]]; then
@@ -1290,7 +1290,7 @@ display_final_info() {
     fi
     print_success "Application directory: $APP_DIR"
     print_success "Application user: $APP_USER"
-    print_success "Logs: /var/log/zentasks/"
+    print_success "Logs: /var/log/focusflow/"
     print_success "Container Environment: ${IS_LXC_CONTAINER}"
     print_success "PM2 Config: ecosystem.config.cjs (CommonJS format)"
     if [[ -n "$EXISTING_SSL_CERT" ]]; then
@@ -1299,11 +1299,11 @@ display_final_info() {
     echo
     print_status "Useful commands:"
     echo "  View application status: sudo -u $APP_USER pm2 list"
-    echo "  View application logs: sudo -u $APP_USER pm2 logs zentasks"
-    echo "  Restart application: sudo -u $APP_USER pm2 restart zentasks"
+    echo "  View application logs: sudo -u $APP_USER pm2 logs focusflow"
+    echo "  Restart application: sudo -u $APP_USER pm2 restart focusflow"
     echo "  View Nginx status: sudo systemctl status nginx"
     echo "  View Nginx logs: sudo tail -f /var/log/nginx/error.log"
-    echo "  Manual backup: sudo /usr/local/bin/backup-zentasks.sh"
+    echo "  Manual backup: sudo /usr/local/bin/backup-focusflow.sh"
     echo
     if [[ "$ENABLE_KIOSK" == true ]]; then
         print_status "Kiosk Portal:"
@@ -1321,8 +1321,8 @@ display_final_info() {
             echo "  No automatic renewal configured for existing certificates"
         else
             print_status "SSL certificate management:"
-            echo "  Manual renewal check: sudo /usr/local/bin/zentasks-ssl-renewal.sh"
-            echo "  View SSL renewal logs: sudo tail -f /var/log/zentasks/ssl-renewal.log"
+            echo "  Manual renewal check: sudo /usr/local/bin/focusflow-ssl-renewal.sh"
+            echo "  View SSL renewal logs: sudo tail -f /var/log/focusflow/ssl-renewal.log"
             echo "  Certificate location: /etc/letsencrypt/live/$DOMAIN/"
             echo "  Cloudflare credentials: $SSL_CONFIG_DIR/cloudflare.ini"
             echo "  Certbot command: /usr/local/bin/certbot-cloudflare (virtual environment wrapper)"
@@ -1358,7 +1358,7 @@ display_final_info() {
 main() {
     echo -e "${BLUE}"
     echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║                    ZenTasks Deployment                      ║"
+    echo "║                    FocusFlow Deployment                      ║"
     echo "║         Ubuntu Setup Script (LXC Compatible)               ║"
     echo "║              PEP 668 Compliant (Ubuntu 24.04)              ║"
     echo "║            Fixed Cloudflare API Token Support              ║"

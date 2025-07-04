@@ -1,8 +1,8 @@
-# ZenTasks - Smart Task Management System
+# FocusFlow - Smart Task Management System
 
 A beautiful, production-ready task management application with smart recurring tasks, multi-profile support, AI-powered insights, advanced collaboration features, and comprehensive notification system.
 
-![ZenTasks](https://img.shields.io/badge/ZenTasks-v1.0-blue.svg)
+![FocusFlow](https://img.shields.io/badge/FocusFlow-v1.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Node.js](https://img.shields.io/badge/node.js-18+-brightgreen.svg)
 ![React](https://img.shields.io/badge/react-18.3-blue.svg)
@@ -68,10 +68,10 @@ A beautiful, production-ready task management application with smart recurring t
 For a complete automated deployment on Ubuntu with Nginx, SSL, and all dependencies:
 
 ```bash
-# Download and extract ZenTasks
-wget https://github.com/your-repo/zentasks/archive/main.zip
+# Download and extract FocusFlow
+wget https://github.com/your-repo/focusflow/archive/main.zip
 unzip main.zip
-cd zentasks-main
+cd focusflow-main
 
 # Make setup script executable
 chmod +x setup.sh
@@ -93,8 +93,8 @@ For local development:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/zentasks.git
-cd zentasks
+git clone https://github.com/your-repo/focusflow.git
+cd focusflow
 
 # Install dependencies
 npm install
@@ -318,8 +318,8 @@ The application will be available at `http://localhost:5173`
 
 #### **Backup & Restore**
 - Automatic daily backups (via setup script)
-- Manual backup: `/usr/local/bin/backup-zentasks.sh`
-- Backup location: `/var/backups/zentasks/`
+- Manual backup: `/usr/local/bin/backup-focusflow.sh`
+- Backup location: `/var/backups/focusflow/`
 - Retention: 7 days of automatic backups
 
 #### **Data Export**
@@ -329,7 +329,7 @@ The application will be available at `http://localhost:5173`
 
 #### **Data Import**
 - Replace JSON files in `server/data/`
-- Restart application: `sudo -u zentasks pm2 restart zentasks`
+- Restart application: `sudo -u focusflow pm2 restart focusflow`
 - Verify data integrity via health check
 
 ## 🔧 Deployment
@@ -387,7 +387,7 @@ FRONTEND_URL=https://your-domain.com
 
 ## 🔄 Updates & Maintenance
 
-### Updating ZenTasks
+### Updating FocusFlow
 
 #### **Using Update Script (Recommended)**
 
@@ -395,7 +395,7 @@ For updating an existing installation:
 
 ```bash
 # Extract updated code over existing installation
-unzip zentasks-updated.zip
+unzip focusflow-updated.zip
 
 # Run update script
 chmod +x update.sh
@@ -429,16 +429,16 @@ chmod +x update.sh
 #### **Application Monitoring**
 ```bash
 # Check application status
-sudo -u zentasks pm2 list
+sudo -u focusflow pm2 list
 
 # View application logs
-sudo -u zentasks pm2 logs zentasks
+sudo -u focusflow pm2 logs focusflow
 
 # Monitor resources
-sudo -u zentasks pm2 monit
+sudo -u focusflow pm2 monit
 
 # Restart if needed
-sudo -u zentasks pm2 restart zentasks
+sudo -u focusflow pm2 restart focusflow
 ```
 
 #### **System Monitoring**
@@ -453,7 +453,7 @@ sudo tail -f /var/log/nginx/error.log
 sudo openssl x509 -enddate -noout -in /etc/letsencrypt/live/your-domain.com/cert.pem
 
 # View SSL renewal logs
-sudo tail -f /var/log/zentasks/ssl-renewal.log
+sudo tail -f /var/log/focusflow/ssl-renewal.log
 ```
 
 #### **Health Checks**
@@ -467,18 +467,18 @@ sudo tail -f /var/log/zentasks/ssl-renewal.log
 
 #### **Automatic Backups**
 - **Schedule**: Daily at 2:00 AM
-- **Location**: `/var/backups/zentasks/`
+- **Location**: `/var/backups/focusflow/`
 - **Retention**: 7 days
 - **Content**: User data and configurations
 
 #### **Manual Backup**
 ```bash
 # Create manual backup
-sudo /usr/local/bin/backup-zentasks.sh
+sudo /usr/local/bin/backup-focusflow.sh
 
 # Restore from backup
-sudo tar -xzf /var/backups/zentasks/zentasks-data-YYYYMMDD.tar.gz -C /var/www/zentasks/
-sudo systemctl restart zentasks
+sudo tar -xzf /var/backups/focusflow/focusflow-data-YYYYMMDD.tar.gz -C /var/www/focusflow/
+sudo systemctl restart focusflow
 ```
 
 ## 🔍 Troubleshooting
@@ -488,13 +488,13 @@ sudo systemctl restart zentasks
 #### **Application Won't Start**
 ```bash
 # Check PM2 status
-sudo -u zentasks pm2 list
+sudo -u focusflow pm2 list
 
 # View error logs
-sudo -u zentasks pm2 logs zentasks --err
+sudo -u focusflow pm2 logs focusflow --err
 
 # Restart application
-sudo -u zentasks pm2 restart zentasks
+sudo -u focusflow pm2 restart focusflow
 
 # Check port availability
 sudo netstat -tlnp | grep :3001
@@ -506,7 +506,7 @@ sudo netstat -tlnp | grep :3001
 sudo systemctl status nginx
 
 # Verify build files
-ls -la /var/www/zentasks/dist/
+ls -la /var/www/focusflow/dist/
 
 # Check Nginx configuration
 sudo nginx -t
@@ -535,19 +535,19 @@ sudo systemctl reload nginx
 sudo openssl x509 -enddate -noout -in /etc/letsencrypt/live/your-domain.com/cert.pem
 
 # Manual renewal
-sudo /usr/local/bin/zentasks-ssl-renewal.sh
+sudo /usr/local/bin/focusflow-ssl-renewal.sh
 
 # Check renewal logs
-sudo tail -f /var/log/zentasks/ssl-renewal.log
+sudo tail -f /var/log/focusflow/ssl-renewal.log
 ```
 
 #### **Database/Data Issues**
 ```bash
 # Check data files
-ls -la /var/www/zentasks/server/data/
+ls -la /var/www/focusflow/server/data/
 
 # Verify file permissions
-sudo chown -R zentasks:zentasks /var/www/zentasks/server/data/
+sudo chown -R focusflow:focusflow /var/www/focusflow/server/data/
 
 # Check API health
 curl http://localhost:3001/api/health
@@ -570,10 +570,10 @@ curl http://localhost:3001/api/health
 ### Getting Help
 
 #### **Log Locations**
-- **Application**: `sudo -u zentasks pm2 logs zentasks`
+- **Application**: `sudo -u focusflow pm2 logs focusflow`
 - **Nginx Access**: `/var/log/nginx/access.log`
 - **Nginx Errors**: `/var/log/nginx/error.log`
-- **SSL Renewal**: `/var/log/zentasks/ssl-renewal.log`
+- **SSL Renewal**: `/var/log/focusflow/ssl-renewal.log`
 - **System**: `journalctl -u nginx`
 
 #### **Support Resources**
@@ -610,7 +610,7 @@ curl http://localhost:3001/api/health
 ### File Structure
 
 ```
-zentasks/
+focusflow/
 ├── src/                    # Frontend React application
 │   ├── components/         # React components
 │   │   ├── AddTaskModal.tsx      # Enhanced with meal/day selection
@@ -689,8 +689,8 @@ zentasks/
 
 ```bash
 # Clone repository
-git clone https://github.com/your-repo/zentasks.git
-cd zentasks
+git clone https://github.com/your-repo/focusflow.git
+cd focusflow
 
 # Install dependencies
 npm install
@@ -748,4 +748,4 @@ For support and questions:
 
 ---
 
-**ZenTasks** - Bringing zen to your task management experience with smart notifications and beautiful design! 🧘‍♀️✨🔔
+**FocusFlow** - Bringing zen to your task management experience with smart notifications and beautiful design! 🧘‍♀️✨🔔

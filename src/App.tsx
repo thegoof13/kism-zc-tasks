@@ -17,7 +17,7 @@ function LoadingSpinner() {
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center">
       <div className="text-center">
         <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-500 rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-neutral-600 dark:text-neutral-400">Loading ZenTasks...</p>
+        <p className="text-neutral-600 dark:text-neutral-400">Loading FocusFlow...</p>
       </div>
     </div>
   );
@@ -71,7 +71,7 @@ function AppContent() {
     
     // Normal profile selection logic
     if (!state.loading && state.profiles.length > 0) {
-      const savedProfileId = localStorage.getItem('zentasks_active_profile');
+      const savedProfileId = localStorage.getItem('focusflow_active_profile');
       const hasValidSavedProfile = savedProfileId && state.profiles.some(p => p.id === savedProfileId);
       
       // If no valid saved profile or no active profile set, show profile selection
@@ -99,7 +99,7 @@ function AppContent() {
             <Plus className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
-            Welcome to ZenTasks
+            Welcome to FocusFlow
           </h2>
           <p className="text-neutral-600 dark:text-neutral-400 mb-6 max-w-md mx-auto">
             Please select a profile to continue
@@ -198,7 +198,7 @@ function AppContent() {
                 <Plus className="w-8 h-8 text-white" />
               </div>
               <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
-                Welcome to ZenTasks
+                Welcome to FocusFlow
               </h2>
               <p className="text-neutral-600 dark:text-neutral-400 mb-6 max-w-md mx-auto">
                 {isViewOnlyMode 

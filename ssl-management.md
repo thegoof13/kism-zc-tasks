@@ -1,6 +1,6 @@
 # SSL Certificate Management with Cloudflare DNS
 
-This document explains how SSL certificates are managed in the ZenTasks deployment using Cloudflare DNS challenges.
+This document explains how SSL certificates are managed in the FocusFlow deployment using Cloudflare DNS challenges.
 
 ## Overview
 
@@ -38,7 +38,7 @@ The system performs automatic renewal checks every **Monday at 3:00 AM** using a
 
 ### Renewal Logic
 
-The renewal script (`/usr/local/bin/zentasks-ssl-renewal.sh`) follows this process:
+The renewal script (`/usr/local/bin/focusflow-ssl-renewal.sh`) follows this process:
 
 1. **Check certificate expiry date**
 2. **If expires within 21 days:**
@@ -54,7 +54,7 @@ The renewal script (`/usr/local/bin/zentasks-ssl-renewal.sh`) follows this proce
 You can manually trigger a renewal check:
 
 ```bash
-sudo /usr/local/bin/zentasks-ssl-renewal.sh
+sudo /usr/local/bin/focusflow-ssl-renewal.sh
 ```
 
 ## File Locations
@@ -64,11 +64,11 @@ sudo /usr/local/bin/zentasks-ssl-renewal.sh
 - **Cloudflare credentials**: `/etc/letsencrypt/cloudflare/cloudflare.ini`
 
 ### Logs
-- **Renewal logs**: `/var/log/zentasks/ssl-renewal.log`
+- **Renewal logs**: `/var/log/focusflow/ssl-renewal.log`
 - **Certbot logs**: `/var/log/letsencrypt/`
 
 ### Scripts
-- **Renewal script**: `/usr/local/bin/zentasks-ssl-renewal.sh`
+- **Renewal script**: `/usr/local/bin/focusflow-ssl-renewal.sh`
 
 ## Monitoring
 
@@ -82,7 +82,7 @@ sudo openssl x509 -text -noout -in /etc/letsencrypt/live/your-domain.com/cert.pe
 sudo openssl x509 -enddate -noout -in /etc/letsencrypt/live/your-domain.com/cert.pem
 
 # View renewal logs
-sudo tail -f /var/log/zentasks/ssl-renewal.log
+sudo tail -f /var/log/focusflow/ssl-renewal.log
 ```
 
 ### Verify SSL Configuration
@@ -133,10 +133,10 @@ If SSL issues occur, you can temporarily disable HTTPS:
 
 ```bash
 # Backup current config
-sudo cp /etc/nginx/sites-available/zentasks /etc/nginx/sites-available/zentasks.ssl.backup
+sudo cp /etc/nginx/sites-available/focusflow /etc/nginx/sites-available/focusflow.ssl.backup
 
 # Use HTTP-only config
-sudo cp /etc/nginx/sites-available/zentasks.http /etc/nginx/sites-available/zentasks
+sudo cp /etc/nginx/sites-available/focusflow.http /etc/nginx/sites-available/focusflow
 
 # Reload Nginx
 sudo nginx -t && sudo systemctl reload nginx
@@ -168,7 +168,7 @@ The renewal cron job is configured as:
 
 ```bash
 # Check every Monday at 3 AM
-0 3 * * 1 /usr/local/bin/zentasks-ssl-renewal.sh
+0 3 * * 1 /usr/local/bin/focusflow-ssl-renewal.sh
 ```
 
 ### Why Monday at 3 AM?
@@ -185,7 +185,7 @@ The renewal cron job is configured as:
 To change the 21-day renewal threshold, edit the renewal script:
 
 ```bash
-sudo nano /usr/local/bin/zentasks-ssl-renewal.sh
+sudo nano /usr/local/bin/focusflow-ssl-renewal.sh
 
 # Change this line:
 if [[ $days_until_expiry -le 21 ]]; then
@@ -232,7 +232,7 @@ echo "SSL certificate renewal failed for $DOMAIN" | mail -s "SSL Renewal Failed"
 
 For SSL-related issues:
 
-1. Check renewal logs: `/var/log/zentasks/ssl-renewal.log`
+1. Check renewal logs: `/var/log/focusflow/ssl-renewal.log`
 2. Verify Cloudflare API access
 3. Test DNS propagation
 4. Check Nginx configuration

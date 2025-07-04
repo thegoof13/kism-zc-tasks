@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# ZenTasks Update Script
-# This script updates an existing ZenTasks installation with new code
+# FocusFlow Update Script
+# This script updates an existing FocusFlow installation with new code
 # It does NOT modify SSL certificates or Nginx configuration
 # Now includes Kiosk Portal update support
 
@@ -15,10 +15,10 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-APP_NAME="zentasks"
-APP_USER="zentasks"
-APP_DIR="/var/www/zentasks"
-BACKUP_DIR="/var/backups/zentasks"
+APP_NAME="focusflow"
+APP_USER="focusflow"
+APP_DIR="/var/www/focusflow"
+BACKUP_DIR="/var/backups/focusflow"
 DATE=$(date +%Y%m%d_%H%M%S)
 
 # Function to print colored output
@@ -54,23 +54,23 @@ check_sudo() {
     fi
 }
 
-# Function to check if ZenTasks is installed
+# Function to check if FocusFlow is installed
 check_installation() {
     if [[ ! -d "$APP_DIR" ]]; then
-        print_error "ZenTasks installation not found at $APP_DIR"
+        print_error "FocusFlow installation not found at $APP_DIR"
         print_error "Please run the initial setup.sh script first"
         exit 1
     fi
 
     if ! id "$APP_USER" &>/dev/null; then
-        print_error "ZenTasks user '$APP_USER' not found"
+        print_error "FocusFlow user '$APP_USER' not found"
         print_error "Please run the initial setup.sh script first"
         exit 1
     fi
 
     if [[ ! -f "$APP_DIR/package.json" ]]; then
         print_error "package.json not found in $APP_DIR"
-        print_error "This doesn't appear to be a valid ZenTasks installation"
+        print_error "This doesn't appear to be a valid FocusFlow installation"
         exit 1
     fi
 }
@@ -107,7 +107,7 @@ create_backup() {
     sudo mkdir -p "$BACKUP_DIR"
     
     # Create backup with timestamp
-    BACKUP_FILE="$BACKUP_DIR/zentasks-backup-$DATE.tar.gz"
+    BACKUP_FILE="$BACKUP_DIR/focusflow-backup-$DATE.tar.gz"
     
     # Backup application directory (excluding node_modules for space)
     sudo tar -czf "$BACKUP_FILE" \
@@ -119,7 +119,7 @@ create_backup() {
     print_success "Backup created: $BACKUP_FILE"
     
     # Keep only last 5 backups
-    sudo find "$BACKUP_DIR" -name "zentasks-backup-*.tar.gz" -type f | \
+    sudo find "$BACKUP_DIR" -name "focusflow-backup-*.tar.gz" -type f | \
         sort -r | tail -n +6 | xargs -r sudo rm -f
     
     print_status "Cleaned up old backups (keeping last 5)"
@@ -127,11 +127,11 @@ create_backup() {
 
 # Function to stop the application
 stop_application() {
-    print_status "Stopping ZenTasks application..."
+    print_status "Stopping FocusFlow application..."
     
     # Stop PM2 process
-    if sudo -u "$APP_USER" pm2 list | grep -q zentasks; then
-        sudo -u "$APP_USER" pm2 stop zentasks
+    if sudo -u "$APP_USER" pm2 list | grep -q focusflow; then
+        sudo -u "$APP_USER" pm2 stop focusflow
         print_success "Application stopped"
     else
         print_warning "Application was not running"
@@ -145,10 +145,10 @@ update_application_files() {
     # Get current directory (where the update script is located)
     CURRENT_DIR=$(pwd)
     
-    # Verify we're in a ZenTasks project directory
+    # Verify we're in a FocusFlow project directory
     if [[ ! -f "$CURRENT_DIR/package.json" ]]; then
         print_error "package.json not found in current directory"
-        print_error "Please run this script from the ZenTasks project directory"
+        print_error "Please run this script from the FocusFlow project directory"
         exit 1
     fi
     
@@ -199,7 +199,7 @@ update_kiosk_portal() {
             
             # Create kiosk config file
             cat > /tmp/kiosk-config.txt << EOF
-# ZenTasks Kiosk Portal Configuration
+# FocusFlow Kiosk Portal Configuration
 # Generated on: $(date)
 
 KIOSK_ENABLED=true
@@ -328,13 +328,13 @@ update_pm2_config() {
 
 # Function to start the application
 start_application() {
-    print_status "Starting ZenTasks application..."
+    print_status "Starting FocusFlow application..."
     
     cd "$APP_DIR"
     
     # Start or restart the application
-    if sudo -u "$APP_USER" pm2 list | grep -q zentasks; then
-        sudo -u "$APP_USER" pm2 restart zentasks
+    if sudo -u "$APP_USER" pm2 list | grep -q focusflow; then
+        sudo -u "$APP_USER" pm2 restart focusflow
         print_success "Application restarted"
     else
         sudo -u "$APP_USER" pm2 start ecosystem.config.cjs
@@ -348,11 +348,11 @@ start_application() {
     sleep 3
     
     # Check if application is running
-    if sudo -u "$APP_USER" pm2 list | grep -q "zentasks.*online"; then
+    if sudo -u "$APP_USER" pm2 list | grep -q "focusflow.*online"; then
         print_success "Application is running successfully"
     else
         print_error "Application failed to start properly"
-        print_status "Check logs with: sudo -u $APP_USER pm2 logs zentasks"
+        print_status "Check logs with: sudo -u $APP_USER pm2 logs focusflow"
         exit 1
     fi
 }
@@ -378,7 +378,7 @@ verify_update() {
     
     if [[ $attempt -gt $max_attempts ]]; then
         print_warning "Application health check failed, but this might be normal if the backend is not configured"
-        print_status "Check application logs: sudo -u $APP_USER pm2 logs zentasks"
+        print_status "Check application logs: sudo -u $APP_USER pm2 logs focusflow"
     fi
     
     # Check if static files are being served
@@ -393,7 +393,7 @@ verify_update() {
 # Function to display update summary
 display_update_summary() {
     echo
-    echo -e "${GREEN}=== ZenTasks Update Complete ===${NC}"
+    echo -e "${GREEN}=== FocusFlow Update Complete ===${NC}"
     echo
     print_success "Application has been updated successfully"
     print_success "Backup created: $BACKUP_FILE"
@@ -411,13 +411,13 @@ display_update_summary() {
     echo
     print_status "Useful commands:"
     echo "  View application status: sudo -u $APP_USER pm2 list"
-    echo "  View application logs: sudo -u $APP_USER pm2 logs zentasks"
-    echo "  Restart application: sudo -u $APP_USER pm2 restart zentasks"
+    echo "  View application logs: sudo -u $APP_USER pm2 logs focusflow"
+    echo "  Restart application: sudo -u $APP_USER pm2 restart focusflow"
     echo "  View Nginx status: sudo systemctl status nginx"
     echo "  View Nginx logs: sudo tail -f /var/log/nginx/error.log"
     echo
     print_status "If you encounter issues:"
-    echo "  1. Check application logs: sudo -u $APP_USER pm2 logs zentasks"
+    echo "  1. Check application logs: sudo -u $APP_USER pm2 logs focusflow"
     echo "  2. Check Nginx logs: sudo tail -f /var/log/nginx/error.log"
     echo "  3. Restore from backup if needed: $BACKUP_FILE"
     echo
@@ -444,7 +444,7 @@ rollback_update() {
         print_status "Rolling back to previous version..."
         
         # Stop current application
-        sudo -u "$APP_USER" pm2 stop zentasks 2>/dev/null || true
+        sudo -u "$APP_USER" pm2 stop focusflow 2>/dev/null || true
         
         # Restore from backup
         if [[ -f "$BACKUP_FILE" ]]; then
@@ -468,7 +468,7 @@ rollback_update() {
 main() {
     echo -e "${BLUE}"
     echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║                    ZenTasks Update Script                   ║"
+    echo "║                    FocusFlow Update Script                   ║"
     echo "║              Update Existing Installation                   ║"
     echo "║          (Does not modify SSL or Nginx config)             ║"
     echo "║              Now with Kiosk Portal Support                 ║"
@@ -483,7 +483,7 @@ main() {
     check_installation
     detect_kiosk_config
     
-    print_status "Starting ZenTasks update process..."
+    print_status "Starting FocusFlow update process..."
     
     create_backup
     stop_application

@@ -528,7 +528,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'SET_ACTIVE_PROFILE': {
       // Save the active profile ID to localStorage
-      localStorage.setItem('zentasks_active_profile', action.profileId);
+      localStorage.setItem('focusflow_active_profile', action.profileId);
       
       return {
         ...state,
@@ -661,7 +661,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         
         // Load active profile from localStorage if available
-        const savedProfileId = localStorage.getItem('zentasks_active_profile');
+        const savedProfileId = localStorage.getItem('focusflow_active_profile');
         if (savedProfileId && userData.profiles.some((p: any) => p.id === savedProfileId)) {
           userData.activeProfileId = savedProfileId;
         }

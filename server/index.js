@@ -335,7 +335,7 @@ async function startServer() {
   try {
     await ensureDataDir();
     app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 ZenTasks server running on port ${PORT}`);
+      console.log(`🚀 FocusFlow server running on port ${PORT}`);
       console.log(`📁 Data directory: ${DATA_DIR}`);
       console.log(`🤖 AI logging enabled: ${AI_LOG_FILE}`);
       console.log(`🌐 API available at: http://localhost:${PORT}/api`);

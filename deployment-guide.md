@@ -1,4 +1,4 @@
-# ZenTasks Deployment Guide
+# FocusFlow Deployment Guide
 
 ## Prerequisites
 
@@ -12,8 +12,8 @@
 
 ```bash
 # Clone the repository
-git clone <your-repo-url> zentasks
-cd zentasks
+git clone <your-repo-url> focusflow
+cd focusflow
 
 # Install dependencies
 npm install
@@ -42,7 +42,7 @@ npm install -g pm2
 cat > ecosystem.config.js << 'EOF'
 module.exports = {
   apps: [{
-    name: 'zentasks',
+    name: 'focusflow',
     script: 'server/index.js',
     instances: 1,
     autorestart: true,
@@ -66,18 +66,18 @@ pm2 startup
 
 ```bash
 # Copy the example nginx config
-sudo cp nginx.conf.example /etc/nginx/sites-available/zentasks
+sudo cp nginx.conf.example /etc/nginx/sites-available/focusflow
 
 # Edit the configuration file
-sudo nano /etc/nginx/sites-available/zentasks
+sudo nano /etc/nginx/sites-available/focusflow
 
 # Update the following in the config:
 # - server_name: your actual domain
 # - ssl_certificate paths (if using HTTPS)
-# - root path: /path/to/zentasks/dist
+# - root path: /path/to/focusflow/dist
 
 # Enable the site
-sudo ln -s /etc/nginx/sites-available/zentasks /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/focusflow /etc/nginx/sites-enabled/
 
 # Test nginx configuration
 sudo nginx -t
@@ -118,7 +118,7 @@ sudo certbot --nginx -d your-domain.com
 ## File Structure
 
 ```
-zentasks/
+focusflow/
 ├── dist/                 # Built frontend files (served by Nginx)
 ├── server/              # Backend Node.js application
 │   ├── data/           # JSON data files
@@ -137,13 +137,13 @@ zentasks/
 pm2 list
 
 # View logs
-pm2 logs zentasks
+pm2 logs focusflow
 
 # Restart application
-pm2 restart zentasks
+pm2 restart focusflow
 
 # Stop application
-pm2 stop zentasks
+pm2 stop focusflow
 
 # Monitor resources
 pm2 monit
@@ -178,7 +178,7 @@ cp -r server/data/ backup-$(date +%Y%m%d)/
 
 1. **502 Bad Gateway**: Backend not running
    - Check: `pm2 list`
-   - Restart: `pm2 restart zentasks`
+   - Restart: `pm2 restart focusflow`
 
 2. **404 on API calls**: Nginx proxy not configured
    - Check nginx config `/api/` location block
@@ -194,7 +194,7 @@ cp -r server/data/ backup-$(date +%Y%m%d)/
 
 ### Logs
 
-- Application logs: `pm2 logs zentasks`
+- Application logs: `pm2 logs focusflow`
 - Nginx access: `/var/log/nginx/access.log`
 - Nginx errors: `/var/log/nginx/error.log`
 - System logs: `journalctl -u nginx`
@@ -214,7 +214,7 @@ npm install
 npm run build
 
 # Restart backend
-pm2 restart zentasks
+pm2 restart focusflow
 
 # Reload nginx (if config changed)
 sudo systemctl reload nginx
