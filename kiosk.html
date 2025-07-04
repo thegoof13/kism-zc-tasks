@@ -48,14 +48,15 @@
             position: relative;
         }
 
-        /* Bouncing Logo */
+        /* Bouncing Logo - Behind profile cards */
         .logo {
             position: absolute;
             width: 120px;
             height: auto;
             pointer-events: none;
-            z-index: 5;
+            z-index: 1; /* Behind profile cards (z-index: 10) */
             transition: all 0.1s ease-out;
+            opacity: 0.3; /* Subtle so it doesn't interfere with reading */
         }
 
         /* Main Content - Now takes full screen */
@@ -77,6 +78,8 @@
             max-width: 1200px;
             width: 100%;
             animation: fadeIn 0.8s ease-out;
+            z-index: 10; /* Above the bouncing logo */
+            position: relative;
         }
 
         .profile-card {
@@ -94,6 +97,7 @@
             flex-direction: column;
             justify-content: center;
             animation: cardFloat 6s ease-in-out infinite;
+            z-index: 10; /* Above the bouncing logo */
         }
 
         .profile-card:nth-child(2n) {
@@ -279,6 +283,8 @@
             width: 100%;
             max-width: 1000px;
             animation: slideIn 0.6s ease-out;
+            z-index: 10; /* Above the bouncing logo */
+            position: relative;
         }
 
         .task-list.active {
@@ -323,6 +329,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            z-index: 10; /* Above the bouncing logo */
         }
 
         .task-button:hover {
@@ -480,24 +487,24 @@
             100% { transform: rotate(360deg) scale(1); }
         }
 
-        /* Fullscreen Button */
+        /* Fullscreen Button - Very dark grey icon only, no visible box */
         .fullscreen-button {
             position: fixed;
             top: 1rem;
             right: 1rem;
-            background: rgba(79, 70, 229, 0.8);
+            background: transparent; /* No background */
             border: none;
-            border-radius: 12px;
             padding: 0.75rem;
-            color: white;
+            color: #1f2937; /* Very dark grey - barely visible */
             cursor: pointer;
             font-size: 1.2rem;
             transition: all 0.3s ease;
             z-index: 100;
+            opacity: 0.3; /* Very subtle */
         }
 
         .fullscreen-button:hover {
-            background: rgba(79, 70, 229, 1);
+            opacity: 0.6; /* Slightly more visible on hover */
             transform: scale(1.1);
         }
 
@@ -517,9 +524,10 @@
     </style>
 </head>
 <body>
+    <!-- Very dark grey fullscreen button - barely visible -->
     <button class="fullscreen-button" onclick="toggleFullscreen()" title="Toggle Fullscreen">⛶</button>
     
-    <!-- Bouncing Logo -->
+    <!-- Bouncing Logo - Behind everything -->
     <img id="logo" class="logo" src="/image.png" alt="ZenTasks Logo" />
     
     <div class="container">
@@ -966,7 +974,7 @@
             hideIdleWarning();
         }
 
-        // Logo Bouncing Animation
+        // Logo Bouncing Animation - Behind profile cards
         function startLogoBounce() {
             let dx = 2;
             let dy = 2;
