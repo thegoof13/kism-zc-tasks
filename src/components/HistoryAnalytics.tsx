@@ -1,6 +1,6 @@
 import React from 'react';
 import { TrendingUp, Users, Calendar, Target, Award, Clock, Crown, RefreshCw, CheckCircle, Eye, Trophy, Medal, Star } from 'lucide-react';
-import { HistoryEntry, Task, UserProfile } from '../types';
+import { HistoryEntry, Task } from '../types';
 
 interface HistoryAnalyticsProps {
   history: HistoryEntry[];
@@ -38,21 +38,13 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
   const uncheckedActions = recentHistory.filter(entry => entry.action === 'unchecked');
   const resetActions = recentHistory.filter(entry => entry.action === 'reset');
   const restoredActions = recentHistory.filter(entry => entry.action === 'restored');
+  const autoResetActions = recentHistory.filter(entry => entry.action === 'auto-reset');
 
   // Calculate reset tasks in last 2 months (manual resets before due date)
-  const resetTasksCount = twoMonthHistory.filter(entry => {
-    if (entry.action !== 'reset') return false;
-    
-    // Find the task to check if it had a due date
-    const task = tasks.find(t => t.id === entry.taskId);
-    if (!task || !task.dueDate) return false;
-    
-    // Check if reset was done before the due date
-    const resetDate = new Date(entry.timestamp);
-    const dueDate = new Date(task.dueDate);
-    
-    return resetDate < dueDate;
-  }).length;
+  // Include both 'reset' and 'auto-reset' actions
+  const resetTasksCount = twoMonthHistory.filter(entry => 
+    entry.action === 'reset' || entry.action === 'auto-reset'
+  ).length;
 
   // Calculate productivity by day of week
   const dayStats = Array.from({ length: 7 }, (_, i) => {
@@ -353,7 +345,7 @@ export function HistoryAnalytics({ history, tasks, profiles }: HistoryAnalyticsP
             <h5 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">
               No Collaborative Tasks Yet
             </h5>
-            <p className="text-neutral-600 dark:text-neutral-400 max-w-md mx-auto">
+            <p className="text-neutral-600 dark:text-neutral-400">
               Create tasks assigned to multiple people to see collaboration statistics. 
               Tasks assigned to only one person don't count toward collaboration metrics.
             </p>
@@ -687,7 +679,7 @@ function RecentActivitySection({
           <div className="flex items-center space-x-2">
             <RefreshCw className="w-4 h-4 text-warning-600 dark:text-warning-400" />
             <p className="text-sm text-warning-700 dark:text-warning-400">
-              <strong>{resetTasksCount}</strong> tasks were reset before their due date in the last 2 months. 
+              <strong>{resetTasksCount}</strong> tasks were reset in the last 2 months. 
               This may indicate incorrect recurrence scheduling.
             </p>
           </div>
