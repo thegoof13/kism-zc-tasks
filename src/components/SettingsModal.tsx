@@ -74,7 +74,6 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
     { id: 'history' as TabType, name: 'History', icon: History },
     { id: 'ai' as TabType, name: 'AI Assistant', icon: Brain },
     { id: 'security' as TabType, name: 'Security', icon: Shield },
-    { id: 'data' as TabType, name: 'Data', icon: Database },
   ];
 
   const handleSaveProfile = () => {
@@ -961,6 +960,241 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        );
+
+      case 'data':
+        return (
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+              Data Management
+            </h3>
+            
+            {/* Data Statistics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="card p-4 text-center">
+                <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <BarChart3 className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+                </div>
+                <p className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+                  {state.tasks.length}
+                </p>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  Tasks
+                </p>
+              </div>
+              
+              <div className="card p-4 text-center">
+                <div className="w-12 h-12 bg-success-100 dark:bg-success-900/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <Users className="w-6 h-6 text-success-600 dark:text-success-400" />
+                </div>
+                <p className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+                  {state.groups.length}
+                </p>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  Groups
+                </p>
+              </div>
+              
+              <div className="card p-4 text-center">
+                <div className="w-12 h-12 bg-warning-100 dark:bg-warning-900/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <User className="w-6 h-6 text-warning-600 dark:text-warning-400" />
+                </div>
+                <p className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+                  {state.profiles.length}
+                </p>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  Profiles
+                </p>
+              </div>
+              
+              <div className="card p-4 text-center">
+                <div className="w-12 h-12 bg-accent-100 dark:bg-accent-900/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <History className="w-6 h-6 text-accent-600 dark:text-accent-400" />
+                </div>
+                <p className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+                  {state.history.length}
+                </p>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  History Entries
+                </p>
+              </div>
+            </div>
+
+            {/* Export Data */}
+            <div className="card p-6">
+              <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
+                Export Data
+              </h4>
+              <p className="text-neutral-600 dark:text-neutral-400 mb-4">
+                Download your data for backup or migration purposes.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/data/1/download');
+                      if (response.ok) {
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `focusflow-data-${new Date().toISOString().split('T')[0]}.json`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                      } else {
+                        alert('Failed to download data');
+                      }
+                    } catch (error) {
+                      console.error('Download error:', error);
+                      alert('Failed to download data');
+                    }
+                  }}
+                  className="flex items-center justify-center space-x-2 p-4 bg-primary-100 dark:bg-primary-900/20 hover:bg-primary-200 dark:hover:bg-primary-900/30 rounded-lg transition-colors duration-200"
+                >
+                  <Download className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                  <span className="font-medium text-primary-700 dark:text-primary-300">
+                    Download JSON Data
+                  </span>
+                </button>
+                
+                <button
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/activity/download');
+                      if (response.ok) {
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `focusflow-activity-${new Date().toISOString().split('T')[0]}.log`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                      } else {
+                        alert('Failed to download activity log');
+                      }
+                    } catch (error) {
+                      console.error('Download error:', error);
+                      alert('Failed to download activity log');
+                    }
+                  }}
+                  className="flex items-center justify-center space-x-2 p-4 bg-success-100 dark:bg-success-900/20 hover:bg-success-200 dark:hover:bg-success-900/30 rounded-lg transition-colors duration-200"
+                >
+                  <Download className="w-5 h-5 text-success-600 dark:text-success-400" />
+                  <span className="font-medium text-success-700 dark:text-success-300">
+                    Download Activity Log
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Import Data */}
+            <div className="card p-6">
+              <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
+                Import Data
+              </h4>
+              <div className="bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-lg p-4 mb-4">
+                <p className="text-warning-800 dark:text-warning-200 text-sm font-medium mb-2">
+                  ⚠️ Warning: Data Import
+                </p>
+                <ul className="text-warning-700 dark:text-warning-300 text-sm space-y-1">
+                  <li>• This will completely replace all current data</li>
+                  <li>• Export your current data first as backup</li>
+                  <li>• Only import JSON files exported from FocusFlow</li>
+                  <li>• This action cannot be undone</li>
+                </ul>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    
+                    if (!confirm('Are you sure you want to import this data? This will replace ALL current data and cannot be undone.')) {
+                      e.target.value = '';
+                      return;
+                    }
+                    
+                    try {
+                      const text = await file.text();
+                      const importedData = JSON.parse(text);
+                      
+                      // Basic validation
+                      if (!importedData.tasks || !importedData.groups || !importedData.profiles) {
+                        alert('Invalid data file. Missing required properties.');
+                        return;
+                      }
+                      
+                      // Save imported data
+                      const response = await fetch('/api/data/1', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(importedData)
+                      });
+                      
+                      if (response.ok) {
+                        alert('Data imported successfully! The page will reload.');
+                        window.location.reload();
+                      } else {
+                        alert('Failed to import data');
+                      }
+                    } catch (error) {
+                      console.error('Import error:', error);
+                      alert('Failed to import data. Please check the file format.');
+                    }
+                    
+                    e.target.value = '';
+                  }}
+                  className="flex-1 input-primary"
+                />
+                <Upload className="w-5 h-5 text-neutral-500" />
+              </div>
+              
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
+                Select a JSON file exported from FocusFlow to import your data.
+              </p>
+            </div>
+
+            {/* Data Storage Information */}
+            <div className="card p-6">
+              <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
+                Data Storage Information
+              </h4>
+              <div className="space-y-3 text-sm text-neutral-600 dark:text-neutral-400">
+                <div className="flex items-start space-x-2">
+                  <div className="w-2 h-2 bg-primary-500 rounded-full mt-2 flex-shrink-0"></div>
+                  <p>
+                    <strong>JSON Data:</strong> All application data (tasks, groups, profiles, settings) is stored in a JSON file on the server
+                  </p>
+                </div>
+                <div className="flex items-start space-x-2">
+                  <div className="w-2 h-2 bg-success-500 rounded-full mt-2 flex-shrink-0"></div>
+                  <p>
+                    <strong>Activity Log:</strong> All user actions and history are logged to a separate activity log file for data integrity
+                  </p>
+                </div>
+                <div className="flex items-start space-x-2">
+                  <div className="w-2 h-2 bg-warning-500 rounded-full mt-2 flex-shrink-0"></div>
+                  <p>
+                    <strong>Browser Storage:</strong> Only profile selection, PIN numbers, and task group expand/collapse states are stored locally
+                  </p>
+                </div>
+                <div className="flex items-start space-x-2">
+                  <div className="w-2 h-2 bg-accent-500 rounded-full mt-2 flex-shrink-0"></div>
+                  <p>
+                    <strong>Data Integrity:</strong> The activity log serves as the source of truth for all user actions and can be used to reconstruct data if needed
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         );
