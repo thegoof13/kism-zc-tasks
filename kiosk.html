@@ -281,7 +281,7 @@
         .task-list {
             display: none;
             width: 100%;
-            max-width: 1000px;
+            max-width: 1200px;
             animation: slideIn 0.6s ease-out;
             z-index: 10; /* Above the bouncing logo */
             position: relative;
@@ -308,10 +308,13 @@
             color: #9ca3af;
         }
 
+        /* Centrally arranged grid for tasks */
         .tasks-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 1.5rem;
+            justify-content: center;
+            align-items: start;
         }
 
         .task-button {
@@ -372,6 +375,32 @@
         .task-button.completed .task-title,
         .task-button.completed .task-meta {
             opacity: 0.7;
+        }
+
+        /* Priority indicators for different recurrence types */
+        .task-button.priority-daily {
+            border-color: #ef4444;
+            background: linear-gradient(135deg, #450a0a 0%, #7f1d1d 100%);
+        }
+
+        .task-button.priority-days {
+            border-color: #f59e0b;
+            background: linear-gradient(135deg, #451a03 0%, #92400e 100%);
+        }
+
+        .task-button.priority-meals {
+            border-color: #10b981;
+            background: linear-gradient(135deg, #022c22 0%, #064e3b 100%);
+        }
+
+        .task-button.priority-weekly {
+            border-color: #8b5cf6;
+            background: linear-gradient(135deg, #2e1065 0%, #5b21b6 100%);
+        }
+
+        .task-button.priority-other {
+            border-color: #6b7280;
+            background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
         }
 
         /* Idle Warning Toast */
@@ -607,6 +636,19 @@
         const pinError = document.getElementById('pinError');
         const logo = document.getElementById('logo');
 
+        // Recurrence priority order
+        const recurrencePriority = {
+            'daily': 1,
+            'meals': 2,
+            'days': 3,
+            'weekly': 4,
+            'fortnightly': 5,
+            'monthly': 6,
+            'quarterly': 7,
+            'half-yearly': 8,
+            'yearly': 9
+        };
+
         // Initialize
         document.addEventListener('DOMContentLoaded', async () => {
             await loadUserData();
@@ -732,22 +774,23 @@
                 task.profiles.includes(currentUser.id)
             );
 
-            // Group tasks by group
-            const tasksByGroup = {};
-            userTasks.forEach(task => {
-                const group = userData.groups.find(g => g.id === task.groupId);
-                const groupName = group ? group.name : 'Other';
+            // Sort tasks by recurrence priority (daily first, then specific days, then weekly, etc.)
+            const sortedTasks = userTasks.sort((a, b) => {
+                const priorityA = recurrencePriority[a.recurrence] || 999;
+                const priorityB = recurrencePriority[b.recurrence] || 999;
                 
-                if (!tasksByGroup[groupName]) {
-                    tasksByGroup[groupName] = [];
+                if (priorityA !== priorityB) {
+                    return priorityA - priorityB;
                 }
-                tasksByGroup[groupName].push(task);
+                
+                // If same priority, sort by title
+                return a.title.localeCompare(b.title);
             });
 
             // Clear and populate tasks
             tasksGrid.innerHTML = '';
             
-            if (userTasks.length === 0) {
+            if (sortedTasks.length === 0) {
                 tasksGrid.innerHTML = `
                     <div style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
                         <h3 style="font-size: 2rem; margin-bottom: 1rem; color: #9ca3af;">No Tasks Found</h3>
@@ -757,43 +800,50 @@
                 return;
             }
 
-            // Add tasks grouped by category
-            Object.entries(tasksByGroup).forEach(([groupName, tasks]) => {
-                // Add group header
-                const groupHeader = document.createElement('div');
-                groupHeader.style.gridColumn = '1 / -1';
-                groupHeader.style.textAlign = 'center';
-                groupHeader.style.margin = '2rem 0 1rem 0';
-                groupHeader.innerHTML = `
-                    <h3 style="font-size: 1.8rem; color: #4f46e5; font-weight: 600;">${groupName}</h3>
+            // Add tasks in priority order
+            sortedTasks.forEach(task => {
+                const taskButton = document.createElement('div');
+                
+                // Get priority class for styling
+                const priorityClass = getPriorityClass(task.recurrence);
+                
+                taskButton.className = `task-button ${task.isCompleted ? 'completed' : ''} ${priorityClass}`;
+                
+                const group = userData.groups.find(g => g.id === task.groupId);
+                const recurrenceLabel = getRecurrenceLabel(task.recurrence, task.recurrenceConfig);
+                
+                taskButton.innerHTML = `
+                    <div class="task-title">${task.title}</div>
+                    <div class="task-meta">${group ? group.name : 'Other'} • ${recurrenceLabel}</div>
                 `;
-                tasksGrid.appendChild(groupHeader);
-
-                // Add tasks
-                tasks.forEach(task => {
-                    const taskButton = document.createElement('div');
-                    taskButton.className = `task-button ${task.isCompleted ? 'completed' : ''}`;
-                    
-                    const group = userData.groups.find(g => g.id === task.groupId);
-                    const recurrenceLabel = getRecurrenceLabel(task.recurrence, task.recurrenceConfig);
-                    
-                    taskButton.innerHTML = `
-                        <div class="task-title">${task.title}</div>
-                        <div class="task-meta">${group ? group.name : 'Other'} • ${recurrenceLabel}</div>
-                    `;
-                    
-                    if (!task.isCompleted) {
-                        taskButton.addEventListener('click', () => completeTask(task));
-                    }
-                    
-                    tasksGrid.appendChild(taskButton);
-                });
+                
+                if (!task.isCompleted) {
+                    taskButton.addEventListener('click', () => completeTask(task));
+                }
+                
+                tasksGrid.appendChild(taskButton);
             });
 
             // Update subtitle with progress
             const completedCount = userTasks.filter(t => t.isCompleted).length;
             const totalCount = userTasks.length;
             taskHeaderSubtitle.textContent = `${completedCount} of ${totalCount} completed`;
+        }
+
+        function getPriorityClass(recurrence) {
+            switch (recurrence) {
+                case 'daily':
+                    return 'priority-daily';
+                case 'days':
+                    return 'priority-days';
+                case 'meals':
+                    return 'priority-meals';
+                case 'weekly':
+                case 'fortnightly':
+                    return 'priority-weekly';
+                default:
+                    return 'priority-other';
+            }
         }
 
         async function completeTask(task) {
