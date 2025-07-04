@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, User, Users, History, Brain, Shield, Eye, EyeOff, Calendar, Bell, BellOff, Palette, Moon, Sun, Monitor, Save, Plus, Edit, Trash2, ChevronDown, ChevronRight, Trophy, Crown, GripVertical } from 'lucide-react';
+import { X, Settings, User, Users, History, Brain, Shield, Eye, EyeOff, Calendar, Bell, BellOff, Palette, Moon, Sun, Monitor, Save, Plus, Edit, Trash2, ChevronDown, ChevronRight, Trophy, Crown, GripVertical, Database, Download, Upload, FileText, AlertTriangle } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { HistoryAnalytics } from './HistoryAnalytics';
@@ -13,7 +13,7 @@ interface SettingsModalProps {
   isSettingsPasswordSet: boolean;
 }
 
-type TabType = 'general' | 'groups' | 'profiles' | 'history' | 'ai' | 'security';
+type TabType = 'general' | 'groups' | 'profiles' | 'history' | 'ai' | 'security' | 'data';
 
 const availableAvatars = [
   '👤', '😊', '😎', '😍', '🤔', '😴', '🤗', '🤓',
@@ -73,6 +73,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
     { id: 'history' as TabType, name: 'History', icon: History },
     { id: 'ai' as TabType, name: 'AI Assistant', icon: Brain },
     { id: 'security' as TabType, name: 'Security', icon: Shield },
+    { id: 'data' as TabType, name: 'Data', icon: Database },
   ];
 
   const handleSaveProfile = () => {
@@ -292,6 +293,48 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
     setDraggedGroupId(null);
   };
 
+  // Data management functions
+  const downloadData = async (type: 'json' | 'log') => {
+    try {
+      let data;
+      let filename;
+      let mimeType;
+      
+      if (type === 'json') {
+        // Download current application state
+        data = JSON.stringify(state, null, 2);
+        filename = `focusflow-data-${new Date().toISOString().split('T')[0]}.json`;
+        mimeType = 'application/json';
+      } else {
+        // Download activity log from server
+        const response = await fetch('/api/activity/logs');
+        if (!response.ok) {
+          throw new Error('Failed to fetch activity log');
+        }
+        const logData = await response.json();
+        data = logData.map(entry => 
+          `[${entry.timestamp}] ${JSON.stringify(entry)}`
+        ).join('\n');
+        filename = `focusflow-activity-${new Date().toISOString().split('T')[0]}.log`;
+        mimeType = 'text/plain';
+      }
+      
+      // Create and download file
+      const blob = new Blob([data], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Error downloading data:', error);
+      alert('Failed to download data. Please try again.');
+    }
+  };
   const renderTabContent = () => {
     switch (activeTab) {
       case 'general':

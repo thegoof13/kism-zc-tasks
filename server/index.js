@@ -549,6 +549,50 @@ app.get('/api/activity/logs', async (req, res) => {
   }
 });
 
+// Download data endpoints for backup
+app.get('/api/data/:userId/download', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const filename = getUserDataFile(userId);
+    const userData = await readJsonFile(filename);
+    
+    if (!userData) {
+      return res.status(404).json({ error: 'User data not found' });
+    }
+    
+    // Set headers for file download
+    const downloadFilename = `focusflow-data-${new Date().toISOString().split('T')[0]}.json`;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
+    
+    res.json(userData);
+  } catch (error) {
+    console.error('Error downloading user data:', error);
+    res.status(500).json({ error: 'Failed to download user data' });
+  }
+});
+
+app.get('/api/activity/download', async (req, res) => {
+  try {
+    const activityLog = await loadActivityLog();
+    
+    // Format as log file content
+    const logContent = activityLog.map(entry => 
+      `[${entry.timestamp}] ${JSON.stringify(entry)}`
+    ).join('\n');
+    
+    // Set headers for file download
+    const downloadFilename = `focusflow-activity-${new Date().toISOString().split('T')[0]}.log`;
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
+    
+    res.send(logContent);
+  } catch (error) {
+    console.error('Error downloading activity log:', error);
+    res.status(500).json({ error: 'Failed to download activity log' });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ 
