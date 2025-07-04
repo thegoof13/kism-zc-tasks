@@ -359,15 +359,17 @@
         }
 
         .task-header h2 {
-            font-size: 2.5rem;
-            font-weight: 700;
+            font-size: 0.6rem; /* MUCH SMALLER - was 2.5rem, now 25% of original */
+            font-weight: 400; /* Lighter weight */
             color: #ffffff;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.2rem; /* Reduced margin */
+            opacity: 0.7; /* More subtle */
         }
 
         .task-header p {
-            font-size: 1.2rem;
+            font-size: 0.3rem; /* MUCH SMALLER - was 1.2rem, now 25% of original */
             color: #9ca3af;
+            opacity: 0.6; /* More subtle */
         }
 
         /* Centrally arranged grid for tasks - Now scrollable */
@@ -440,25 +442,25 @@
             opacity: 0.7;
         }
 
-        /* Beautiful priority colors - No more nasty reds! */
+        /* Beautiful priority colors - Green for Daily, Blue for Weekly */
         .task-button.priority-daily {
-            border-color: #3b82f6; /* Beautiful blue */
-            background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%);
+            border-color: #10b981; /* Beautiful green for daily tasks */
+            background: linear-gradient(135deg, #047857 0%, #059669 100%);
         }
 
         .task-button.priority-days {
-            border-color: #8b5cf6; /* Elegant purple */
+            border-color: #8b5cf6; /* Elegant purple for specific days */
             background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%);
         }
 
         .task-button.priority-meals {
-            border-color: #10b981; /* Fresh green */
-            background: linear-gradient(135deg, #047857 0%, #059669 100%);
+            border-color: #f59e0b; /* Warm amber for meal times */
+            background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
         }
 
         .task-button.priority-weekly {
-            border-color: #f59e0b; /* Warm amber */
-            background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+            border-color: #3b82f6; /* Beautiful blue for weekly tasks */
+            background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
         }
 
         .task-button.priority-other {
@@ -626,7 +628,8 @@
             .profile-avatar { font-size: 3rem; }
             .profile-name { font-size: 0.8rem; } /* Even smaller on mobile */
             .profile-role { font-size: 0.6rem; } /* Smaller role text */
-            .task-header h2 { font-size: 2rem; }
+            .task-header h2 { font-size: 0.5rem; } /* Even smaller on mobile */
+            .task-header p { font-size: 0.25rem; } /* Even smaller on mobile */
             .task-button { padding: 1.5rem; min-height: 120px; }
             .task-title { font-size: 1.2rem; }
             .celebration-emoji { font-size: 6rem; }
