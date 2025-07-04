@@ -48,17 +48,6 @@
             position: relative;
         }
 
-        /* Bouncing Logo - Behind profile cards */
-        .logo {
-            position: absolute;
-            width: 120px;
-            height: auto;
-            pointer-events: none;
-            z-index: 1; /* Behind profile cards (z-index: 10) */
-            transition: all 0.1s ease-out;
-            opacity: 0.3; /* Subtle so it doesn't interfere with reading */
-        }
-
         /* Screensaver Mode */
         .screensaver {
             position: fixed;
@@ -85,6 +74,17 @@
             opacity: 0.15; /* Very dark/subtle */
             transition: all 0.1s ease-out;
             filter: brightness(0.3); /* Make it even darker */
+        }
+
+        /* Bouncing Logo - Behind profile cards */
+        .logo {
+            position: absolute;
+            width: 120px;
+            height: auto;
+            pointer-events: none;
+            z-index: 1; /* Behind profile cards (z-index: 10) */
+            transition: all 0.1s ease-out;
+            opacity: 0.3; /* Subtle so it doesn't interfere with reading */
         }
 
         /* Main Content - Now scrollable */
@@ -187,17 +187,17 @@
         }
 
         .profile-name {
-            font-size: 1.2rem; /* Much smaller - was 1.8rem */
-            font-weight: 500; /* Lighter weight */
-            margin-bottom: 0.5rem;
+            font-size: 0.9rem; /* MUCH smaller - was 1.8rem, then 1.2rem */
+            font-weight: 400; /* Even lighter weight */
+            margin-bottom: 0.3rem; /* Reduced margin */
             color: #ffffff;
-            opacity: 0.9; /* Slightly less prominent */
+            opacity: 0.8; /* More subtle */
         }
 
         .profile-role {
-            font-size: 0.8rem; /* Smaller - was 1rem */
+            font-size: 0.7rem; /* Smaller - was 1rem, then 0.8rem */
             color: #9ca3af;
-            opacity: 0.7; /* Even more subtle */
+            opacity: 0.6; /* Even more subtle */
         }
 
         .profile-pin-indicator {
@@ -624,8 +624,8 @@
         @media (max-width: 768px) {
             .profile-card { padding: 2rem; min-height: 160px; }
             .profile-avatar { font-size: 3rem; }
-            .profile-name { font-size: 1rem; } /* Even smaller on mobile */
-            .profile-role { font-size: 0.7rem; } /* Smaller role text */
+            .profile-name { font-size: 0.8rem; } /* Even smaller on mobile */
+            .profile-role { font-size: 0.6rem; } /* Smaller role text */
             .task-header h2 { font-size: 2rem; }
             .task-button { padding: 1.5rem; min-height: 120px; }
             .task-title { font-size: 1.2rem; }
