@@ -59,6 +59,34 @@
             opacity: 0.3; /* Subtle so it doesn't interfere with reading */
         }
 
+        /* Screensaver Mode */
+        .screensaver {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000000;
+            z-index: 1000;
+            display: none;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+        }
+
+        .screensaver.active {
+            display: block;
+            opacity: 1;
+        }
+
+        .screensaver-logo {
+            position: absolute;
+            width: 80px;
+            height: auto;
+            opacity: 0.15; /* Very dark/subtle */
+            transition: all 0.1s ease-out;
+            filter: brightness(0.3); /* Make it even darker */
+        }
+
         /* Main Content - Now scrollable */
         .main-content {
             flex: 1;
@@ -635,6 +663,11 @@
     <!-- Bouncing Logo - Behind everything -->
     <img id="logo" class="logo" src="/image.png" alt="ZenTasks Logo" />
     
+    <!-- Screensaver Mode -->
+    <div class="screensaver" id="screensaver">
+        <img id="screensaverLogo" class="screensaver-logo" src="/image.png" alt="ZenTasks Logo" />
+    </div>
+    
     <!-- Scroll indicator for mobile -->
     <div class="scroll-indicator" id="scrollIndicator">↓</div>
     
@@ -693,14 +726,17 @@
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
         const IDLE_TIMEOUT = 3000; // 3 seconds
         const PIN_IDLE_TIMEOUT = 10000; // 10 seconds for PIN entry
+        const SCREENSAVER_TIMEOUT = 120000; // 120 seconds (2 minutes) for screensaver
         
         // State
         let currentUser = null;
         let userData = null;
         let idleTimer = null;
         let pinIdleTimer = null;
+        let screensaverTimer = null;
         let lastActivity = Date.now();
         let pinInput = '';
+        let isScreensaverActive = false;
 
         // DOM Elements
         const profileSelection = document.getElementById('profileSelection');
@@ -714,6 +750,8 @@
         const pinDisplay = document.getElementById('pinDisplay');
         const pinError = document.getElementById('pinError');
         const logo = document.getElementById('logo');
+        const screensaver = document.getElementById('screensaver');
+        const screensaverLogo = document.getElementById('screensaverLogo');
         const mainContent = document.getElementById('mainContent');
         const scrollIndicator = document.getElementById('scrollIndicator');
 
@@ -738,10 +776,12 @@
             await loadUserData();
             showProfileSelection();
             setupIdleDetection();
+            setupScreensaverDetection();
             setupPinModal();
             setupScrollIndicator();
             preventScreenSleep();
             startLogoBounce();
+            startScreensaverLogoBounce();
             
             // Ensure we start at the top
             scrollToTop();
@@ -820,6 +860,7 @@
         // UI Functions
         function showProfileSelection() {
             clearIdle();
+            clearScreensaver();
             hidePinModal();
             profileSelection.style.display = 'grid';
             taskList.classList.remove('active');
@@ -870,12 +911,14 @@
             }
             
             resetIdleTimer();
+            resetScreensaverTimer();
         }
 
         function showTaskList() {
             if (!currentUser) return;
 
             clearIdle();
+            clearScreensaver();
             profileSelection.style.display = 'none';
             taskList.classList.add('active');
             
@@ -987,6 +1030,7 @@
             taskHeaderSubtitle.textContent = `${completedCount} of ${totalCount} completed`;
             
             resetIdleTimer();
+            resetScreensaverTimer();
         }
 
         function showCelebration() {
@@ -1103,11 +1147,14 @@
                 document.addEventListener(event, () => {
                     lastActivity = Date.now();
                     resetIdleTimer();
+                    resetScreensaverTimer();
                     hideIdleWarning();
+                    hideScreensaver();
                 }, true);
             });
             
             resetIdleTimer();
+            resetScreensaverTimer();
         }
 
         function resetIdleTimer() {
@@ -1139,6 +1186,40 @@
             hideIdleWarning();
         }
 
+        // Screensaver Detection
+        function setupScreensaverDetection() {
+            resetScreensaverTimer();
+        }
+
+        function resetScreensaverTimer() {
+            clearTimeout(screensaverTimer);
+            
+            screensaverTimer = setTimeout(() => {
+                showScreensaver();
+            }, SCREENSAVER_TIMEOUT);
+        }
+
+        function showScreensaver() {
+            if (!isScreensaverActive) {
+                isScreensaverActive = true;
+                screensaver.classList.add('active');
+                console.log('Screensaver activated after 120 seconds of inactivity');
+            }
+        }
+
+        function hideScreensaver() {
+            if (isScreensaverActive) {
+                isScreensaverActive = false;
+                screensaver.classList.remove('active');
+                console.log('Screensaver deactivated');
+            }
+        }
+
+        function clearScreensaver() {
+            clearTimeout(screensaverTimer);
+            hideScreensaver();
+        }
+
         // Logo Bouncing Animation - Behind profile cards
         function startLogoBounce() {
             let dx = 2;
@@ -1167,6 +1248,43 @@
             logo.style.position = 'absolute';
             logo.style.left = Math.random() * (window.innerWidth - 120) + 'px';
             logo.style.top = Math.random() * (window.innerHeight - 120) + 'px';
+            
+            animate();
+        }
+
+        // Screensaver Logo Bouncing Animation
+        function startScreensaverLogoBounce() {
+            let dx = 1.5;
+            let dy = 1.5;
+            
+            function animate() {
+                if (!isScreensaverActive) {
+                    requestAnimationFrame(animate);
+                    return;
+                }
+                
+                const rect = screensaverLogo.getBoundingClientRect();
+                const containerRect = screensaver.getBoundingClientRect();
+                
+                // Bounce off edges
+                if (rect.left <= 0 || rect.right >= containerRect.width) {
+                    dx = -dx;
+                }
+                if (rect.top <= 0 || rect.bottom >= containerRect.height) {
+                    dy = -dy;
+                }
+                
+                // Update position
+                screensaverLogo.style.left = (rect.left + dx) + 'px';
+                screensaverLogo.style.top = (rect.top + dy) + 'px';
+                
+                requestAnimationFrame(animate);
+            }
+            
+            // Set initial position
+            screensaverLogo.style.position = 'absolute';
+            screensaverLogo.style.left = Math.random() * (window.innerWidth - 80) + 'px';
+            screensaverLogo.style.top = Math.random() * (window.innerHeight - 80) + 'px';
             
             animate();
         }
