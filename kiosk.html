@@ -5,818 +5,354 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZenTasks Kiosk Portal</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #000000;
-            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            background: #000;
+            color: #fff;
             overflow: hidden;
             height: 100vh;
             width: 100vw;
             user-select: none;
-            -webkit-user-select: none;
-            -webkit-touch-callout: none;
         }
-
-        /* Prevent screen sleep */
         body::before {
             content: '';
             position: fixed;
-            top: -1px;
-            left: -1px;
-            width: 1px;
-            height: 1px;
-            background: rgba(255, 255, 255, 0.001);
+            top: -1px; left: -1px;
+            width: 1px; height: 1px;
+            background: rgba(255,255,255,0.001);
             animation: preventSleep 30s infinite;
         }
+        @keyframes preventSleep { 0%,100%{opacity:0.001;}50%{opacity:0.002;} }
 
-        @keyframes preventSleep {
-            0%, 100% { opacity: 0.001; }
-            50% { opacity: 0.002; }
+        .container { position: relative; width:100vw; height:100vh; }
+        .logo {
+            position: absolute; z-index: 10;
+            width: 150px; height: auto;
+            pointer-events: none;
         }
+        .main-content { width:100%; height:100%; }
 
-        .container {
-            height: 100vh;
-            width: 100vw;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-        }
-
-        /* Header */
-        .header {
-            padding: 2rem;
-            text-align: center;
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-            border-bottom: 2px solid #4f46e5;
-        }
-
-        .header h1 {
-            font-size: 3rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #4f46e5, #06b6d4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.5rem;
-        }
-
-        .header p {
-            font-size: 1.2rem;
-            color: #9ca3af;
-        }
-
-        /* Main Content */
-        .main-content {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-            position: relative;
-        }
-
-        /* Profile Selection Screen */
         .profile-selection {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 2rem;
-            max-width: 1200px;
-            width: 100%;
-            animation: fadeIn 0.8s ease-out;
+            position: absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+            display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr));
+            gap:1rem; width:80%; max-width:800px;
         }
-
         .profile-card {
-            background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
-            border: 2px solid transparent;
-            border-radius: 24px;
-            padding: 2.5rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-            min-height: 200px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            animation: cardFloat 6s ease-in-out infinite;
+            background: #1f2937; border-radius:16px;
+            padding:2rem; text-align:center;
+            cursor:pointer; transition:transform .3s;
+            display:flex; flex-direction:column; justify-content:center;
+            min-height:150px;
+        }
+        .profile-card:hover { transform:scale(1.05); }
+        .profile-avatar { font-size:4rem; margin-bottom:.5rem; }
+        .profile-name { font-size:1.5rem; font-weight:600; }
+
+        .pin-modal {
+            position:fixed; inset:0;
+            background:rgba(0,0,0,0.9);
+            display:none; flex-direction:column;
+            align-items:center; justify-content:center;
+            z-index:20;
+        }
+        .pin-modal.active { display:flex; }
+        .pin-display {
+            font-size:2rem; letter-spacing:1rem;
+            margin-bottom:1.5rem;
+        }
+        .pin-buttons {
+            display:grid; grid-template-columns:repeat(3,100px);
+            gap:1rem; margin-bottom:1.5rem;
+        }
+        .pin-button {
+            width:100px; height:100px;
+            background:#374151; border-radius:12px;
+            font-size:2rem; display:flex;
+            align-items:center; justify-content:center;
+            cursor:pointer; user-select:none;
+        }
+        .pin-ok {
+            width:100px; height:60px;
+            background:#10b981; border-radius:12px;
+            font-size:1.5rem; display:flex;
+            align-items:center; justify-content:center;
+            cursor:pointer;
+        }
+        .pin-error {
+            color:#ef4444;
+            margin-top:1rem; height:1.2rem;
+            font-size:1rem;
         }
 
-        .profile-card:nth-child(2n) {
-            animation-delay: -2s;
-        }
-
-        .profile-card:nth-child(3n) {
-            animation-delay: -4s;
-        }
-
-        .profile-card::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            padding: 2px;
-            background: linear-gradient(135deg, #4f46e5, #06b6d4, #10b981);
-            border-radius: 24px;
-            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            mask-composite: exclude;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .profile-card:hover::before {
-            opacity: 1;
-        }
-
-        .profile-card:hover {
-            transform: translateY(-8px) scale(1.02);
-            box-shadow: 0 20px 40px rgba(79, 70, 229, 0.3);
-        }
-
-        .profile-avatar {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-            display: block;
-        }
-
-        .profile-name {
-            font-size: 1.8rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: #ffffff;
-        }
-
-        .profile-role {
-            font-size: 1rem;
-            color: #9ca3af;
-        }
-
-        /* Task List Screen */
         .task-list {
-            display: none;
-            width: 100%;
-            max-width: 1000px;
-            animation: slideIn 0.6s ease-out;
+            position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+            width:90%; max-width:900px;
+            display:none; flex-direction:column; gap:1.5rem;
         }
-
-        .task-list.active {
-            display: block;
+        .task-list.active { display:flex; }
+        .back-button {
+            align-self:flex-start;
+            background:#374151; border-radius:12px;
+            padding:.75rem 1.5rem; cursor:pointer;
+            font-weight:600;
         }
-
-        .task-header {
-            text-align: center;
-            margin-bottom: 3rem;
-        }
-
-        .task-header h2 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #ffffff;
-            margin-bottom: 0.5rem;
-        }
-
-        .task-header p {
-            font-size: 1.2rem;
-            color: #9ca3af;
-        }
+        .task-header { text-align:center; margin-bottom:1rem; }
+        .task-header h2 { font-size:2.5rem; }
+        .task-header p { font-size:1rem; color:#9ca3af; }
 
         .tasks-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
+            display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+            gap:1rem;
         }
-
         .task-button {
-            background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
-            border: 2px solid #6b7280;
-            border-radius: 20px;
-            padding: 2rem;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-            min-height: 120px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            background:#374151; border-radius:16px;
+            padding:1.5rem; text-align:center;
+            cursor:pointer; position:relative;
+            display:flex; flex-direction:column;
+            justify-content:center; min-height:120px;
         }
-
-        .task-button:hover {
-            transform: translateY(-4px);
-            border-color: #4f46e5;
-            box-shadow: 0 15px 30px rgba(79, 70, 229, 0.2);
-        }
-
+        .task-title { font-size:1.25rem; font-weight:600; }
+        .task-meta { font-size:.85rem; color:#9ca3af; margin-top:.5rem; }
         .task-button.completed {
-            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-            border-color: #10b981;
-            animation: completePulse 0.6s ease-out;
+            background:#059669;
+            animation:completePulse .6s ease-out;
         }
-
         .task-button.completed::after {
-            content: '✓';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 3rem;
-            color: #ffffff;
-            animation: checkmarkAppear 0.6s ease-out;
+            content:'✓'; font-size:2.5rem; color:#fff;
+            position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
         }
+        @keyframes completePulse { 0%{transform:scale(1);}50%{transform:scale(1.05);}100%{transform:scale(1);} }
 
-        .task-title {
-            font-size: 1.4rem;
-            font-weight: 600;
-            color: #ffffff;
-            line-height: 1.4;
-        }
-
-        .task-button.completed .task-title {
-            opacity: 0.7;
-        }
-
-        /* Back Button */
-        .back-button {
-            position: absolute;
-            top: 2rem;
-            left: 2rem;
-            background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
-            border: 2px solid #6b7280;
-            border-radius: 16px;
-            padding: 1rem 1.5rem;
-            color: #ffffff;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: none;
-        }
-
-        .back-button.visible {
-            display: block;
-        }
-
-        .back-button:hover {
-            border-color: #4f46e5;
-            transform: translateY(-2px);
-        }
-
-        /* Idle Warning Toast */
         .idle-toast {
-            position: fixed;
-            bottom: 2rem;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
-            color: #ffffff;
-            padding: 1.5rem 2rem;
-            border-radius: 16px;
-            font-size: 1.2rem;
-            font-weight: 600;
-            box-shadow: 0 10px 25px rgba(220, 38, 38, 0.3);
-            opacity: 0;
-            transform: translateX(-50%) translateY(100px);
-            transition: all 0.4s ease;
-            z-index: 1000;
+            position:fixed; bottom:2rem; left:50%; transform:translateX(-50%);
+            width:80%; max-width:400px; height:10px;
+            background:rgba(17,24,39,0.5);
+            border-radius:8px; overflow:hidden;
+            display:none; z-index:15;
         }
-
-        .idle-toast.visible {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
+        .idle-toast.visible { display:block; }
+        .progress-bar {
+            height:100%;
+            background:linear-gradient(to right,#10b981,#34d399);
+            animation:progressBar 3s linear forwards;
         }
+        @keyframes progressBar { from{width:100%;}to{width:0;} }
 
-        /* Completion Celebration */
-        .celebration {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.9);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-            animation: celebrationFade 0.5s ease-out;
-        }
-
-        .celebration.active {
-            display: flex;
-        }
-
-        .celebration-content {
-            text-align: center;
-            animation: celebrationBounce 0.8s ease-out;
-        }
-
-        .celebration-emoji {
-            font-size: 8rem;
-            margin-bottom: 1rem;
-            animation: emojiSpin 1s ease-out;
-        }
-
-        .celebration-text {
-            font-size: 3rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        /* Confetti Animation */
-        .confetti {
-            position: absolute;
-            width: 10px;
-            height: 10px;
-            background: #4f46e5;
-            animation: confettiFall 3s linear infinite;
-        }
-
-        .confetti:nth-child(2n) { background: #10b981; animation-delay: -0.5s; }
-        .confetti:nth-child(3n) { background: #f59e0b; animation-delay: -1s; }
-        .confetti:nth-child(4n) { background: #ef4444; animation-delay: -1.5s; }
-        .confetti:nth-child(5n) { background: #8b5cf6; animation-delay: -2s; }
-
-        /* Animations */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(50px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-
-        @keyframes cardFloat {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-        }
-
-        @keyframes completePulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-
-        @keyframes checkmarkAppear {
-            0% { opacity: 0; transform: translate(-50%, -50%) scale(0); }
-            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
-            100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-        }
-
-        @keyframes celebrationFade {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes celebrationBounce {
-            0% { transform: scale(0.5) translateY(50px); opacity: 0; }
-            50% { transform: scale(1.1) translateY(-10px); opacity: 1; }
-            100% { transform: scale(1) translateY(0); opacity: 1; }
-        }
-
-        @keyframes emojiSpin {
-            0% { transform: rotate(0deg) scale(0.5); }
-            50% { transform: rotate(180deg) scale(1.1); }
-            100% { transform: rotate(360deg) scale(1); }
-        }
-
-        @keyframes confettiFall {
-            0% { 
-                transform: translateY(-100vh) rotate(0deg);
-                opacity: 1;
-            }
-            100% { 
-                transform: translateY(100vh) rotate(720deg);
-                opacity: 0;
-            }
-        }
-
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .header h1 { font-size: 2.5rem; }
-            .header p { font-size: 1rem; }
-            .profile-card { padding: 2rem; min-height: 160px; }
-            .profile-avatar { font-size: 3rem; }
-            .profile-name { font-size: 1.5rem; }
-            .task-header h2 { font-size: 2rem; }
-            .task-button { padding: 1.5rem; min-height: 100px; }
-            .task-title { font-size: 1.2rem; }
-            .celebration-emoji { font-size: 6rem; }
-            .celebration-text { font-size: 2rem; }
-        }
-
-        /* Fullscreen styles */
         .fullscreen-button {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            background: rgba(79, 70, 229, 0.8);
-            border: none;
-            border-radius: 12px;
-            padding: 0.75rem;
-            color: white;
-            cursor: pointer;
-            font-size: 1.2rem;
-            transition: all 0.3s ease;
-            z-index: 100;
-        }
-
-        .fullscreen-button:hover {
-            background: rgba(79, 70, 229, 1);
-            transform: scale(1.1);
+            position:fixed; top:1rem; right:1rem;
+            background:rgba(79,70,229,0.8); border:none;
+            border-radius:8px; padding:.5rem;
+            cursor:pointer; font-size:1.2rem; z-index:15;
         }
     </style>
 </head>
 <body>
-    <button class="fullscreen-button" onclick="toggleFullscreen()" title="Toggle Fullscreen">⛶</button>
-    
+    <button class="fullscreen-button" onclick="toggleFullscreen()">⛶</button>
     <div class="container">
-        <header class="header">
-            <h1>ZenTasks</h1>
-            <p>Select your profile to view tasks</p>
-        </header>
-
+        <img id="logo" class="logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA" alt="ZenTasks Logo" />
         <main class="main-content">
-            <!-- Profile Selection Screen -->
-            <div class="profile-selection" id="profileSelection">
-                <!-- Profiles will be loaded here -->
+            <div class="profile-selection" id="profileSelection"></div>
+            <div class="pin-modal" id="pinModal">
+                <div class="pin-display" id="pinDisplay"></div>
+                <div class="pin-buttons" id="pinButtons"></div>
+                <div class="pin-ok" id="pinOk">OK</div>
+                <div class="pin-error" id="pinError"></div>
             </div>
-
-            <!-- Task List Screen -->
             <div class="task-list" id="taskList">
-                <button class="back-button" id="backButton" onclick="showProfileSelection()">
-                    ← Back to Profiles
-                </button>
-                
+                <div class="back-button" id="backButton" onclick="showProfileSelection()">← Back</div>
                 <div class="task-header">
-                    <h2 id="taskHeaderTitle">Your Tasks</h2>
-                    <p id="taskHeaderSubtitle">Tap to complete tasks</p>
+                    <h2 id="taskHeaderTitle">Tasks</h2>
+                    <p id="taskHeaderSubtitle"></p>
                 </div>
-
-                <div class="tasks-grid" id="tasksGrid">
-                    <!-- Tasks will be loaded here -->
-                </div>
+                <div class="tasks-grid" id="tasksGrid"></div>
             </div>
         </main>
     </div>
-
-    <!-- Idle Warning Toast -->
-    <div class="idle-toast" id="idleToast">
-        No activity detected. Returning to user selection in <span id="countdown">3</span> seconds.
-    </div>
-
-    <!-- Completion Celebration -->
-    <div class="celebration" id="celebration">
-        <div class="celebration-content">
-            <div class="celebration-emoji">🎉</div>
-            <div class="celebration-text">All Tasks Complete!</div>
-        </div>
-    </div>
-
+    <div class="idle-toast" id="idleToast"><div class="progress-bar"></div></div>
     <script>
-        // Configuration
-        const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
-        const IDLE_TIMEOUT = 3000; // 3 seconds
-        const IDLE_WARNING_DURATION = 3000; // 3 seconds
-        
-        // State
+        const API_BASE = window.location.hostname==='localhost'?'http://localhost:3001/api':'/api';
+        const IDLE_TIMEOUT = 3000;
+        const PIN_IDLE_TIMEOUT = 3000;
+        let userData = {profiles:[],tasks:[]};
         let currentUser = null;
-        let userData = null;
-        let idleTimer = null;
-        let idleWarningTimer = null;
-        let lastActivity = Date.now();
+        let idleTimer, pinIdleTimer;
+        let pinInput = '';
 
-        // DOM Elements
-        const profileSelection = document.getElementById('profileSelection');
-        const taskList = document.getElementById('taskList');
-        const backButton = document.getElementById('backButton');
-        const taskHeaderTitle = document.getElementById('taskHeaderTitle');
-        const taskHeaderSubtitle = document.getElementById('taskHeaderSubtitle');
-        const tasksGrid = document.getElementById('tasksGrid');
-        const idleToast = document.getElementById('idleToast');
-        const countdown = document.getElementById('countdown');
-        const celebration = document.getElementById('celebration');
-
-        // Initialize
         document.addEventListener('DOMContentLoaded', async () => {
             await loadUserData();
             showProfileSelection();
-            setupIdleDetection();
-            preventScreenSleep();
+            setupIdle();
+            setupPin();
+            startBounce(document.getElementById('profileSelection'), 1.5);
+            startBounce(document.getElementById('logo'), 1);
+            requestWakeLock();
+            setTimeout(toggleFullscreen, 1000);
         });
 
-        // API Functions
         async function loadUserData() {
-            try {
-                const response = await fetch(`${API_BASE}/data/1`);
-                userData = await response.json();
-                console.log('Loaded user data:', userData);
-            } catch (error) {
-                console.error('Failed to load user data:', error);
-                userData = { profiles: [], tasks: [], groups: [] };
-            }
+            try { const res = await fetch(`${API_BASE}/data/1`); userData = await res.json(); }
+            catch { userData = {profiles:[],tasks:[]}; }
         }
 
-        async function toggleTask(taskId, profileId) {
-            try {
-                // Optimistically update UI
-                const task = userData.tasks.find(t => t.id === taskId);
-                if (task) {
-                    task.isCompleted = !task.isCompleted;
-                    task.completedBy = task.isCompleted ? profileId : undefined;
-                    task.completedAt = task.isCompleted ? new Date().toISOString() : undefined;
-                }
-
-                // Save to server
-                await fetch(`${API_BASE}/data/1`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(userData)
-                });
-
-                console.log('Task toggled successfully');
-            } catch (error) {
-                console.error('Failed to toggle task:', error);
-                // Revert optimistic update on error
-                const task = userData.tasks.find(t => t.id === taskId);
-                if (task) {
-                    task.isCompleted = !task.isCompleted;
-                    task.completedBy = task.isCompleted ? profileId : undefined;
-                    task.completedAt = task.isCompleted ? new Date().toISOString() : undefined;
-                }
-            }
-        }
-
-        // UI Functions
         function showProfileSelection() {
-            profileSelection.style.display = 'grid';
-            taskList.classList.remove('active');
-            backButton.classList.remove('visible');
+            clearIdle(); hidePinModal();
             currentUser = null;
-            
-            // Clear and populate profiles
-            profileSelection.innerHTML = '';
-            
-            if (!userData.profiles || userData.profiles.length === 0) {
-                profileSelection.innerHTML = `
-                    <div style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
-                        <h3 style="font-size: 2rem; margin-bottom: 1rem; color: #9ca3af;">No Profiles Found</h3>
-                        <p style="font-size: 1.2rem; color: #6b7280;">Please configure profiles in the main application.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            userData.profiles.forEach(profile => {
-                const profileCard = document.createElement('div');
-                profileCard.className = 'profile-card';
-                profileCard.innerHTML = `
-                    <div class="profile-avatar">${profile.avatar}</div>
-                    <div class="profile-name">${profile.name}</div>
-                    <div class="profile-role">${profile.isTaskCompetitor ? 'Task Competitor' : 'Regular User'}</div>
-                `;
-                
-                profileCard.addEventListener('click', () => selectProfile(profile));
-                profileSelection.appendChild(profileCard);
+            document.getElementById('taskList').classList.remove('active');
+            const ps = document.getElementById('profileSelection'); ps.innerHTML = '';
+            userData.profiles.forEach(p => {
+                const card = document.createElement('div'); card.className = 'profile-card';
+                card.innerHTML = `<div class="profile-avatar">${p.avatar}</div><div class="profile-name">${p.name}</div>`;
+                card.onclick = () => selectProfile(p);
+                ps.appendChild(card);
             });
         }
 
         function selectProfile(profile) {
             currentUser = profile;
-            showTaskList();
-            resetIdleTimer();
+            if (profile.pin) showPinModal(); else showTaskList();
+        }
+
+        function setupPin() {
+            const container = document.getElementById('pinButtons'); container.innerHTML = '';
+            for (let i = 1; i <= 9; i++) createPinButton(i);
+            createPinButton(0);
+            document.getElementById('pinOk').onclick = checkPin;
+        }
+
+        function createPinButton(num) {
+            const btn = document.createElement('div'); btn.className = 'pin-button'; btn.textContent = num;
+            btn.onclick = () => {
+                pinInput += num;
+                document.getElementById('pinDisplay').textContent = '*'.repeat(pinInput.length);
+                resetPinIdle();
+            };
+            document.getElementById('pinButtons').appendChild(btn);
+        }
+
+        function showPinModal() {
+            pinInput = '';
+            document.getElementById('pinDisplay').textContent = '';
+            document.getElementById('pinError').textContent = '';
+            document.getElementById('pinModal').classList.add('active');
+            resetPinIdle();
+        }
+
+        function hidePinModal() {
+            document.getElementById('pinModal').classList.remove('active');
+            clearTimeout(pinIdleTimer);
+        }
+
+        function resetPinIdle() {
+            clearTimeout(pinIdleTimer);
+            pinIdleTimer = setTimeout(() => {
+                hidePinModal();
+                showProfileSelection();
+            }, PIN_IDLE_TIMEOUT);
+        }
+
+        function checkPin() {
+            clearTimeout(pinIdleTimer);
+            if (pinInput === String(currentUser.pin)) {
+                hidePinModal();
+                showTaskList();
+            } else {
+                document.getElementById('pinError').textContent = 'Invalid PIN';
+                pinInput = '';
+                document.getElementById('pinDisplay').textContent = '';
+                setTimeout(() => { document.getElementById('pinError').textContent = ''; }, 1500);
+                resetPinIdle();
+            }
         }
 
         function showTaskList() {
-            if (!currentUser) return;
+            clearIdle();
+            document.getElementById('profileSelection').style.display = 'none';
+            const tl = document.getElementById('taskList'); tl.classList.add('active');
+            document.getElementById('taskHeaderTitle').textContent = `${currentUser.name}'s Tasks`;
+            const now = new Date(), dow = now.getDay();
+            const tasks = userData.tasks.filter(t => t.profiles.includes(currentUser.id) && isInTimeframe(t, dow));
 
-            profileSelection.style.display = 'none';
-            taskList.classList.add('active');
-            backButton.classList.add('visible');
-            
-            taskHeaderTitle.textContent = `${currentUser.name}'s Tasks`;
-            
-            // Get user's tasks
-            const userTasks = userData.tasks.filter(task => 
-                task.profiles.includes(currentUser.id)
-            );
-
-            // Group tasks by group
-            const tasksByGroup = {};
-            userTasks.forEach(task => {
-                const group = userData.groups.find(g => g.id === task.groupId);
-                const groupName = group ? group.name : 'Other';
-                
-                if (!tasksByGroup[groupName]) {
-                    tasksByGroup[groupName] = [];
-                }
-                tasksByGroup[groupName].push(task);
+            const grid = document.getElementById('tasksGrid'); grid.innerHTML = '';
+            tasks.forEach(t => {
+                const btn = document.createElement('div'); btn.className = 'task-button' + (t.isCompleted ? ' completed' : '');
+                btn.innerHTML = `<div class="task-title">${t.title}</div><div class="task-meta">${t.groupName||'Other'} | ${t.recurrence}</div>`;
+                if (!t.isCompleted) btn.onclick = () => completeTask(t, btn);
+                grid.appendChild(btn);
             });
 
-            // Clear and populate tasks
-            tasksGrid.innerHTML = '';
-            
-            if (userTasks.length === 0) {
-                tasksGrid.innerHTML = `
-                    <div style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
-                        <h3 style="font-size: 2rem; margin-bottom: 1rem; color: #9ca3af;">No Tasks Found</h3>
-                        <p style="font-size: 1.2rem; color: #6b7280;">No tasks are assigned to this profile.</p>
-                    </div>
-                `;
-                return;
-            }
+            document.getElementById('taskHeaderSubtitle').textContent = `${tasks.filter(x => x.isCompleted).length} of ${tasks.length} done`;
+        }
 
-            // Add tasks grouped by category
-            Object.entries(tasksByGroup).forEach(([groupName, tasks]) => {
-                // Add group header
-                const groupHeader = document.createElement('div');
-                groupHeader.style.gridColumn = '1 / -1';
-                groupHeader.style.textAlign = 'center';
-                groupHeader.style.margin = '2rem 0 1rem 0';
-                groupHeader.innerHTML = `
-                    <h3 style="font-size: 1.8rem; color: #4f46e5; font-weight: 600;">${groupName}</h3>
-                `;
-                tasksGrid.appendChild(groupHeader);
+        function isInTimeframe(task, day) {
+            if (task.recurrence === 'daily') return true;
+            if (task.recurrence === 'weekly' && task.dayOfWeek === day) return true;
+            return false;
+        }
 
-                // Add tasks
-                tasks.forEach(task => {
-                    const taskButton = document.createElement('div');
-                    taskButton.className = `task-button ${task.isCompleted ? 'completed' : ''}`;
-                    taskButton.innerHTML = `
-                        <div class="task-title">${task.title}</div>
-                    `;
-                    
-                    if (!task.isCompleted) {
-                        taskButton.addEventListener('click', () => completeTask(task));
-                    }
-                    
-                    tasksGrid.appendChild(taskButton);
-                });
+        async function completeTask(task, btn) {
+            btn.classList.add('completed');
+            await fetch(`${API_BASE}/data/1`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(userData)
             });
-
-            // Update subtitle with progress
-            const completedCount = userTasks.filter(t => t.isCompleted).length;
-            const totalCount = userTasks.length;
-            taskHeaderSubtitle.textContent = `${completedCount} of ${totalCount} completed`;
+            const userTasks = userData.tasks.filter(t => t.profiles.includes(currentUser.id));
+            if (userTasks.every(t => t.isCompleted)) celebrate();
+            showTaskList();
         }
 
-        async function completeTask(task) {
-            if (task.isCompleted) return;
-
-            // Visual feedback
-            const taskButton = event.currentTarget;
-            taskButton.classList.add('completed');
-            
-            // Update data
-            await toggleTask(task.id, currentUser.id);
-            
-            // Check if all tasks are complete
-            const userTasks = userData.tasks.filter(t => 
-                t.profiles.includes(currentUser.id)
-            );
-            const allComplete = userTasks.every(t => t.isCompleted);
-            
-            if (allComplete && userTasks.length > 0) {
-                setTimeout(() => showCelebration(), 500);
-            }
-
-            // Update progress
-            const completedCount = userTasks.filter(t => t.isCompleted).length;
-            const totalCount = userTasks.length;
-            taskHeaderSubtitle.textContent = `${completedCount} of ${totalCount} completed`;
-            
-            resetIdleTimer();
+        function setupIdle() {
+            ['click','mousemove','keypress','touchstart'].forEach(e => document.addEventListener(e, resetIdle, true));
+            resetIdle();
         }
 
-        function showCelebration() {
-            celebration.classList.add('active');
-            createConfetti();
-            
-            setTimeout(() => {
-                celebration.classList.remove('active');
-            }, 3000);
-        }
-
-        function createConfetti() {
-            for (let i = 0; i < 50; i++) {
-                const confetti = document.createElement('div');
-                confetti.className = 'confetti';
-                confetti.style.left = Math.random() * 100 + 'vw';
-                confetti.style.animationDelay = Math.random() * 3 + 's';
-                confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
-                document.body.appendChild(confetti);
-                
-                setTimeout(() => confetti.remove(), 5000);
-            }
-        }
-
-        // Idle Detection
-        function setupIdleDetection() {
-            const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-            
-            events.forEach(event => {
-                document.addEventListener(event, () => {
-                    lastActivity = Date.now();
-                    resetIdleTimer();
-                    hideIdleWarning();
-                }, true);
-            });
-            
-            resetIdleTimer();
-        }
-
-        function resetIdleTimer() {
+        function resetIdle() {
             clearTimeout(idleTimer);
-            clearTimeout(idleWarningTimer);
-            
+            document.getElementById('idleToast').classList.remove('visible');
             idleTimer = setTimeout(() => {
-                if (currentUser) {
-                    showIdleWarning();
-                }
+                document.getElementById('idleToast').classList.add('visible');
+                setTimeout(showProfileSelection, IDLE_TIMEOUT);
             }, IDLE_TIMEOUT);
         }
 
-        function showIdleWarning() {
-            idleToast.classList.add('visible');
-            let timeLeft = 3;
-            countdown.textContent = timeLeft;
-            
-            idleWarningTimer = setInterval(() => {
-                timeLeft--;
-                countdown.textContent = timeLeft;
-                
-                if (timeLeft <= 0) {
-                    hideIdleWarning();
-                    showProfileSelection();
-                }
-            }, 1000);
+        function clearIdle() {
+            clearTimeout(idleTimer);
+            document.getElementById('idleToast').classList.remove('visible');
         }
 
-        function hideIdleWarning() {
-            idleToast.classList.remove('visible');
-            clearInterval(idleWarningTimer);
+        function celebrate() {
+            const c = document.createElement('div');
+            c.textContent = '🎉 All done!';
+            c.style.cssText = 'position:fixed;inset:0;display:flex;justify-content:center;align-items:center;font-size:4rem;';
+            document.body.appendChild(c);
+            setTimeout(() => c.remove(), 2000);
         }
 
-        // Screen Sleep Prevention
-        function preventScreenSleep() {
-            // Request wake lock if supported
-            if ('wakeLock' in navigator) {
-                navigator.wakeLock.request('screen').catch(err => {
-                    console.log('Wake lock failed:', err);
-                });
-            }
-            
-            // Fallback: periodic invisible activity
-            setInterval(() => {
-                const video = document.createElement('video');
-                video.style.position = 'fixed';
-                video.style.top = '-1px';
-                video.style.left = '-1px';
-                video.style.width = '1px';
-                video.style.height = '1px';
-                video.style.opacity = '0.01';
-                video.muted = true;
-                video.loop = true;
-                
-                // Create a minimal video data URL
-                video.src = 'data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMWF2YzEAAAAIZnJlZQAAAr1tZGF0AAACrgYF//+q3EXpvebZSLeWLNgg2SPu73gyNjQgLSBjb3JlIDE1MiByMjg1NCBlOWE1OTAzIC0gSC4yNjQvTVBFRy00IEFWQyBjb2RlYyAtIENvcHlsZWZ0IDIwMDMtMjAxNyAtIGh0dHA6Ly93d3cudmlkZW9sYW4ub3JnL3gyNjQuaHRtbCAtIG9wdGlvbnM6IGNhYmFjPTEgcmVmPTMgZGVibG9jaz0xOjA6MCBhbmFseXNlPTB4MzoweDExMyBtZT1oZXggc3VibWU9NyBwc3k9MSBwc3lfcmQ9MS4wMDowLjAwIG1peGVkX3JlZj0xIG1lX3JhbmdlPTE2IGNocm9tYV9tZT0xIHRyZWxsaXM9MSA4eDhkY3Q9MSBjcW09MCBkZWFkem9uZT0yMSwxMSBmYXN0X3Bza2lwPTEgY2hyb21hX3FwX29mZnNldD0tMiB0aHJlYWRzPTMgbG9va2FoZWFkX3RocmVhZHM9MSBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2VkPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0zIGJfcHlyYW1pZD0yIGJfYWRhcHQ9MSBiX2JpYXM9MCBkaXJlY3Q9MSB3ZWlnaHRiPTEgb3Blbl9nb3A9MCB3ZWlnaHRwPTIga2V5aW50PTI1MCBrZXlpbnRfbWluPTEwIHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAAD2WIhAA3//728P4FNjuZQQAAAu5tb292AAAAbG12aGQAAAAAAAAAAAAAAAAAAAPoAAAAZAABAAABAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAACGHRyYWsAAABcdGtoZAAAAAMAAAAAAAAAAAAAAAEAAAAAAAAAZAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAEAAAAAAAgAAAAIAAAAAACRlZHRzAAAAHGVsc3QAAAAAAAAAAQAAAGQAAAAAAAEAAAAAAZhtZGlhAAAAIG1kaGQAAAAAAAAAAAAAAAAAAKxEAAAIAFXEAAAAAAAtaGRscgAAAAAAAAAAdmlkZQAAAAAAAAAAAAAAAFZpZGVvSGFuZGxlcgAAAAFDbWluZgAAABR2bWhkAAAAAQAAAAAAAAAAAAAAJGRpbmYAAAAcZHJlZgAAAAAAAAABAAAADHVybCAAAAABAAAAA3N0YmwAAABcc3RzZAAAAAAAAAABAAAATGF2YzEAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAgACAABIAAAASAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGP//AAAAMGF2Y0MBQsAN/+EAGGdCwA3949F6oEAW5eXvAiAiRKaFAAAAABhzdHRzAAAAAAAAAAEAAAABAAAACAAAAAEAAAQIc3RzYwAAAAAAAAABAAAAAQAAAAEAAAABAAAAFHN0c3oAAAAAAAAAEwAAAAEAAAAUAAAAFHN0Y28AAAAAAAAAAQAAADAAAABidWR0YQAAAFptZXRhAAAAAAAAACFoZGxyAAAAAAAAAABtZGlyYXBwbAAAAAAAAAAAAAAAAC1pbHN0AAAAJal9dG9vAAAAHWRhdGEAAAABAAAAAExhdmY1Ni40MC4xMDE=';
-                
-                document.body.appendChild(video);
-                video.play().then(() => {
-                    setTimeout(() => {
-                        video.remove();
-                    }, 100);
-                }).catch(() => {
-                    video.remove();
-                });
-            }, 30000); // Every 30 seconds
+        function startBounce(el, speed) {
+            let dx = speed, dy = speed;
+            el.style.position = 'absolute';
+            const move = () => {
+                const r = el.getBoundingClientRect();
+                if (r.left < 0 || r.right > window.innerWidth) dx = -dx;
+                if (r.top < 0 || r.bottom > window.innerHeight) dy = -dy;
+                el.style.left = (r.left + dx) + 'px';
+                el.style.top = (r.top + dy) + 'px';
+                requestAnimationFrame(move);
+            };
+            el.style.left = Math.random() * (window.innerWidth - el.offsetWidth) + 'px';
+            el.style.top = Math.random() * (window.innerHeight - el.offsetHeight) + 'px';
+            requestAnimationFrame(move);
         }
 
-        // Fullscreen functionality
+        function requestWakeLock() {
+            if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(() => {});
+        }
+
         function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    console.log('Fullscreen failed:', err);
-                });
-            } else {
-                document.exitFullscreen();
-            }
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+            else document.exitFullscreen();
         }
-
-        // Auto-enter fullscreen on load (if supported)
-        window.addEventListener('load', () => {
-            setTimeout(() => {
-                if (document.documentElement.requestFullscreen) {
-                    toggleFullscreen();
-                }
-            }, 1000);
-        });
     </script>
 </body>
 </html>
