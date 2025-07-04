@@ -16,9 +16,11 @@ type AppAction =
   | { type: 'UPDATE_GROUP'; groupId: string; updates: Partial<TaskGroup> }
   | { type: 'DELETE_GROUP'; groupId: string }
   | { type: 'TOGGLE_GROUP_COLLAPSE'; groupId: string }
+  | { type: 'REORDER_GROUPS'; groupIds: string[] }
   | { type: 'ADD_PROFILE'; profile: Omit<UserProfile, 'id' | 'createdAt'> }
   | { type: 'UPDATE_PROFILE'; profileId: string; updates: Partial<UserProfile> }
   | { type: 'DELETE_PROFILE'; profileId: string }
+  | { type: 'REORDER_PROFILES'; profileIds: string[] }
   | { type: 'SET_ACTIVE_PROFILE'; profileId: string }
   | { type: 'UPDATE_SETTINGS'; updates: Partial<AppState['settings']> }
   | { type: 'RESET_RECURRING_TASKS' }
@@ -227,11 +229,22 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'ADD_TASK': {
       const maxOrder = Math.max(...state.tasks.filter(t => t.groupId === action.task.groupId).map(t => t.order), -1);
+      
+      // For sub-tasks, calculate sub-task order
+      let subTaskOrder = 0;
+      if (action.task.isSubTask && action.task.parentTaskId) {
+        const siblingSubTasks = state.tasks.filter(t => 
+          t.parentTaskId === action.task.parentTaskId && t.isSubTask
+        );
+        subTaskOrder = Math.max(...siblingSubTasks.map(t => t.subTaskOrder || 0), -1) + 1;
+      }
+      
       const newTask: Task = {
         ...action.task,
         id: Date.now().toString(),
         createdAt: new Date(),
         order: maxOrder + 1,
+        subTaskOrder: action.task.isSubTask ? subTaskOrder : undefined,
       };
       
       return {
@@ -250,9 +263,19 @@ function appReducer(state: AppState, action: AppAction): AppState {
     }
 
     case 'DELETE_TASK': {
+      // When deleting a task, also delete all its sub-tasks
+      const taskToDelete = state.tasks.find(t => t.id === action.taskId);
+      const tasksToDelete = [action.taskId];
+      
+      if (taskToDelete && !taskToDelete.isSubTask) {
+        // If deleting a parent task, also delete all sub-tasks
+        const subTasks = state.tasks.filter(t => t.parentTaskId === action.taskId);
+        tasksToDelete.push(...subTasks.map(t => t.id));
+      }
+      
       return {
         ...state,
-        tasks: state.tasks.filter(t => t.id !== action.taskId),
+        tasks: state.tasks.filter(t => !tasksToDelete.includes(t.id)),
       };
     }
 
@@ -291,12 +314,24 @@ function appReducer(state: AppState, action: AppAction): AppState {
       const task = state.tasks.find(t => t.id === action.taskId);
       if (!task) return state;
 
-      const updatedTask = {
-        ...task,
-        isCompleted: false,
-        completedBy: undefined,
-        completedAt: undefined,
-      };
+      // Reset the task and all its sub-tasks
+      const tasksToReset = [task.id];
+      if (!task.isSubTask) {
+        const subTasks = state.tasks.filter(t => t.parentTaskId === task.id);
+        tasksToReset.push(...subTasks.map(t => t.id));
+      }
+
+      const updatedTasks = state.tasks.map(t => {
+        if (tasksToReset.includes(t.id)) {
+          return {
+            ...t,
+            isCompleted: false,
+            completedBy: undefined,
+            completedAt: undefined,
+          };
+        }
+        return t;
+      });
 
       const historyEntry: HistoryEntry = {
         id: Date.now().toString(),
@@ -306,12 +341,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
         timestamp: new Date(),
         taskTitle: task.title,
         profileName: state.profiles.find(p => p.id === state.activeProfileId)?.name || 'Unknown',
-        details: 'Task reset - unchecked but completion history preserved',
+        details: tasksToReset.length > 1 
+          ? `Task and ${tasksToReset.length - 1} sub-tasks reset - unchecked but completion history preserved`
+          : 'Task reset - unchecked but completion history preserved',
       };
 
       return {
         ...state,
-        tasks: state.tasks.map(t => t.id === action.taskId ? updatedTask : t),
+        tasks: updatedTasks,
         history: [historyEntry, ...state.history],
       };
     }
@@ -357,11 +394,25 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     }
 
+    case 'REORDER_GROUPS': {
+      const reorderedGroups = state.groups.map(group => {
+        const newOrder = action.groupIds.indexOf(group.id);
+        return { ...group, order: newOrder };
+      });
+      
+      return {
+        ...state,
+        groups: reorderedGroups,
+      };
+    }
+
     case 'ADD_PROFILE': {
+      const maxOrder = Math.max(...state.profiles.map(p => p.order || 0), -1);
       const newProfile: UserProfile = {
         ...action.profile,
         id: Date.now().toString(),
         createdAt: new Date(),
+        order: maxOrder + 1,
         // Add default meal times if not provided
         mealTimes: action.profile.mealTimes || {
           breakfast: '07:00',
@@ -394,6 +445,18 @@ function appReducer(state: AppState, action: AppAction): AppState {
         activeProfileId: state.activeProfileId === action.profileId 
           ? remainingProfiles[0]?.id || ''
           : state.activeProfileId,
+      };
+    }
+
+    case 'REORDER_PROFILES': {
+      const reorderedProfiles = state.profiles.map(profile => {
+        const newOrder = action.profileIds.indexOf(profile.id);
+        return { ...profile, order: newOrder };
+      });
+      
+      return {
+        ...state,
+        profiles: reorderedProfiles,
       };
     }
 
@@ -438,9 +501,26 @@ function appReducer(state: AppState, action: AppAction): AppState {
         return task;
       });
 
+      // Log auto-resets
+      const resetTasks = state.tasks.filter((task, index) => 
+        task.isCompleted && !updatedTasks[index].isCompleted
+      );
+
+      const autoResetEntries: HistoryEntry[] = resetTasks.map(task => ({
+        id: `auto-reset-${task.id}-${Date.now()}`,
+        taskId: task.id,
+        profileId: 'system',
+        action: 'auto-reset',
+        timestamp: new Date(),
+        taskTitle: task.title,
+        profileName: 'System',
+        details: `Task automatically reset based on ${task.recurrence} recurrence`,
+      }));
+
       return {
         ...state,
         tasks: updatedTasks,
+        history: [...autoResetEntries, ...state.history],
       };
     }
 
@@ -502,6 +582,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
               dinner: '18:00',
               nightcap: '21:00',
             },
+            // Ensure order exists
+            order: profile.order ?? 0,
           }));
         }
         

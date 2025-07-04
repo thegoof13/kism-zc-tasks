@@ -53,6 +53,11 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
   );
   const [enableNotifications, setEnableNotifications] = useState<boolean | undefined>(task.enableNotifications);
   
+  // NEW: Sub-task functionality
+  const [isSubTask, setIsSubTask] = useState(task.isSubTask || false);
+  const [parentTaskId, setParentTaskId] = useState(task.parentTaskId || '');
+  const [requireAllSubTasksComplete, setRequireAllSubTasksComplete] = useState(task.requireAllSubTasksComplete || false);
+  
   // Recurrence config state
   const [selectedMeals, setSelectedMeals] = useState<('breakfast' | 'lunch' | 'dinner' | 'nightcap')[]>(
     task.recurrenceConfig?.meals || ['breakfast']
@@ -76,6 +81,18 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
   // Get active profile for meal time display
   const activeProfile = state.profiles.find(p => p.id === state.activeProfileId);
 
+  // Get available parent tasks (non-sub-tasks in the same group, excluding current task)
+  const availableParentTasks = state.tasks.filter(t => 
+    t.groupId === groupId && 
+    !t.isSubTask &&
+    t.id !== task.id &&
+    t.profiles.some(profileId => selectedProfiles.includes(profileId))
+  );
+
+  // Check if this task has sub-tasks
+  const hasSubTasks = state.tasks.some(t => t.parentTaskId === task.id);
+  const isParentTask = !task.isSubTask && hasSubTasks;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -86,6 +103,9 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
       groupId,
       recurrence,
       profiles: selectedProfiles,
+      isSubTask,
+      parentTaskId: isSubTask ? parentTaskId : undefined,
+      requireAllSubTasksComplete: !isSubTask ? requireAllSubTasksComplete : undefined,
     };
 
     // Handle recurrence config
@@ -232,28 +252,100 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
               </select>
             </div>
 
-            {/* Recurrence Type */}
+            {/* Sub-task Configuration */}
             <div>
-              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-                Recurrence Type
+              <label className="flex items-center space-x-3 p-3 rounded-lg border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700 cursor-pointer transition-all duration-200">
+                <input
+                  type="checkbox"
+                  checked={isSubTask}
+                  onChange={(e) => setIsSubTask(e.target.checked)}
+                  disabled={hasSubTasks} // Can't make a parent task into a sub-task
+                  className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500 disabled:opacity-50"
+                />
+                <div>
+                  <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                    Make this a sub-task
+                  </p>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    {hasSubTasks ? 'Cannot change - this task has sub-tasks' : 'Sub-tasks are grouped under a parent task'}
+                  </p>
+                </div>
               </label>
-              <select
-                value={recurrence}
-                onChange={(e) => setRecurrence(e.target.value as RecurrenceType)}
-                className="w-full px-3 py-2 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all duration-200"
-              >
-                {basicRecurrenceOptions.map(option => (
-                  <option key={option} value={option}>
-                    {option === 'meals' ? 'Meal Times' : 
-                     option === 'days' ? 'Specific Days' : 
-                     getRecurrenceLabel(option)}
-                  </option>
-                ))}
-              </select>
             </div>
 
-            {/* Meal Selection */}
-            {showMealConfig && (
+            {/* Parent Task Selection */}
+            {isSubTask && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                  Parent Task
+                </label>
+                <select
+                  value={parentTaskId}
+                  onChange={(e) => setParentTaskId(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all duration-200"
+                  required={isSubTask}
+                >
+                  <option value="">Select a parent task...</option>
+                  {availableParentTasks.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.title}
+                    </option>
+                  ))}
+                </select>
+                {availableParentTasks.length === 0 && (
+                  <p className="text-xs text-warning-600 dark:text-warning-400 mt-1">
+                    No available parent tasks in this group with shared profiles
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Parent Task Settings */}
+            {!isSubTask && (
+              <div>
+                <label className="flex items-center space-x-3 p-3 rounded-lg border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700 cursor-pointer transition-all duration-200">
+                  <input
+                    type="checkbox"
+                    checked={requireAllSubTasksComplete}
+                    onChange={(e) => setRequireAllSubTasksComplete(e.target.checked)}
+                    className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                      Require all sub-tasks to be completed
+                    </p>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                      This task can only be completed when all sub-tasks are done
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
+
+            {/* Recurrence Type - Only show for non-sub-tasks */}
+            {!isSubTask && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                  Recurrence Type
+                </label>
+                <select
+                  value={recurrence}
+                  onChange={(e) => setRecurrence(e.target.value as RecurrenceType)}
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all duration-200"
+                >
+                  {basicRecurrenceOptions.map(option => (
+                    <option key={option} value={option}>
+                      {option === 'meals' ? 'Meal Times' : 
+                       option === 'days' ? 'Specific Days' : 
+                       getRecurrenceLabel(option)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Meal Selection - Only for non-sub-tasks */}
+            {!isSubTask && showMealConfig && (
               <div>
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                   Select Meal Times
@@ -312,8 +404,8 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
               </div>
             )}
 
-            {/* Day Selection */}
-            {showDayConfig && (
+            {/* Day Selection - Only for non-sub-tasks */}
+            {!isSubTask && showDayConfig && (
               <div>
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                   Select Days of Week
@@ -375,8 +467,8 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
               </div>
             )}
 
-            {/* Recurrence From Date (conditional - NOT for meals) */}
-            {showRecurrenceFromDate && (
+            {/* Recurrence From Date (conditional - NOT for meals or sub-tasks) */}
+            {!isSubTask && showRecurrenceFromDate && (
               <div>
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
                   <div className="flex items-center space-x-1.5">
@@ -419,8 +511,8 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
               </div>
             )}
 
-            {/* Notifications (conditional - only for non-due-date tasks) */}
-            {showNotifications && (
+            {/* Notifications (conditional - only for non-due-date tasks and non-sub-tasks) */}
+            {!isSubTask && showNotifications && (
               <div>
                 <label className="flex items-center justify-between p-3 rounded-lg border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700 cursor-pointer transition-all duration-200">
                   <div className="flex items-center space-x-3">
@@ -516,8 +608,9 @@ export function EditTaskModal({ isOpen, onClose, task }: EditTaskModalProps) {
               !title.trim() || 
               !groupId || 
               selectedProfiles.length === 0 ||
-              (showMealConfig && selectedMeals.length === 0) ||
-              (showDayConfig && selectedDays.length === 0)
+              (isSubTask && !parentTaskId) ||
+              (!isSubTask && showMealConfig && selectedMeals.length === 0) ||
+              (!isSubTask && showDayConfig && selectedDays.length === 0)
             }
           >
             <Save className="w-3.5 h-3.5 mr-1.5 inline" />

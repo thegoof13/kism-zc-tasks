@@ -25,8 +25,21 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
     task.profiles.includes(state.activeProfileId)
   );
   
-  // Sort tasks based on group settings
-  const sortedTasks = [...profileTasks].sort((a, b) => {
+  // Separate parent tasks and sub-tasks
+  const parentTasks = profileTasks.filter(task => !task.isSubTask);
+  const subTasksMap = new Map<string, Task[]>();
+  
+  // Group sub-tasks by parent
+  profileTasks.filter(task => task.isSubTask && task.parentTaskId).forEach(subTask => {
+    const parentId = subTask.parentTaskId!;
+    if (!subTasksMap.has(parentId)) {
+      subTasksMap.set(parentId, []);
+    }
+    subTasksMap.get(parentId)!.push(subTask);
+  });
+  
+  // Sort parent tasks based on group settings
+  const sortedParentTasks = [...parentTasks].sort((a, b) => {
     // If group has due date sorting enabled, sort by due date first
     if (group.sortByDueDate && group.enableDueDates) {
       // Tasks with due dates come first
@@ -49,22 +62,22 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
   
   switch (group.completedDisplayMode) {
     case 'grey-out':
-      displayedTasks = sortedTasks;
+      displayedTasks = sortedParentTasks;
       break;
     
     case 'grey-drop':
-      const incompleteTasks = sortedTasks.filter(t => !t.isCompleted);
-      completedTasks = sortedTasks.filter(t => t.isCompleted);
+      const incompleteTasks = sortedParentTasks.filter(t => !t.isCompleted);
+      completedTasks = sortedParentTasks.filter(t => t.isCompleted);
       displayedTasks = [...incompleteTasks, ...completedTasks];
       break;
     
     case 'separate-completed':
-      displayedTasks = sortedTasks.filter(t => !t.isCompleted);
-      completedTasks = sortedTasks.filter(t => t.isCompleted);
+      displayedTasks = sortedParentTasks.filter(t => !t.isCompleted);
+      completedTasks = sortedParentTasks.filter(t => t.isCompleted);
       break;
     
     default:
-      displayedTasks = sortedTasks;
+      displayedTasks = sortedParentTasks;
   }
 
   const completedCount = profileTasks.filter(t => t.isCompleted).length;
@@ -165,6 +178,7 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
                 displayMode={group.completedDisplayMode}
                 onEdit={onEditTask}
                 showDueDate={group.enableDueDates}
+                subTasks={subTasksMap.get(task.id) || []}
               />
             ))
           )}
@@ -183,6 +197,7 @@ export function TaskGroup({ group, tasks, onAddTask, onEditTask }: TaskGroupProp
                     displayMode="grey-out"
                     onEdit={onEditTask}
                     showDueDate={group.enableDueDates}
+                    subTasks={subTasksMap.get(task.id) || []}
                   />
                 ))}
               </div>

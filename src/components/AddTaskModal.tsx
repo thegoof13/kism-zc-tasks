@@ -49,6 +49,10 @@ export function AddTaskModal({ isOpen, onClose, initialGroupId }: AddTaskModalPr
   const [recurrenceFromDate, setRecurrenceFromDate] = useState('');
   const [enableNotifications, setEnableNotifications] = useState<boolean | undefined>(undefined);
   
+  // NEW: Sub-task functionality
+  const [isSubTask, setIsSubTask] = useState(false);
+  const [parentTaskId, setParentTaskId] = useState('');
+  
   // Recurrence config state
   const [selectedMeals, setSelectedMeals] = useState<('breakfast' | 'lunch' | 'dinner' | 'nightcap')[]>(['breakfast']);
   const [selectedDays, setSelectedDays] = useState<(0 | 1 | 2 | 3 | 4 | 5 | 6)[]>([1, 2, 3, 4, 5]); // Weekdays by default
@@ -67,6 +71,13 @@ export function AddTaskModal({ isOpen, onClose, initialGroupId }: AddTaskModalPr
 
   // Get active profile for meal time display
   const activeProfile = state.profiles.find(p => p.id === state.activeProfileId);
+
+  // Get available parent tasks (non-sub-tasks in the same group)
+  const availableParentTasks = state.tasks.filter(task => 
+    task.groupId === groupId && 
+    !task.isSubTask &&
+    task.profiles.some(profileId => selectedProfiles.includes(profileId))
+  );
 
   // Update notification default when group changes
   React.useEffect(() => {
@@ -87,6 +98,8 @@ export function AddTaskModal({ isOpen, onClose, initialGroupId }: AddTaskModalPr
       recurrence,
       isCompleted: false,
       profiles: selectedProfiles,
+      isSubTask,
+      parentTaskId: isSubTask ? parentTaskId : undefined,
     };
 
     // Add recurrence config
@@ -124,6 +137,8 @@ export function AddTaskModal({ isOpen, onClose, initialGroupId }: AddTaskModalPr
     setDueDate('');
     setRecurrenceFromDate('');
     setEnableNotifications(undefined);
+    setIsSubTask(false);
+    setParentTaskId('');
     setSelectedMeals(['breakfast']);
     setSelectedDays([1, 2, 3, 4, 5]);
     onClose();
@@ -231,28 +246,77 @@ export function AddTaskModal({ isOpen, onClose, initialGroupId }: AddTaskModalPr
               </select>
             </div>
 
-            {/* Recurrence Type */}
+            {/* Sub-task Configuration */}
             <div>
-              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-                Recurrence Type
+              <label className="flex items-center space-x-3 p-3 rounded-lg border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700 cursor-pointer transition-all duration-200">
+                <input
+                  type="checkbox"
+                  checked={isSubTask}
+                  onChange={(e) => setIsSubTask(e.target.checked)}
+                  className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                />
+                <div>
+                  <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                    Make this a sub-task
+                  </p>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    Sub-tasks are grouped under a parent task
+                  </p>
+                </div>
               </label>
-              <select
-                value={recurrence}
-                onChange={(e) => setRecurrence(e.target.value as RecurrenceType)}
-                className="w-full px-3 py-2 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all duration-200"
-              >
-                {basicRecurrenceOptions.map(option => (
-                  <option key={option} value={option}>
-                    {option === 'meals' ? 'Meal Times' : 
-                     option === 'days' ? 'Specific Days' : 
-                     getRecurrenceLabel(option)}
-                  </option>
-                ))}
-              </select>
             </div>
 
-            {/* Meal Selection */}
-            {showMealConfig && (
+            {/* Parent Task Selection */}
+            {isSubTask && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                  Parent Task
+                </label>
+                <select
+                  value={parentTaskId}
+                  onChange={(e) => setParentTaskId(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all duration-200"
+                  required={isSubTask}
+                >
+                  <option value="">Select a parent task...</option>
+                  {availableParentTasks.map(task => (
+                    <option key={task.id} value={task.id}>
+                      {task.title}
+                    </option>
+                  ))}
+                </select>
+                {availableParentTasks.length === 0 && (
+                  <p className="text-xs text-warning-600 dark:text-warning-400 mt-1">
+                    No available parent tasks in this group with shared profiles
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Recurrence Type - Only show for non-sub-tasks */}
+            {!isSubTask && (
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                  Recurrence Type
+                </label>
+                <select
+                  value={recurrence}
+                  onChange={(e) => setRecurrence(e.target.value as RecurrenceType)}
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none transition-all duration-200"
+                >
+                  {basicRecurrenceOptions.map(option => (
+                    <option key={option} value={option}>
+                      {option === 'meals' ? 'Meal Times' : 
+                       option === 'days' ? 'Specific Days' : 
+                       getRecurrenceLabel(option)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Meal Selection - Only for non-sub-tasks */}
+            {!isSubTask && showMealConfig && (
               <div>
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                   Select Meal Times
@@ -311,8 +375,8 @@ export function AddTaskModal({ isOpen, onClose, initialGroupId }: AddTaskModalPr
               </div>
             )}
 
-            {/* Day Selection */}
-            {showDayConfig && (
+            {/* Day Selection - Only for non-sub-tasks */}
+            {!isSubTask && showDayConfig && (
               <div>
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                   Select Days of Week
@@ -374,8 +438,8 @@ export function AddTaskModal({ isOpen, onClose, initialGroupId }: AddTaskModalPr
               </div>
             )}
 
-            {/* Recurrence From Date (conditional - NOT for meals) */}
-            {showRecurrenceFromDate && (
+            {/* Recurrence From Date (conditional - NOT for meals or sub-tasks) */}
+            {!isSubTask && showRecurrenceFromDate && (
               <div>
                 <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
                   <div className="flex items-center space-x-1.5">
@@ -418,8 +482,8 @@ export function AddTaskModal({ isOpen, onClose, initialGroupId }: AddTaskModalPr
               </div>
             )}
 
-            {/* Notifications (conditional - only for non-due-date tasks) */}
-            {showNotifications && (
+            {/* Notifications (conditional - only for non-due-date tasks and non-sub-tasks) */}
+            {!isSubTask && showNotifications && (
               <div>
                 <label className="flex items-center justify-between p-3 rounded-lg border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700 cursor-pointer transition-all duration-200">
                   <div className="flex items-center space-x-3">
@@ -515,8 +579,9 @@ export function AddTaskModal({ isOpen, onClose, initialGroupId }: AddTaskModalPr
               !title.trim() || 
               !groupId || 
               selectedProfiles.length === 0 ||
-              (showMealConfig && selectedMeals.length === 0) ||
-              (showDayConfig && selectedDays.length === 0)
+              (isSubTask && !parentTaskId) ||
+              (!isSubTask && showMealConfig && selectedMeals.length === 0) ||
+              (!isSubTask && showDayConfig && selectedDays.length === 0)
             }
           >
             <Plus className="w-3.5 h-3.5 mr-1.5 inline" />

@@ -29,6 +29,11 @@ export interface Task {
   dueDate?: Date;
   recurrenceFromDate?: Date; // Not available for meal-based tasks
   enableNotifications?: boolean;
+  // NEW: Sub-task functionality
+  isSubTask?: boolean;
+  parentTaskId?: string;
+  subTaskOrder?: number;
+  requireAllSubTasksComplete?: boolean; // Only for parent tasks
 }
 
 export interface TaskGroup {
@@ -66,13 +71,14 @@ export interface UserProfile {
     nightcap: string;
   };
   viewOnlyMode?: boolean; // NEW: View only mode setting
+  order?: number; // NEW: For reordering profiles
 }
 
 export interface HistoryEntry {
   id: string;
   taskId: string;
   profileId: string;
-  action: 'completed' | 'unchecked' | 'reset' | 'restored';
+  action: 'completed' | 'unchecked' | 'reset' | 'restored' | 'auto-reset';
   timestamp: Date;
   taskTitle: string;
   profileName: string;
