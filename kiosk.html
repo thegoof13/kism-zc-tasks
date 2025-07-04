@@ -15,7 +15,7 @@
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             background: #000000;
             color: #ffffff;
-            overflow: hidden;
+            overflow-x: hidden; /* Allow vertical scrolling, prevent horizontal */
             height: 100vh;
             width: 100vw;
             user-select: none;
@@ -41,7 +41,7 @@
         }
 
         .container {
-            height: 100vh;
+            min-height: 100vh;
             width: 100vw;
             display: flex;
             flex-direction: column;
@@ -59,15 +59,36 @@
             opacity: 0.3; /* Subtle so it doesn't interfere with reading */
         }
 
-        /* Main Content - Now takes full screen */
+        /* Main Content - Now scrollable */
         .main-content {
             flex: 1;
-            height: 100vh;
+            min-height: 100vh;
             display: flex;
-            align-items: center;
+            align-items: flex-start; /* Align to top for scrolling */
             justify-content: center;
             padding: 2rem;
             position: relative;
+            overflow-y: auto; /* Enable vertical scrolling */
+            overflow-x: hidden; /* Prevent horizontal scrolling */
+        }
+
+        /* Custom scrollbar for webkit browsers */
+        .main-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .main-content::-webkit-scrollbar-track {
+            background: rgba(55, 65, 81, 0.3);
+            border-radius: 4px;
+        }
+
+        .main-content::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.5);
+            border-radius: 4px;
+        }
+
+        .main-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 0.7);
         }
 
         /* Profile Selection Screen */
@@ -80,6 +101,7 @@
             animation: fadeIn 0.8s ease-out;
             z-index: 10; /* Above the bouncing logo */
             position: relative;
+            margin-top: 2rem; /* Add top margin for better spacing */
         }
 
         .profile-card {
@@ -285,6 +307,8 @@
             animation: slideIn 0.6s ease-out;
             z-index: 10; /* Above the bouncing logo */
             position: relative;
+            margin-top: 2rem; /* Add top margin for better spacing */
+            padding-bottom: 4rem; /* Add bottom padding for scroll space */
         }
 
         .task-list.active {
@@ -294,6 +318,14 @@
         .task-header {
             text-align: center;
             margin-bottom: 3rem;
+            position: sticky;
+            top: 0;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            z-index: 20;
+            border-radius: 16px;
+            margin-bottom: 2rem;
         }
 
         .task-header h2 {
@@ -308,13 +340,14 @@
             color: #9ca3af;
         }
 
-        /* Centrally arranged grid for tasks */
+        /* Centrally arranged grid for tasks - Now scrollable */
         .tasks-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 1.5rem;
             justify-content: center;
             align-items: start;
+            width: 100%;
         }
 
         .task-button {
@@ -401,6 +434,26 @@
         .task-button.priority-other {
             border-color: #6b7280;
             background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
+        }
+
+        /* Scroll indicator for mobile */
+        .scroll-indicator {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: rgba(79, 70, 229, 0.8);
+            color: white;
+            padding: 0.5rem;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            z-index: 30;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .scroll-indicator.visible {
+            opacity: 1;
         }
 
         /* Idle Warning Toast */
@@ -549,6 +602,26 @@
             .celebration-text { font-size: 2rem; }
             .pin-modal-content { padding: 2rem; }
             .pin-button { width: 80px; height: 80px; font-size: 1.5rem; }
+            
+            /* Better mobile scrolling */
+            .main-content {
+                padding: 1rem;
+            }
+            
+            .tasks-grid {
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 1rem;
+            }
+        }
+
+        /* Smooth scrolling for all browsers */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Touch scrolling optimization for mobile */
+        .main-content {
+            -webkit-overflow-scrolling: touch;
         }
     </style>
 </head>
@@ -559,8 +632,11 @@
     <!-- Bouncing Logo - Behind everything -->
     <img id="logo" class="logo" src="/image.png" alt="ZenTasks Logo" />
     
+    <!-- Scroll indicator for mobile -->
+    <div class="scroll-indicator" id="scrollIndicator">↓</div>
+    
     <div class="container">
-        <main class="main-content">
+        <main class="main-content" id="mainContent">
             <!-- Profile Selection Screen -->
             <div class="profile-selection" id="profileSelection">
                 <!-- Profiles will be loaded here -->
@@ -635,6 +711,8 @@
         const pinDisplay = document.getElementById('pinDisplay');
         const pinError = document.getElementById('pinError');
         const logo = document.getElementById('logo');
+        const mainContent = document.getElementById('mainContent');
+        const scrollIndicator = document.getElementById('scrollIndicator');
 
         // Recurrence priority order
         const recurrencePriority = {
@@ -655,8 +733,12 @@
             showProfileSelection();
             setupIdleDetection();
             setupPinModal();
+            setupScrollIndicator();
             preventScreenSleep();
             startLogoBounce();
+            
+            // Ensure we start at the top
+            scrollToTop();
             
             // Auto-enter fullscreen after a short delay
             setTimeout(() => {
@@ -665,6 +747,27 @@
                 }
             }, 1000);
         });
+
+        // Scroll management functions
+        function scrollToTop() {
+            mainContent.scrollTop = 0;
+            window.scrollTo(0, 0);
+        }
+
+        function setupScrollIndicator() {
+            mainContent.addEventListener('scroll', () => {
+                const scrollTop = mainContent.scrollTop;
+                const scrollHeight = mainContent.scrollHeight;
+                const clientHeight = mainContent.clientHeight;
+                
+                // Show scroll indicator if there's more content below
+                if (scrollHeight > clientHeight && scrollTop < scrollHeight - clientHeight - 100) {
+                    scrollIndicator.classList.add('visible');
+                } else {
+                    scrollIndicator.classList.remove('visible');
+                }
+            });
+        }
 
         // API Functions
         async function loadUserData() {
@@ -716,6 +819,9 @@
             taskList.classList.remove('active');
             currentUser = null;
             
+            // Scroll to top when showing profile selection
+            scrollToTop();
+            
             // Clear and populate profiles
             profileSelection.innerHTML = '';
             
@@ -766,6 +872,9 @@
             clearIdle();
             profileSelection.style.display = 'none';
             taskList.classList.add('active');
+            
+            // Scroll to top when showing task list
+            scrollToTop();
             
             taskHeaderTitle.textContent = `${currentUser.name}'s Tasks`;
             
