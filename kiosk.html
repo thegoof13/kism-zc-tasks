@@ -58,34 +58,10 @@
             transition: all 0.1s ease-out;
         }
 
-        /* Header */
-        .header {
-            padding: 2rem;
-            text-align: center;
-            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-            border-bottom: 2px solid #4f46e5;
-            position: relative;
-            z-index: 10;
-        }
-
-        .header h1 {
-            font-size: 3rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #4f46e5, #06b6d4);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.5rem;
-        }
-
-        .header p {
-            font-size: 1.2rem;
-            color: #9ca3af;
-        }
-
-        /* Main Content */
+        /* Main Content - Now takes full screen */
         .main-content {
             flex: 1;
+            height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -391,32 +367,6 @@
             opacity: 0.7;
         }
 
-        /* Back Button */
-        .back-button {
-            position: absolute;
-            top: 2rem;
-            left: 2rem;
-            background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
-            border: 2px solid #6b7280;
-            border-radius: 16px;
-            padding: 1rem 1.5rem;
-            color: #ffffff;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: none;
-        }
-
-        .back-button.visible {
-            display: block;
-        }
-
-        .back-button:hover {
-            border-color: #4f46e5;
-            transform: translateY(-2px);
-        }
-
         /* Idle Warning Toast */
         .idle-toast {
             position: fixed;
@@ -553,8 +503,6 @@
 
         /* Responsive Design */
         @media (max-width: 768px) {
-            .header h1 { font-size: 2.5rem; }
-            .header p { font-size: 1rem; }
             .profile-card { padding: 2rem; min-height: 160px; }
             .profile-avatar { font-size: 3rem; }
             .profile-name { font-size: 1.5rem; }
@@ -575,11 +523,6 @@
     <img id="logo" class="logo" src="/image.png" alt="ZenTasks Logo" />
     
     <div class="container">
-        <header class="header">
-            <h1>ZenTasks</h1>
-            <p>Select your profile to view tasks</p>
-        </header>
-
         <main class="main-content">
             <!-- Profile Selection Screen -->
             <div class="profile-selection" id="profileSelection">
@@ -588,10 +531,6 @@
 
             <!-- Task List Screen -->
             <div class="task-list" id="taskList">
-                <button class="back-button" id="backButton" onclick="showProfileSelection()">
-                    ← Back to Profiles
-                </button>
-                
                 <div class="task-header">
                     <h2 id="taskHeaderTitle">Your Tasks</h2>
                     <p id="taskHeaderSubtitle">Tap to complete tasks</p>
@@ -650,7 +589,6 @@
         // DOM Elements
         const profileSelection = document.getElementById('profileSelection');
         const taskList = document.getElementById('taskList');
-        const backButton = document.getElementById('backButton');
         const taskHeaderTitle = document.getElementById('taskHeaderTitle');
         const taskHeaderSubtitle = document.getElementById('taskHeaderSubtitle');
         const tasksGrid = document.getElementById('tasksGrid');
@@ -726,7 +664,6 @@
             hidePinModal();
             profileSelection.style.display = 'grid';
             taskList.classList.remove('active');
-            backButton.classList.remove('visible');
             currentUser = null;
             
             // Clear and populate profiles
@@ -779,7 +716,6 @@
             clearIdle();
             profileSelection.style.display = 'none';
             taskList.classList.add('active');
-            backButton.classList.add('visible');
             
             taskHeaderTitle.textContent = `${currentUser.name}'s Tasks`;
             
