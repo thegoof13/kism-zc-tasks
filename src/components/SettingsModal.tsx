@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, User, Users, History, Brain, Shield, Eye, EyeOff, Calendar, Bell, BellOff, Palette, Moon, Sun, Monitor, Save, Plus, Edit, Trash2, ChevronDown, ChevronRight, Trophy, Crown } from 'lucide-react';
+import { X, Settings, User, Users, History, Brain, Shield, Eye, EyeOff, Calendar, Bell, BellOff, Palette, Moon, Sun, Monitor, Save, Plus, Edit, Trash2, ChevronDown, ChevronRight, Trophy, Crown, GripVertical } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { HistoryAnalytics } from './HistoryAnalytics';
@@ -58,6 +58,10 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
   const [enableDueDates, setEnableDueDates] = useState(false);
   const [sortByDueDate, setSortByDueDate] = useState(false);
   const [defaultNotifications, setDefaultNotifications] = useState(false);
+  const [showAddProfileForm, setShowAddProfileForm] = useState(false);
+  const [showAddGroupForm, setShowAddGroupForm] = useState(false);
+  const [draggedProfileId, setDraggedProfileId] = useState<string | null>(null);
+  const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
 
   // Early return AFTER all hooks are declared
   if (!isOpen) return null;
@@ -116,6 +120,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
       dinner: '18:00',
       nightcap: '21:00'
     });
+    setShowAddProfileForm(false);
   };
 
   const handleEditProfile = (profile: any) => {
@@ -136,6 +141,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
       dinner: '18:00',
       nightcap: '21:00'
     });
+    setShowAddProfileForm(true);
   };
 
   const handleSaveGroup = () => {
@@ -174,6 +180,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
     setEnableDueDates(false);
     setSortByDueDate(false);
     setDefaultNotifications(false);
+    setShowAddGroupForm(false);
   };
 
   const handleEditGroup = (group: any) => {
@@ -185,6 +192,104 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
     setEnableDueDates(group.enableDueDates || false);
     setSortByDueDate(group.sortByDueDate || false);
     setDefaultNotifications(group.defaultNotifications || false);
+    setShowAddGroupForm(true);
+  };
+
+  const handleStartAddProfile = () => {
+    setEditingProfile(null);
+    setNewProfileName('');
+    setNewProfileAvatar('👤');
+    setNewProfileColor('#6366F1');
+    setProfilePin('');
+    setIsTaskCompetitor(false);
+    setProfilePermissions({
+      canCreateTasks: true,
+      canEditTasks: true,
+      canDeleteTasks: true
+    });
+    setProfileMealTimes({
+      breakfast: '07:00',
+      lunch: '12:00',
+      dinner: '18:00',
+      nightcap: '21:00'
+    });
+    setShowAddProfileForm(true);
+  };
+
+  const handleStartAddGroup = () => {
+    setEditingGroup(null);
+    setNewGroupName('');
+    setNewGroupColor('#6366F1');
+    setNewGroupIcon('User');
+    setGroupDisplayMode('grey-out');
+    setEnableDueDates(false);
+    setSortByDueDate(false);
+    setDefaultNotifications(false);
+    setShowAddGroupForm(true);
+  };
+
+  // Drag and drop handlers for profiles
+  const handleProfileDragStart = (e: React.DragEvent, profileId: string) => {
+    setDraggedProfileId(profileId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleProfileDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleProfileDrop = (e: React.DragEvent, targetProfileId: string) => {
+    e.preventDefault();
+    if (!draggedProfileId || draggedProfileId === targetProfileId) return;
+
+    const profiles = [...state.profiles];
+    const draggedIndex = profiles.findIndex(p => p.id === draggedProfileId);
+    const targetIndex = profiles.findIndex(p => p.id === targetProfileId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    // Reorder profiles
+    const [draggedProfile] = profiles.splice(draggedIndex, 1);
+    profiles.splice(targetIndex, 0, draggedProfile);
+
+    // Update order values
+    const reorderedProfileIds = profiles.map(p => p.id);
+    dispatch({ type: 'REORDER_PROFILES', profileIds: reorderedProfileIds });
+
+    setDraggedProfileId(null);
+  };
+
+  // Drag and drop handlers for groups
+  const handleGroupDragStart = (e: React.DragEvent, groupId: string) => {
+    setDraggedGroupId(groupId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleGroupDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleGroupDrop = (e: React.DragEvent, targetGroupId: string) => {
+    e.preventDefault();
+    if (!draggedGroupId || draggedGroupId === targetGroupId) return;
+
+    const groups = [...state.groups];
+    const draggedIndex = groups.findIndex(g => g.id === draggedGroupId);
+    const targetIndex = groups.findIndex(g => g.id === targetGroupId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    // Reorder groups
+    const [draggedGroup] = groups.splice(draggedIndex, 1);
+    groups.splice(targetIndex, 0, draggedGroup);
+
+    // Update order values
+    const reorderedGroupIds = groups.map(g => g.id);
+    dispatch({ type: 'REORDER_GROUPS', groupIds: reorderedGroupIds });
+
+    setDraggedGroupId(null);
   };
 
   const renderTabContent = () => {
@@ -339,16 +444,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                 Task Groups
               </h3>
               <button
-                onClick={() => {
-                  setEditingGroup(null);
-                  setNewGroupName('');
-                  setNewGroupColor('#6366F1');
-                  setNewGroupIcon('User');
-                  setGroupDisplayMode('grey-out');
-                  setEnableDueDates(false);
-                  setSortByDueDate(false);
-                  setDefaultNotifications(false);
-                }}
+                onClick={handleStartAddGroup}
                 className="btn-primary"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -357,7 +453,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
             </div>
 
             {/* Group Form */}
-            {(editingGroup || newGroupName) && (
+            {showAddGroupForm && (
               <div className="card p-4 space-y-4">
                 <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
                   {editingGroup ? 'Edit Group' : 'New Group'}
@@ -467,10 +563,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
 
                 <div className="flex space-x-3">
                   <button
-                    onClick={() => {
-                      setEditingGroup(null);
-                      setNewGroupName('');
-                    }}
+                    onClick={() => setShowAddGroupForm(false)}
                     className="btn-secondary flex-1"
                   >
                     Cancel
@@ -486,12 +579,22 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
               </div>
             )}
 
-            {/* Groups List */}
+            {/* Groups List with Drag and Drop */}
             <div className="space-y-3">
-              {state.groups.map(group => (
-                <div key={group.id} className="card p-4">
+              {state.groups
+                .sort((a, b) => a.order - b.order)
+                .map(group => (
+                <div 
+                  key={group.id} 
+                  className="card p-4 cursor-move"
+                  draggable
+                  onDragStart={(e) => handleGroupDragStart(e, group.id)}
+                  onDragOver={handleGroupDragOver}
+                  onDrop={(e) => handleGroupDrop(e, group.id)}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
+                      <GripVertical className="w-4 h-4 text-neutral-400" />
                       <div 
                         className="w-4 h-4 rounded-full"
                         style={{ backgroundColor: group.color }}
@@ -540,25 +643,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                 User Profiles
               </h3>
               <button
-                onClick={() => {
-                  setEditingProfile(null);
-                  setNewProfileName('');
-                  setNewProfileAvatar('👤');
-                  setNewProfileColor('#6366F1');
-                  setProfilePin('');
-                  setIsTaskCompetitor(false);
-                  setProfilePermissions({
-                    canCreateTasks: true,
-                    canEditTasks: true,
-                    canDeleteTasks: true
-                  });
-                  setProfileMealTimes({
-                    breakfast: '07:00',
-                    lunch: '12:00',
-                    dinner: '18:00',
-                    nightcap: '21:00'
-                  });
-                }}
+                onClick={handleStartAddProfile}
                 className="btn-primary"
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -567,7 +652,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
             </div>
 
             {/* Profile Form */}
-            {(editingProfile || newProfileName) && (
+            {showAddProfileForm && (
               <div className="card p-4 space-y-4">
                 <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
                   {editingProfile ? 'Edit Profile' : 'New Profile'}
@@ -758,10 +843,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
 
                 <div className="flex space-x-3">
                   <button
-                    onClick={() => {
-                      setEditingProfile(null);
-                      setNewProfileName('');
-                    }}
+                    onClick={() => setShowAddProfileForm(false)}
                     className="btn-secondary flex-1"
                   >
                     Cancel
@@ -777,12 +859,22 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
               </div>
             )}
 
-            {/* Profiles List */}
+            {/* Profiles List with Drag and Drop */}
             <div className="space-y-3">
-              {state.profiles.map(profile => (
-                <div key={profile.id} className="card p-4">
+              {state.profiles
+                .sort((a, b) => (a.order || 0) - (b.order || 0))
+                .map(profile => (
+                <div 
+                  key={profile.id} 
+                  className="card p-4 cursor-move"
+                  draggable
+                  onDragStart={(e) => handleProfileDragStart(e, profile.id)}
+                  onDragOver={handleProfileDragOver}
+                  onDrop={(e) => handleProfileDrop(e, profile.id)}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
+                      <GripVertical className="w-4 h-4 text-neutral-400" />
                       <div className="text-2xl">{profile.avatar}</div>
                       <div>
                         <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
@@ -831,12 +923,17 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
 
       case 'history':
         return (
-          <div className="h-full overflow-hidden">
-            <HistoryAnalytics 
-              history={state.history} 
-              tasks={state.tasks} 
-              profiles={state.profiles} 
-            />
+          <div className="h-full flex flex-col">
+            <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4 flex-shrink-0">
+              Task History & Analytics
+            </h3>
+            <div className="flex-1 overflow-y-auto">
+              <HistoryAnalytics 
+                history={state.history} 
+                tasks={state.tasks} 
+                profiles={state.profiles} 
+              />
+            </div>
           </div>
         );
 
@@ -940,8 +1037,8 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
       <div className="fixed inset-0 z-50 flex">
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
         
-        <div className="relative w-full max-w-6xl mx-auto bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in m-4 flex overflow-hidden settings-modal">
-          {/* Sidebar */}
+        <div className="relative w-full max-w-6xl mx-auto bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in m-4 flex overflow-hidden">
+          {/* Sidebar - Responsive */}
           <div className="w-16 md:w-64 bg-neutral-50 dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-700 flex-shrink-0">
             <div className="p-4 border-b border-neutral-200 dark:border-neutral-700">
               <div className="flex items-center justify-between">
