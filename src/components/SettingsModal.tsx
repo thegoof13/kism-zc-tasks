@@ -58,26 +58,6 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
   const [draggedGroup, setDraggedGroup] = useState<string | null>(null);
   const dragCounter = useRef(0);
 
-  const suggestedQueries = [
-    "What are my task completion patterns?",
-    "Which tasks do I complete most consistently?",
-    "How many tasks did I accidentally check this week?",
-    "What's my productivity trend over time?",
-    "Which task groups need more attention?",
-    "When am I most productive during the day?",
-  ];
-
-  const tabs = [
-    { id: 'general' as TabType, label: 'General', icon: Settings },
-    { id: 'profiles' as TabType, label: 'Profiles', icon: Users },
-    { id: 'groups' as TabType, label: 'Groups', icon: Folder },
-    { id: 'ai' as TabType, label: 'AI Assistant', icon: Brain },
-    { id: 'history' as TabType, label: 'History', icon: History },
-    { id: 'security' as TabType, label: 'Security', icon: Shield },
-  ];
-
-  if (!isOpen) return null;
-
   // Profile form state
   const [profileForm, setProfileForm] = useState({
     name: '',
@@ -109,6 +89,27 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
     sortByDueDate: false,
     defaultNotifications: false,
   });
+
+  const suggestedQueries = [
+    "What are my task completion patterns?",
+    "Which tasks do I complete most consistently?",
+    "How many tasks did I accidentally check this week?",
+    "What's my productivity trend over time?",
+    "Which task groups need more attention?",
+    "When am I most productive during the day?",
+  ];
+
+  const tabs = [
+    { id: 'general' as TabType, label: 'General', icon: Settings },
+    { id: 'profiles' as TabType, label: 'Profiles', icon: Users },
+    { id: 'groups' as TabType, label: 'Groups', icon: Folder },
+    { id: 'ai' as TabType, label: 'AI Assistant', icon: Brain },
+    { id: 'history' as TabType, label: 'History', icon: History },
+    { id: 'security' as TabType, label: 'Security', icon: Shield },
+  ];
+
+  // Early return after all hooks are declared
+  if (!isOpen) return null;
 
   const handleEditProfile = (profile: UserProfile) => {
     setProfileForm({
