@@ -32,6 +32,9 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate, subTasks = []
   const taskGroup = state.groups.find(g => g.id === task.groupId);
   const isViewOnlyMode = state.settings.viewOnlyMode;
 
+  // Get task update status
+  const updateStatus = state.taskUpdateStatuses?.get(task.id);
+
   // Check profile permissions (disabled in view only mode)
   const canEdit = !isViewOnlyMode && (activeProfile?.permissions?.canEditTasks ?? true);
   const canDelete = !isViewOnlyMode && (activeProfile?.permissions?.canDeleteTasks ?? true);
@@ -48,7 +51,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate, subTasks = []
 
   const handleToggle = () => {
     // Only allow checking (completing) tasks, not unchecking, and not in view only mode
-    if (!task.isCompleted && activeProfile && canToggle) {
+    if (!task.isCompleted && activeProfile && canToggle && updateStatus !== 'pending') {
       // For parent tasks with requireAllSubTasksComplete, check if all sub-tasks are done
       if (isParentTask && task.requireAllSubTasksComplete && !allSubTasksCompleted) {
         return; // Don't allow completion
@@ -198,6 +201,15 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate, subTasks = []
   const getItemClasses = () => {
     let baseClasses = "group flex items-center space-x-2.5 p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:shadow-sm transition-all duration-200 relative overflow-hidden";
     
+    // Add update status styling
+    if (updateStatus === 'pending') {
+      baseClasses += " border-yellow-300 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-900/10";
+    } else if (updateStatus === 'success') {
+      baseClasses += " border-green-300 dark:border-green-600 bg-green-50 dark:bg-green-900/10 animate-pulse";
+    } else if (updateStatus === 'error') {
+      baseClasses += " border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900/10 animate-pulse";
+    }
+    
     // Add indentation for sub-tasks
     if (isSubTask) {
       baseClasses += " ml-6 border-l-4 border-l-primary-300 dark:border-l-primary-600";
@@ -208,7 +220,7 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate, subTasks = []
       baseClasses += " opacity-75 cursor-default";
     }
     
-    if (task.isCompleted) {
+    if (task.isCompleted && updateStatus !== 'error') {
       switch (displayMode) {
         case 'grey-out':
         case 'grey-drop':
@@ -283,6 +295,15 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate, subTasks = []
         ref={taskRef}
         className="relative"
       >
+        {/* Update Status Indicator */}
+        {updateStatus && (
+          <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full z-10 ${
+            updateStatus === 'pending' ? 'bg-yellow-400 animate-pulse' :
+            updateStatus === 'success' ? 'bg-green-400 animate-ping' :
+            updateStatus === 'error' ? 'bg-red-400 animate-ping' : ''
+          }`} />
+        )}
+
         {/* Swipe Actions Background - Shows on both mobile and desktop when triggered and not in view only mode */}
         {(showSwipeActions || swipeOffset < 0) && !isViewOnlyMode && (
           <div 
@@ -363,13 +384,15 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate, subTasks = []
           <button
             onClick={handleToggle}
             className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
-              task.isCompleted
+              task.isCompleted && updateStatus !== 'error'
                 ? 'bg-success-500 border-success-500 scale-110 cursor-default'
-                : canToggle && canCompleteParent
+                : canToggle && canCompleteParent && updateStatus !== 'pending'
                   ? 'border-neutral-300 dark:border-neutral-600 hover:border-success-400 dark:hover:border-success-400 cursor-pointer'
                   : 'border-neutral-300 dark:border-neutral-600 cursor-default opacity-50'
             }`}
             aria-label={
+              updateStatus === 'pending' ? 'Saving...' :
+              updateStatus === 'error' ? 'Save failed - click to retry' :
               isViewOnlyMode 
                 ? 'View only mode - cannot modify tasks'
                 : task.isCompleted 
@@ -378,8 +401,15 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate, subTasks = []
                     ? 'Complete all sub-tasks first'
                     : 'Mark as complete'
             }
-            disabled={task.isCompleted || !canToggle || (isParentTask && task.requireAllSubTasksComplete && !allSubTasksCompleted)}
+            disabled={
+              updateStatus === 'pending' ||
+              (task.isCompleted && updateStatus !== 'error') || 
+              !canToggle || 
+              (isParentTask && task.requireAllSubTasksComplete && !allSubTasksCompleted)
+            }
             title={
+              updateStatus === 'pending' ? 'Saving...' :
+              updateStatus === 'error' ? 'Save failed - click to retry' :
               isViewOnlyMode 
                 ? 'View only mode - cannot modify tasks' 
                 : isParentTask && task.requireAllSubTasksComplete && !allSubTasksCompleted
@@ -387,9 +417,13 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate, subTasks = []
                   : undefined
             }
           >
-            {task.isCompleted && (
+            {updateStatus === 'pending' ? (
+              <div className="w-3 h-3 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin" />
+            ) : (task.isCompleted && updateStatus !== 'error') ? (
               <Check className="w-3 h-3 text-white animate-scale-in" />
-            )}
+            ) : updateStatus === 'error' ? (
+              <X className="w-3 h-3 text-red-500" />
+            ) : null}
           </button>
 
           {/* Task Content */}
@@ -399,12 +433,25 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate, subTasks = []
               <div className="flex-1 min-w-0">
                 <div className="flex items-center space-x-2">
                   <h4 className={`font-medium truncate text-sm ${
-                    task.isCompleted 
+                    task.isCompleted && updateStatus !== 'error'
                       ? 'line-through text-neutral-500 dark:text-neutral-400' 
                       : 'text-neutral-900 dark:text-neutral-100'
                   }`}>
                     {task.title}
                   </h4>
+                  
+                  {/* Update Status Text */}
+                  {updateStatus && (
+                    <span className={`text-xs font-medium ${
+                      updateStatus === 'pending' ? 'text-yellow-600 dark:text-yellow-400' :
+                      updateStatus === 'success' ? 'text-green-600 dark:text-green-400' :
+                      updateStatus === 'error' ? 'text-red-600 dark:text-red-400' : ''
+                    }`}>
+                      {updateStatus === 'pending' ? 'Saving...' :
+                       updateStatus === 'success' ? 'Saved!' :
+                       updateStatus === 'error' ? 'Failed!' : ''}
+                    </span>
+                  )}
                   
                   {/* Parent Task Indicator */}
                   {isParentTask && (
@@ -438,13 +485,15 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate, subTasks = []
               
               {/* Desktop Right Side - Recurrence + Completed By + Menu Button */}
               <div className="flex items-center space-x-1.5 ml-3">
-                {/* Recurrence Badge - Desktop */}
-                <div className="flex items-center space-x-1 px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-700 rounded-full">
-                  <Clock className="w-2.5 h-2.5 text-neutral-500 dark:text-neutral-400" />
-                  <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
-                    {getRecurrenceInfo()}
-                  </span>
-                </div>
+                {/* Recurrence Badge - Desktop (only for non-sub-tasks) */}
+                {!isSubTask && (
+                  <div className="flex items-center space-x-1 px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-700 rounded-full">
+                    <Clock className="w-2.5 h-2.5 text-neutral-500 dark:text-neutral-400" />
+                    <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
+                      {getRecurrenceInfo()}
+                    </span>
+                  </div>
+                )}
 
                 {/* Completed By Indicator - Desktop */}
                 {task.isCompleted && completedByProfile && (
@@ -481,12 +530,25 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate, subTasks = []
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2">
                     <h4 className={`font-medium truncate text-sm ${
-                      task.isCompleted 
+                      task.isCompleted && updateStatus !== 'error'
                         ? 'line-through text-neutral-500 dark:text-neutral-400' 
                         : 'text-neutral-900 dark:text-neutral-100'
                     }`}>
                       {task.title}
                     </h4>
+                    
+                    {/* Update Status Text - Mobile */}
+                    {updateStatus && (
+                      <span className={`text-xs font-medium ${
+                        updateStatus === 'pending' ? 'text-yellow-600 dark:text-yellow-400' :
+                        updateStatus === 'success' ? 'text-green-600 dark:text-green-400' :
+                        updateStatus === 'error' ? 'text-red-600 dark:text-red-400' : ''
+                      }`}>
+                        {updateStatus === 'pending' ? 'Saving...' :
+                         updateStatus === 'success' ? 'Saved!' :
+                         updateStatus === 'error' ? 'Failed!' : ''}
+                      </span>
+                    )}
                     
                     {/* Parent Task Indicator - Mobile */}
                     {isParentTask && (
@@ -528,26 +590,28 @@ export function TaskItem({ task, displayMode, onEdit, showDueDate, subTasks = []
                 </div>
               )}
 
-              {/* Mobile Third Row - Recurrence + Completed By */}
-              <div className="flex items-center space-x-1.5 mt-1">
-                {/* Recurrence Badge - Mobile */}
-                <div className="flex items-center space-x-1 px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-700 rounded-full">
-                  <Clock className="w-2.5 h-2.5 text-neutral-500 dark:text-neutral-400" />
-                  <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
-                    {getRecurrenceInfo()}
-                  </span>
-                </div>
-
-                {/* Completed By Indicator - Mobile */}
-                {task.isCompleted && completedByProfile && (
-                  <div className="flex items-center space-x-1 px-1.5 py-0.5 bg-success-100 dark:bg-success-900/20 rounded-full">
-                    <span className="text-xs">{completedByProfile.avatar}</span>
-                    <span className="text-xs text-success-700 dark:text-success-400 font-medium">
-                      {completedByProfile.name}
+              {/* Mobile Third Row - Recurrence + Completed By (only for non-sub-tasks) */}
+              {!isSubTask && (
+                <div className="flex items-center space-x-1.5 mt-1">
+                  {/* Recurrence Badge - Mobile */}
+                  <div className="flex items-center space-x-1 px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-700 rounded-full">
+                    <Clock className="w-2.5 h-2.5 text-neutral-500 dark:text-neutral-400" />
+                    <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
+                      {getRecurrenceInfo()}
                     </span>
                   </div>
-                )}
-              </div>
+
+                  {/* Completed By Indicator - Mobile */}
+                  {task.isCompleted && completedByProfile && (
+                    <div className="flex items-center space-x-1 px-1.5 py-0.5 bg-success-100 dark:bg-success-900/20 rounded-full">
+                      <span className="text-xs">{completedByProfile.avatar}</span>
+                      <span className="text-xs text-success-700 dark:text-success-400 font-medium">
+                        {completedByProfile.name}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Completion Time - Both layouts */}

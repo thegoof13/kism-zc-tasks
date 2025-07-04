@@ -6,6 +6,8 @@ import { ApiService } from '../services/api';
 
 type AppAction = 
   | { type: 'TOGGLE_TASK'; taskId: string; profileId: string }
+  | { type: 'TOGGLE_TASK_SUCCESS'; taskId: string; profileId: string }
+  | { type: 'TOGGLE_TASK_FAILURE'; taskId: string }
   | { type: 'ADD_TASK'; task: Omit<Task, 'id' | 'createdAt' | 'order'> }
   | { type: 'UPDATE_TASK'; taskId: string; updates: Partial<Task> }
   | { type: 'DELETE_TASK'; taskId: string }
@@ -26,7 +28,8 @@ type AppAction =
   | { type: 'RESET_RECURRING_TASKS' }
   | { type: 'LOAD_STATE'; state: AppState }
   | { type: 'SET_LOADING'; loading: boolean }
-  | { type: 'SET_ERROR'; error: string | null };
+  | { type: 'SET_ERROR'; error: string | null }
+  | { type: 'SET_TASK_UPDATE_STATUS'; taskId: string; status: 'pending' | 'success' | 'error' | null };
 
 const initialState: AppState = {
   tasks: [],
@@ -36,6 +39,7 @@ const initialState: AppState = {
   settings: defaultSettings,
   activeProfileId: 'default',
   loading: true,
+  taskUpdateStatuses: new Map(), // Track update status for each task
 };
 
 // Helper function to calculate top competitor
@@ -127,13 +131,31 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { 
         ...action.state, 
         settings: mergedSettings,
-        loading: false 
+        loading: false,
+        taskUpdateStatuses: new Map(),
+      };
+    }
+
+    case 'SET_TASK_UPDATE_STATUS': {
+      const newStatuses = new Map(state.taskUpdateStatuses);
+      if (action.status === null) {
+        newStatuses.delete(action.taskId);
+      } else {
+        newStatuses.set(action.taskId, action.status);
+      }
+      return {
+        ...state,
+        taskUpdateStatuses: newStatuses,
       };
     }
 
     case 'TOGGLE_TASK': {
       const task = state.tasks.find(t => t.id === action.taskId);
       if (!task) return state;
+
+      // Set status to pending immediately
+      const newStatuses = new Map(state.taskUpdateStatuses);
+      newStatuses.set(action.taskId, 'pending');
 
       const isCompleting = !task.isCompleted;
       const profile = state.profiles.find(p => p.id === action.profileId);
@@ -185,6 +207,50 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         tasks: updatedTasks,
         history: finalHistory,
+        taskUpdateStatuses: newStatuses,
+      };
+    }
+
+    case 'TOGGLE_TASK_SUCCESS': {
+      // Clear the pending status and set to success briefly
+      const newStatuses = new Map(state.taskUpdateStatuses);
+      newStatuses.set(action.taskId, 'success');
+      
+      // Clear the success status after a short delay
+      setTimeout(() => {
+        // This will be handled by the component
+      }, 1000);
+
+      return {
+        ...state,
+        taskUpdateStatuses: newStatuses,
+      };
+    }
+
+    case 'TOGGLE_TASK_FAILURE': {
+      // Revert the task to its previous state
+      const task = state.tasks.find(t => t.id === action.taskId);
+      if (!task) return state;
+
+      const revertedTask = {
+        ...task,
+        isCompleted: !task.isCompleted,
+        completedBy: undefined,
+        completedAt: undefined,
+      };
+
+      const newStatuses = new Map(state.taskUpdateStatuses);
+      newStatuses.set(action.taskId, 'error');
+
+      // Clear the error status after a short delay
+      setTimeout(() => {
+        // This will be handled by the component
+      }, 2000);
+
+      return {
+        ...state,
+        tasks: state.tasks.map(t => t.id === action.taskId ? revertedTask : t),
+        taskUpdateStatuses: newStatuses,
       };
     }
 
@@ -610,9 +676,52 @@ export function AppProvider({ children }: { children: ReactNode }) {
     loadData();
   }, []);
 
-  // Save data to server whenever state changes (debounced)
+  // Handle task toggle with API confirmation
+  useEffect(() => {
+    const handleTaskToggle = async (taskId: string, profileId: string) => {
+      try {
+        // Save to server
+        await ApiService.saveUserData(state);
+        
+        // Success - show green flash
+        dispatch({ type: 'TOGGLE_TASK_SUCCESS', taskId, profileId });
+        
+        // Clear success status after animation
+        setTimeout(() => {
+          dispatch({ type: 'SET_TASK_UPDATE_STATUS', taskId, status: null });
+        }, 1000);
+        
+      } catch (error) {
+        console.error('Failed to save task update:', error);
+        
+        // Failure - show red flash and revert
+        dispatch({ type: 'TOGGLE_TASK_FAILURE', taskId });
+        
+        // Clear error status after animation
+        setTimeout(() => {
+          dispatch({ type: 'SET_TASK_UPDATE_STATUS', taskId, status: null });
+        }, 2000);
+      }
+    };
+
+    // Check for pending task updates
+    state.taskUpdateStatuses.forEach((status, taskId) => {
+      if (status === 'pending') {
+        const activeProfile = state.profiles.find(p => p.id === state.activeProfileId);
+        if (activeProfile) {
+          handleTaskToggle(taskId, activeProfile.id);
+        }
+      }
+    });
+  }, [state.taskUpdateStatuses, state]);
+
+  // Save data to server whenever state changes (debounced) - but not for task toggles
   useEffect(() => {
     if (state.loading) return;
+
+    // Don't save if there are pending task updates
+    const hasPendingUpdates = Array.from(state.taskUpdateStatuses.values()).some(status => status === 'pending');
+    if (hasPendingUpdates) return;
 
     const saveData = async () => {
       try {

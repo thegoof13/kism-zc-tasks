@@ -120,4 +120,5 @@ export interface AppState {
   settings: AppSettings;
   activeProfileId: string;
   loading?: boolean;
+  taskUpdateStatuses?: Map<string, 'pending' | 'success' | 'error'>; // NEW: Track task update status
 }
