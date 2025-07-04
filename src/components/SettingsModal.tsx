@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, User, Users, History, Brain, Shield, Eye, EyeOff, Calendar, Bell, BellOff, Palette, Moon, Sun, Monitor, Save, Plus, Edit, Trash2, ChevronDown, ChevronRight, Trophy, Crown, GripVertical, Database, Download, Upload, FileText, AlertTriangle } from 'lucide-react';
+import { X, Settings, User, Users, History, Brain, Shield, Eye, EyeOff, Calendar, Bell, BellOff, Palette, Moon, Sun, Monitor, Save, Plus, Edit, Trash2, ChevronDown, ChevronRight, Trophy, Crown, GripVertical, Database, Download, Upload, BarChart3 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { HistoryAnalytics } from './HistoryAnalytics';
@@ -13,7 +13,7 @@ interface SettingsModalProps {
   isSettingsPasswordSet: boolean;
 }
 
-type TabType = 'general' | 'groups' | 'profiles' | 'history' | 'ai' | 'security' | 'data';
+type TabType = 'general' | 'groups' | 'profiles' | 'data' | 'history' | 'ai' | 'security';
 
 const availableAvatars = [
   '👤', '😊', '😎', '😍', '🤔', '😴', '🤗', '🤓',
@@ -70,6 +70,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
     { id: 'general' as TabType, name: 'General', icon: Settings },
     { id: 'groups' as TabType, name: 'Groups', icon: Users },
     { id: 'profiles' as TabType, name: 'Profiles', icon: User },
+    { id: 'data' as TabType, name: 'Data', icon: Database },
     { id: 'history' as TabType, name: 'History', icon: History },
     { id: 'ai' as TabType, name: 'AI Assistant', icon: Brain },
     { id: 'security' as TabType, name: 'Security', icon: Shield },
