@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, User, Users, Shield, Brain, BarChart3, Save, Eye, EyeOff, Lock, Unlock, GripVertical, TestTube, MessageSquare, Send } from 'lucide-react';
+import { X, Settings, User, Users, Shield, Brain, BarChart3, Save, Eye, EyeOff, Lock, Unlock, GripVertical, TestTube, MessageSquare, Send, Plus } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { getIconComponent, getAvailableIcons } from '../utils/icons';
 import { PasswordModal } from './PasswordModal';
