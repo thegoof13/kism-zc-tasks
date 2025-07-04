@@ -159,15 +159,17 @@
         }
 
         .profile-name {
-            font-size: 1.8rem;
-            font-weight: 600;
+            font-size: 1.2rem; /* Much smaller - was 1.8rem */
+            font-weight: 500; /* Lighter weight */
             margin-bottom: 0.5rem;
             color: #ffffff;
+            opacity: 0.9; /* Slightly less prominent */
         }
 
         .profile-role {
-            font-size: 1rem;
+            font-size: 0.8rem; /* Smaller - was 1rem */
             color: #9ca3af;
+            opacity: 0.7; /* Even more subtle */
         }
 
         .profile-pin-indicator {
@@ -410,29 +412,29 @@
             opacity: 0.7;
         }
 
-        /* Priority indicators for different recurrence types */
+        /* Beautiful priority colors - No more nasty reds! */
         .task-button.priority-daily {
-            border-color: #ef4444;
-            background: linear-gradient(135deg, #450a0a 0%, #7f1d1d 100%);
+            border-color: #3b82f6; /* Beautiful blue */
+            background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%);
         }
 
         .task-button.priority-days {
-            border-color: #f59e0b;
-            background: linear-gradient(135deg, #451a03 0%, #92400e 100%);
+            border-color: #8b5cf6; /* Elegant purple */
+            background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 100%);
         }
 
         .task-button.priority-meals {
-            border-color: #10b981;
-            background: linear-gradient(135deg, #022c22 0%, #064e3b 100%);
+            border-color: #10b981; /* Fresh green */
+            background: linear-gradient(135deg, #047857 0%, #059669 100%);
         }
 
         .task-button.priority-weekly {
-            border-color: #8b5cf6;
-            background: linear-gradient(135deg, #2e1065 0%, #5b21b6 100%);
+            border-color: #f59e0b; /* Warm amber */
+            background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
         }
 
         .task-button.priority-other {
-            border-color: #6b7280;
+            border-color: #6b7280; /* Neutral grey */
             background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
         }
 
@@ -594,7 +596,8 @@
         @media (max-width: 768px) {
             .profile-card { padding: 2rem; min-height: 160px; }
             .profile-avatar { font-size: 3rem; }
-            .profile-name { font-size: 1.5rem; }
+            .profile-name { font-size: 1rem; } /* Even smaller on mobile */
+            .profile-role { font-size: 0.7rem; } /* Smaller role text */
             .task-header h2 { font-size: 2rem; }
             .task-button { padding: 1.5rem; min-height: 120px; }
             .task-title { font-size: 1.2rem; }
@@ -714,18 +717,21 @@
         const mainContent = document.getElementById('mainContent');
         const scrollIndicator = document.getElementById('scrollIndicator');
 
-        // Recurrence priority order
+        // Recurrence priority order - FILTER OUT MONTHLY AND HIGHER
         const recurrencePriority = {
             'daily': 1,
             'meals': 2,
             'days': 3,
             'weekly': 4,
             'fortnightly': 5,
-            'monthly': 6,
-            'quarterly': 7,
-            'half-yearly': 8,
-            'yearly': 9
+            // monthly, quarterly, half-yearly, yearly are excluded
         };
+
+        // Function to check if task should be shown in kiosk
+        function shouldShowInKiosk(task) {
+            // Only show tasks with recurrence types that are in our priority list
+            return recurrencePriority.hasOwnProperty(task.recurrence);
+        }
 
         // Initialize
         document.addEventListener('DOMContentLoaded', async () => {
@@ -878,12 +884,12 @@
             
             taskHeaderTitle.textContent = `${currentUser.name}'s Tasks`;
             
-            // Get user's tasks
+            // Get user's tasks and filter for kiosk display
             const userTasks = userData.tasks.filter(task => 
-                task.profiles.includes(currentUser.id)
+                task.profiles.includes(currentUser.id) && shouldShowInKiosk(task)
             );
 
-            // Sort tasks by recurrence priority (daily first, then specific days, then weekly, etc.)
+            // Sort tasks by recurrence priority (daily first, then meals, then days, then weekly, etc.)
             const sortedTasks = userTasks.sort((a, b) => {
                 const priorityA = recurrencePriority[a.recurrence] || 999;
                 const priorityB = recurrencePriority[b.recurrence] || 999;
@@ -903,7 +909,7 @@
                 tasksGrid.innerHTML = `
                     <div style="grid-column: 1 / -1; text-align: center; padding: 3rem;">
                         <h3 style="font-size: 2rem; margin-bottom: 1rem; color: #9ca3af;">No Tasks Found</h3>
-                        <p style="font-size: 1.2rem; color: #6b7280;">No tasks are assigned to this profile.</p>
+                        <p style="font-size: 1.2rem; color: #6b7280;">No short-term tasks are assigned to this profile.</p>
                     </div>
                 `;
                 return;
@@ -967,7 +973,7 @@
             
             // Check if all tasks are complete
             const userTasks = userData.tasks.filter(t => 
-                t.profiles.includes(currentUser.id)
+                t.profiles.includes(currentUser.id) && shouldShowInKiosk(t)
             );
             const allComplete = userTasks.every(t => t.isCompleted);
             
@@ -1173,10 +1179,6 @@
                 'daily': 'Daily',
                 'weekly': 'Weekly',
                 'fortnightly': 'Fortnightly',
-                'monthly': 'Monthly',
-                'quarterly': 'Quarterly',
-                'half-yearly': 'Half-Yearly',
-                'yearly': 'Yearly'
             };
 
             if (recurrence === 'meals' && config?.meals) {
