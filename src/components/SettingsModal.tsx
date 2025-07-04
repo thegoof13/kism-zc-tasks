@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Save, Palette, Users, Settings as SettingsIcon, Brain, Eye, EyeOff, Plus, Edit, Trash2, GripVertical } from 'lucide-react';
+import { X, Save, Palette, Users, Settings as SettingsIcon, Brain, Eye, EyeOff, Plus, Edit, Trash2, GripVertical, Shield, Lock } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { TaskGroup, UserProfile, AISettings } from '../types';
 import { getAvailableIcons } from '../utils/icons';
@@ -14,7 +14,7 @@ interface SettingsModalProps {
   isSettingsPasswordSet: boolean;
 }
 
-type SettingsTab = 'general' | 'groups' | 'profiles' | 'ai' | 'analytics';
+type SettingsTab = 'general' | 'groups' | 'profiles' | 'security' | 'ai' | 'analytics';
 
 export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettingsPasswordSet }: SettingsModalProps) {
   const { state, dispatch } = useApp();
@@ -258,6 +258,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                   { id: 'general', label: 'General', icon: SettingsIcon },
                   { id: 'groups', label: 'Task Groups', icon: Palette },
                   { id: 'profiles', label: 'Profiles', icon: Users },
+                  { id: 'security', label: 'Security', icon: Shield },
                   { id: 'ai', label: 'AI Assistant', icon: Brain },
                   { id: 'analytics', label: 'Analytics', icon: Eye },
                 ].map(tab => (
@@ -346,46 +347,6 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                             Show top collaborator in trophy modal
                           </span>
                         </label>
-                      </div>
-
-                      {/* Settings Password */}
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                          Settings Password Protection
-                        </label>
-                        <div className="flex items-center space-x-3">
-                          {isSettingsPasswordSet ? (
-                            <>
-                              <div className="flex items-center space-x-2 px-3 py-2 bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800 rounded-lg">
-                                <div className="w-2 h-2 bg-success-500 rounded-full"></div>
-                                <span className="text-sm text-success-700 dark:text-success-400">
-                                  Password protection enabled
-                                </span>
-                              </div>
-                              <button
-                                onClick={handleRemovePassword}
-                                className="btn-secondary text-sm"
-                              >
-                                Remove Password
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <div className="flex items-center space-x-2 px-3 py-2 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg">
-                                <div className="w-2 h-2 bg-neutral-400 rounded-full"></div>
-                                <span className="text-sm text-neutral-600 dark:text-neutral-400">
-                                  No password protection
-                                </span>
-                              </div>
-                              <button
-                                onClick={handleSetPassword}
-                                className="btn-primary text-sm"
-                              >
-                                Set Password
-                              </button>
-                            </>
-                          )}
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -850,6 +811,156 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {activeTab === 'security' && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
+                      Security Settings
+                    </h3>
+                    
+                    <div className="space-y-6">
+                      {/* Settings Password Protection */}
+                      <div className="card p-6">
+                        <div className="flex items-start space-x-4">
+                          <div className="w-12 h-12 bg-warning-100 dark:bg-warning-900/20 rounded-full flex items-center justify-center flex-shrink-0">
+                            <Lock className="w-6 h-6 text-warning-600 dark:text-warning-400" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">
+                              Settings Password Protection
+                            </h4>
+                            <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+                              Protect access to settings with a password. When enabled, users will need to enter the password to access any settings.
+                            </p>
+                            
+                            <div className="flex items-center space-x-4">
+                              {isSettingsPasswordSet ? (
+                                <>
+                                  <div className="flex items-center space-x-2 px-3 py-2 bg-success-50 dark:bg-success-900/20 border border-success-200 dark:border-success-800 rounded-lg">
+                                    <div className="w-2 h-2 bg-success-500 rounded-full"></div>
+                                    <span className="text-sm text-success-700 dark:text-success-400 font-medium">
+                                      Password protection enabled
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={handleRemovePassword}
+                                    className="btn-secondary text-sm"
+                                  >
+                                    Remove Password
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="flex items-center space-x-2 px-3 py-2 bg-neutral-50 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 rounded-lg">
+                                    <div className="w-2 h-2 bg-neutral-400 rounded-full"></div>
+                                    <span className="text-sm text-neutral-600 dark:text-neutral-400">
+                                      No password protection
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={handleSetPassword}
+                                    className="btn-primary text-sm"
+                                  >
+                                    Set Password
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Profile PIN Protection Summary */}
+                      <div className="card p-6">
+                        <div className="flex items-start space-x-4">
+                          <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/20 rounded-full flex items-center justify-center flex-shrink-0">
+                            <Shield className="w-6 h-6 text-primary-600 dark:text-primary-400" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">
+                              Profile PIN Protection
+                            </h4>
+                            <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
+                              Individual profiles can be protected with PIN codes. Configure PINs in the Profiles tab.
+                            </p>
+                            
+                            <div className="space-y-2">
+                              {state.profiles.map(profile => (
+                                <div key={profile.id} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+                                  <div className="flex items-center space-x-3">
+                                    <span className="text-lg">{profile.avatar}</span>
+                                    <span className="font-medium text-neutral-900 dark:text-neutral-100">
+                                      {profile.name}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    {profile.pin && profile.pin.trim().length > 0 ? (
+                                      <div className="flex items-center space-x-1 px-2 py-1 bg-success-100 dark:bg-success-900/20 text-success-700 dark:text-success-400 text-xs rounded-full">
+                                        <Lock className="w-3 h-3" />
+                                        <span>PIN Protected</span>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center space-x-1 px-2 py-1 bg-neutral-100 dark:bg-neutral-600 text-neutral-600 dark:text-neutral-400 text-xs rounded-full">
+                                        <span>No PIN</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Security Best Practices */}
+                      <div className="card p-6 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/10">
+                        <h4 className="text-lg font-medium text-blue-900 dark:text-blue-100 mb-3">
+                          Security Best Practices
+                        </h4>
+                        <div className="space-y-3 text-sm text-blue-800 dark:text-blue-200">
+                          <div className="flex items-start space-x-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <p>
+                              <strong>Settings Password:</strong> Use a strong password to protect access to application settings and prevent unauthorized changes.
+                            </p>
+                          </div>
+                          <div className="flex items-start space-x-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <p>
+                              <strong>Profile PINs:</strong> Set PINs for individual profiles to prevent unauthorized access to personal tasks and data.
+                            </p>
+                          </div>
+                          <div className="flex items-start space-x-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <p>
+                              <strong>View Only Mode:</strong> Use profile selection with "View Only" option to allow limited access without modification permissions.
+                            </p>
+                          </div>
+                          <div className="flex items-start space-x-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                            <p>
+                              <strong>Permissions:</strong> Configure individual profile permissions to control who can create, edit, or delete tasks.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Security Warning */}
+                      <div className="card p-6 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/10">
+                        <h4 className="text-lg font-medium text-amber-900 dark:text-amber-100 mb-3">
+                          ⚠️ Security Notice
+                        </h4>
+                        <p className="text-sm text-amber-800 dark:text-amber-200">
+                          <strong>Important:</strong> Passwords and PINs are stored in plain text on the server for simplicity. 
+                          Do not use passwords that you use for other important accounts. This application is designed for 
+                          personal or family use and should not be used for sensitive or confidential information.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
