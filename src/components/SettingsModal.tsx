@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Settings, User, Users, History, Brain, Shield, Eye, EyeOff, Calendar, Bell, BellOff, Palette, Moon, Sun, Monitor, Save, Plus, Edit, Trash2, ChevronDown, ChevronRight, Trophy, Crown, GripVertical, Database, Download, Upload, BarChart3 } from 'lucide-react';
+import { X, Settings, User, Users, History, Brain, Shield, Eye, EyeOff, Calendar, Bell, BellOff, Palette, Moon, Sun, Monitor, Save, Plus, Edit, Trash2, ChevronDown, ChevronRight, Trophy, Crown, GripVertical, Database, Download, Upload, BarChart3, Sparkles, Loader, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useTheme } from '../hooks/useTheme';
 import { HistoryAnalytics } from './HistoryAnalytics';
@@ -62,6 +62,8 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
   const [showAddGroupForm, setShowAddGroupForm] = useState(false);
   const [draggedProfileId, setDraggedProfileId] = useState<string | null>(null);
   const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
+  const [isGeneratingIcons, setIsGeneratingIcons] = useState(false);
+  const [iconGenerationStatus, setIconGenerationStatus] = useState<string | null>(null);
 
   // Early return AFTER all hooks are declared
   if (!isOpen) return null;
@@ -291,6 +293,55 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
     dispatch({ type: 'REORDER_GROUPS', groupIds: reorderedGroupIds });
 
     setDraggedGroupId(null);
+  };
+
+  const handleGenerateTaskIcons = async () => {
+    if (!state.settings.ai.enabled || !state.settings.ai.apiKey) {
+      setIconGenerationStatus('AI is not configured. Please set up AI settings first.');
+      return;
+    }
+
+    setIsGeneratingIcons(true);
+    setIconGenerationStatus('Generating child-friendly icons for tasks...');
+
+    try {
+      const response = await fetch('/api/generate-task-icons', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tasks: state.tasks,
+          groups: state.groups,
+          aiSettings: state.settings.ai,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate task icons');
+      }
+
+      const taskIcons = await response.json();
+      const iconCount = Object.keys(taskIcons).length;
+      
+      setIconGenerationStatus(`Successfully generated icons for ${iconCount} tasks! Icons are now available in the Kiosk Portal.`);
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => {
+        setIconGenerationStatus(null);
+      }, 5000);
+      
+    } catch (error) {
+      console.error('Error generating task icons:', error);
+      setIconGenerationStatus('Failed to generate task icons. Please check your AI settings and try again.');
+      
+      // Clear error message after 5 seconds
+      setTimeout(() => {
+        setIconGenerationStatus(null);
+      }, 5000);
+    } finally {
+      setIsGeneratingIcons(false);
+    }
   };
 
   // Data management functions
@@ -1019,6 +1070,116 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">
                   History Entries
                 </p>
+              </div>
+            </div>
+
+            {/* Task Icons for Kiosk */}
+            <div className="card p-6">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/20 rounded-full flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                    Kiosk Task Icons
+                  </h3>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                    Generate child-friendly icons for tasks using AI
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-start space-x-3">
+                    <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-1">
+                        AI-Powered Task Icons
+                      </h4>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                        Generate two emoji icons for each task to help young children (ages 4-10) understand what tasks are about. 
+                        Icons are displayed in the Kiosk Portal on either side of task names.
+                      </p>
+                      <ul className="text-xs text-blue-600 dark:text-blue-400 space-y-1">
+                        <li>• Icons are simple and easily recognizable by children</li>
+                        <li>• Two distinct icons per task for better visual understanding</li>
+                        <li>• Stored locally and served through the API</li>
+                        <li>• Only visible in the Kiosk Portal interface</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                      Generate Icons for {state.tasks.length} Tasks
+                    </p>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                      Requires AI to be configured and enabled
+                    </p>
+                  </div>
+                  
+                  <button
+                    onClick={handleGenerateTaskIcons}
+                    disabled={isGeneratingIcons || !state.settings.ai.enabled || !state.settings.ai.apiKey}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                      isGeneratingIcons || !state.settings.ai.enabled || !state.settings.ai.apiKey
+                        ? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-400 dark:text-neutral-500 cursor-not-allowed'
+                        : 'bg-purple-500 hover:bg-purple-600 text-white shadow-sm hover:shadow-md'
+                    }`}
+                  >
+                    {isGeneratingIcons ? (
+                      <>
+                        <Loader className="w-4 h-4 animate-spin" />
+                        <span>Generating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        <span>Generate Icons</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                
+                {iconGenerationStatus && (
+                  <div className={`p-3 rounded-lg border ${
+                    iconGenerationStatus.includes('Successfully') 
+                      ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300'
+                      : iconGenerationStatus.includes('Failed') || iconGenerationStatus.includes('not configured')
+                        ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'
+                        : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                  }`}>
+                    <div className="flex items-start space-x-2">
+                      {iconGenerationStatus.includes('Successfully') ? (
+                        <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      ) : iconGenerationStatus.includes('Failed') ? (
+                        <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <Loader className="w-4 h-4 mt-0.5 flex-shrink-0 animate-spin" />
+                      )}
+                      <p className="text-sm">{iconGenerationStatus}</p>
+                    </div>
+                  </div>
+                )}
+                
+                {!state.settings.ai.enabled && (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                    <div className="flex items-start space-x-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">
+                          AI Configuration Required
+                        </p>
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                          Please configure and enable AI in the AI Assistant section to generate task icons.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

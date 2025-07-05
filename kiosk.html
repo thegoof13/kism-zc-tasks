@@ -422,6 +422,33 @@
             animation: checkmarkAppear 0.6s ease-out;
         }
 
+        /* Task title with icons styling */
+        .task-title-with-icons {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .task-icon-left,
+        .task-icon-right {
+            font-size: 2rem;
+            line-height: 1;
+            opacity: 0.9;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+        }
+
+        .task-title-text {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #ffffff;
+            line-height: 1.4;
+            text-align: center;
+            flex: 1;
+            min-width: 0;
+        }
+
         .task-title {
             font-size: 1.4rem;
             font-weight: 600;
@@ -437,6 +464,7 @@
         }
 
         .task-button.completed .task-title,
+        .task-button.completed .task-title-text,
         .task-button.completed .task-meta {
             opacity: 0.7;
         }
@@ -630,7 +658,10 @@
             .task-header h2 { font-size: 0.5rem; } /* Even smaller on mobile */
             .task-header p { font-size: 0.25rem; } /* Even smaller on mobile */
             .task-button { padding: 1.5rem; min-height: 120px; }
-            .task-title { font-size: 1.2rem; }
+            .task-title,
+            .task-title-text { font-size: 1.2rem; }
+            .task-icon-left,
+            .task-icon-right { font-size: 1.5rem; }
             .celebration-emoji { font-size: 6rem; }
             .celebration-text { font-size: 2rem; }
             .pin-modal-content { padding: 2rem; }
@@ -644,6 +675,10 @@
             .tasks-grid {
                 grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
                 gap: 1rem;
+            }
+            
+            .task-title-with-icons {
+                gap: 0.5rem;
             }
         }
 
@@ -734,6 +769,7 @@
         // State
         let currentUser = null;
         let userData = null;
+        let taskIcons = {};
         let idleTimer = null;
         let pinIdleTimer = null;
         let screensaverTimer = null;
@@ -779,6 +815,7 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', async () => {
             await loadUserData();
+            await loadTaskIcons();
             showProfileSelection();
             setupIdleDetection();
             setupScreensaverDetection();
@@ -829,6 +866,17 @@
             } catch (error) {
                 console.error('Failed to load user data:', error);
                 userData = { profiles: [], tasks: [], groups: [] };
+            }
+        }
+
+        async function loadTaskIcons() {
+            try {
+                const response = await fetch(`${API_BASE}/task-icons`);
+                taskIcons = await response.json();
+                console.log('Loaded task icons:', Object.keys(taskIcons).length, 'tasks have icons');
+            } catch (error) {
+                console.error('Failed to load task icons:', error);
+                taskIcons = {};
             }
         }
 
@@ -970,13 +1018,30 @@
                 // Get priority class for styling
                 const priorityClass = getPriorityClass(task.recurrence);
                 
+                // Get task icons if available
+                const icons = taskIcons[task.id];
+                
                 taskButton.className = `task-button ${task.isCompleted ? 'completed' : ''} ${priorityClass}`;
                 
                 const group = userData.groups.find(g => g.id === task.groupId);
                 const recurrenceLabel = getRecurrenceLabel(task.recurrence, task.recurrenceConfig);
                 
+                // Create task title with icons if available
+                let taskTitleHTML;
+                if (icons && icons.icons && icons.icons.length >= 2) {
+                    taskTitleHTML = `
+                        <div class="task-title-with-icons">
+                            <span class="task-icon-left">${icons.icons[0]}</span>
+                            <span class="task-title-text">${task.title}</span>
+                            <span class="task-icon-right">${icons.icons[1]}</span>
+                        </div>
+                    `;
+                } else {
+                    taskTitleHTML = `<div class="task-title">${task.title}</div>`;
+                }
+                
                 taskButton.innerHTML = `
-                    <div class="task-title">${task.title}</div>
+                    ${taskTitleHTML}
                     <div class="task-meta">${group ? group.name : 'Other'} • ${recurrenceLabel}</div>
                 `;
                 
