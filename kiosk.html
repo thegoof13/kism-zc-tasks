@@ -726,7 +726,7 @@
     <script>
         // Configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
-        const IDLE_TIMEOUT = 3000; // 3 seconds
+        const IDLE_TIMEOUT = 6000; // 6 seconds
         const IDLE_WARNING_DURATION = 3000; // 3 seconds warning
         const PIN_IDLE_TIMEOUT = 10000; // 10 seconds for PIN entry
         const SCREENSAVER_TIMEOUT = 120000; // 120 seconds (2 minutes) for screensaver
@@ -741,6 +741,7 @@
         let pinInput = '';
         let isScreensaverActive = false;
         let isIdleWarningActive = false;
+        let idleWarningTimer = null;
 
         // DOM Elements
         const profileSelection = document.getElementById('profileSelection');
@@ -1163,6 +1164,7 @@
 
         function resetIdleTimer() {
             clearTimeout(idleTimer);
+            clearTimeout(idleWarningTimer); // Clear warning timer too
             hideIdleWarning();
             
             idleTimer = setTimeout(() => {
@@ -1184,7 +1186,7 @@
             progressBar.offsetHeight; // Trigger reflow
             progressBar.style.animation = `progressBar ${IDLE_WARNING_DURATION}ms linear forwards`;
             
-            setTimeout(() => {
+            idleWarningTimer = setTimeout(() => {
                 hideIdleWarning();
                 showProfileSelection();
             }, IDLE_WARNING_DURATION);
@@ -1193,10 +1195,12 @@
         function hideIdleWarning() {
             isIdleWarningActive = false;
             idleToast.classList.remove('visible');
+            clearTimeout(idleWarningTimer); // Clear the warning timer when hiding
         }
 
         function clearIdle() {
             clearTimeout(idleTimer);
+            clearTimeout(idleWarningTimer); // Clear warning timer too
             hideIdleWarning();
         }
 
