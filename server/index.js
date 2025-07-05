@@ -21,7 +21,7 @@ const apiRouter = express.Router();
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? ['http://localhost', 'http://127.0.0.1', process.env.FRONTEND_URL].filter(Boolean)
-    : ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    : ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://localhost:5173', 'https://127.0.0.1:5173'],
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
