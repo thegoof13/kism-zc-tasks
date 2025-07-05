@@ -135,7 +135,7 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
               <div className="w-8 h-8 hidden sm:block">
                 <img 
                   src="/image.png" 
-                  alt="FocusFlow Logo" 
+                  alt="ZenTasks Logo" 
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -144,7 +144,7 @@ export function Header({ onOpenSettings, onOpenProfileSelection }: HeaderProps) 
               <div>
                 <div className="flex items-center space-x-2">
                   <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                    FocusFlow
+                    ZenTasks
                   </h1>
                   {/* View Only Mode Indicator */}
                   {isViewOnlyMode && (
