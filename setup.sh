@@ -5,6 +5,7 @@
 # Compatible with LXC containers and traditional Ubuntu installations
 # Now includes Kiosk Portal support with secure random paths
 # Enhanced SSL detection with comprehensive debugging
+# Complete installation logging
 
 set -e
 
@@ -33,28 +34,80 @@ EXISTING_SSL_CERT=""
 EXISTING_SSL_KEY=""
 DEBUG_MODE=true
 
+# Logging configuration
+LOG_DIR="/var/log/focusflow"
+INSTALL_LOG="$LOG_DIR/install_$(date +%Y%m%d-%H%M).log"
+
+# Function to setup logging
+setup_logging() {
+    # Create log directory
+    sudo mkdir -p "$LOG_DIR"
+    sudo chmod 755 "$LOG_DIR"
+    
+    # Create install log file
+    sudo touch "$INSTALL_LOG"
+    sudo chmod 644 "$INSTALL_LOG"
+    
+    # Redirect all output to both console and log file
+    exec > >(tee -a "$INSTALL_LOG")
+    exec 2>&1
+    
+    echo "=== FocusFlow Installation Started at $(date) ===" | sudo tee -a "$INSTALL_LOG"
+    echo "Installation log: $INSTALL_LOG"
+}
+
+# Function to log with timestamp
+log_message() {
+    local level="$1"
+    shift
+    local message="$*"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message" | sudo tee -a "$INSTALL_LOG"
+}
+
 # Function to print colored output
 print_status() {
     echo -e "${BLUE}[INFO]${NC} $1"
+    log_message "INFO" "$1"
 }
 
 print_success() {
     echo -e "${GREEN}[SUCCESS]${NC} $1"
+    log_message "SUCCESS" "$1"
 }
 
 print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
+    log_message "WARNING" "$1"
 }
 
 print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
+    log_message "ERROR" "$1"
 }
 
 print_debug() {
     if [[ "$DEBUG_MODE" == true ]]; then
         echo -e "${YELLOW}[DEBUG]${NC} $1"
+        log_message "DEBUG" "$1"
     fi
 }
+
+# Function to handle errors
+handle_error() {
+    local exit_code=$?
+    local line_number=$1
+    print_error "Script failed at line $line_number with exit code $exit_code"
+    log_message "ERROR" "Script failed at line $line_number with exit code $exit_code"
+    
+    # Show last few lines of log for debugging
+    print_error "Last 10 lines of installation log:"
+    tail -10 "$INSTALL_LOG" 2>/dev/null || echo "Could not read log file"
+    
+    exit $exit_code
+}
+
+# Set up error handling
+trap 'handle_error $LINENO' ERR
 
 # Function to detect if running in LXC container
 detect_container_environment() {
@@ -559,6 +612,7 @@ install_certbot() {
         sudo python3 -m venv /opt/certbot-venv
         
         # Upgrade pip in virtual environment
+        print_status "Upgrading pip in virtual environment..."
         sudo /opt/certbot-venv/bin/pip install --upgrade pip setuptools wheel
         
         # Install certbot and cloudflare plugin in virtual environment
@@ -597,14 +651,24 @@ EOF
             print_success "Certbot installed successfully: $certbot_version"
         else
             print_error "Certbot installation verification failed"
+            print_error "Checking virtual environment..."
+            if [[ -f /opt/certbot-venv/bin/certbot ]]; then
+                print_status "Virtual environment exists, testing directly..."
+                sudo /opt/certbot-venv/bin/certbot --version || print_error "Direct test failed"
+            else
+                print_error "Virtual environment not found"
+            fi
             exit 1
         fi
         
         # Test cloudflare plugin
+        print_status "Testing Cloudflare plugin availability..."
         if /usr/local/bin/certbot-cloudflare plugins | grep -q "dns-cloudflare"; then
             print_success "Cloudflare DNS plugin available"
         else
             print_error "Cloudflare DNS plugin not found"
+            print_status "Available plugins:"
+            /usr/local/bin/certbot-cloudflare plugins || true
             exit 1
         fi
         
@@ -788,64 +852,16 @@ start_application() {
     print_success "Application started"
 }
 
-# Function to configure Nginx
-configure_nginx() {
-    print_status "Configuring Nginx..."
+# Function to configure Nginx (without SSL first)
+configure_nginx_http() {
+    print_status "Configuring Nginx (HTTP only initially)..."
     
-    # Create Nginx configuration with HTTP to HTTPS redirect and Kiosk support
+    # Create basic HTTP configuration first
     cat > /tmp/focusflow.nginx << EOF
-# HTTP server - redirect all traffic to HTTPS
+# HTTP server
 server {
     listen 80;
     server_name $DOMAIN;
-    
-    # Redirect all HTTP traffic to HTTPS
-    return 301 https://\$server_name\$request_uri;
-}
-
-# HTTPS server (or HTTP if SSL not enabled)
-server {
-EOF
-
-    if [[ "$USE_SSL" == true ]]; then
-        cat >> /tmp/focusflow.nginx << EOF
-    listen 443 ssl http2;
-    server_name $DOMAIN;
-    
-    # SSL configuration
-EOF
-        if [[ -n "$EXISTING_SSL_CERT" ]]; then
-            cat >> /tmp/focusflow.nginx << EOF
-    ssl_certificate $EXISTING_SSL_CERT;
-    ssl_certificate_key $EXISTING_SSL_KEY;
-EOF
-        else
-            cat >> /tmp/focusflow.nginx << EOF
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
-EOF
-        fi
-        cat >> /tmp/focusflow.nginx << EOF
-    ssl_session_timeout 1d;
-    ssl_session_cache shared:MozTLS:10m;
-    ssl_session_tickets off;
-    
-    # Modern SSL configuration
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers off;
-    
-    # HSTS
-    add_header Strict-Transport-Security "max-age=63072000" always;
-EOF
-    else
-        cat >> /tmp/focusflow.nginx << EOF
-    listen 80;
-    server_name $DOMAIN;
-EOF
-    fi
-
-    cat >> /tmp/focusflow.nginx << EOF
     
     # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -941,12 +957,18 @@ EOF
     sudo rm -f /etc/nginx/sites-enabled/default
     
     # Test Nginx configuration
-    sudo nginx -t
+    print_status "Testing Nginx configuration..."
+    if sudo nginx -t; then
+        print_success "Nginx configuration is valid"
+    else
+        print_error "Nginx configuration test failed"
+        exit 1
+    fi
     
     # Reload Nginx
     sudo systemctl reload nginx
     
-    print_success "Nginx configured with HTTP to HTTPS redirect"
+    print_success "Nginx configured (HTTP only)"
     if [[ "$ENABLE_KIOSK" == true ]]; then
         print_success "Kiosk Portal configured at: /kiosk/$KIOSK_PATH/"
     fi
@@ -985,6 +1007,7 @@ setup_ssl() {
         print_status "Using Certbot wrapper: $CERTBOT_CMD"
         
         # Verify certbot is working
+        print_status "Verifying Certbot functionality..."
         if ! $CERTBOT_CMD --version >/dev/null 2>&1; then
             print_error "Certbot is not working properly"
             print_status "Attempting to diagnose the issue..."
@@ -992,7 +1015,7 @@ setup_ssl() {
             # Check virtual environment
             if [[ -f /opt/certbot-venv/bin/certbot ]]; then
                 print_status "Virtual environment exists, testing directly..."
-                /opt/certbot-venv/bin/certbot --version || true
+                sudo /opt/certbot-venv/bin/certbot --version || true
             fi
             
             print_error "SSL setup failed - continuing without SSL"
@@ -1000,10 +1023,19 @@ setup_ssl() {
             return 1
         fi
         
+        # Test Cloudflare credentials
+        print_status "Testing Cloudflare API credentials..."
+        if [[ ! -f "$SSL_CONFIG_DIR/cloudflare.ini" ]]; then
+            print_error "Cloudflare credentials file not found: $SSL_CONFIG_DIR/cloudflare.ini"
+            exit 1
+        fi
+        
         # Get SSL certificate using DNS challenge
         print_status "Requesting SSL certificate for $DOMAIN..."
         print_status "Using Cloudflare API token for DNS validation..."
+        print_status "This may take a few minutes..."
         
+        # Run certbot with detailed logging
         if sudo $CERTBOT_CMD certonly \
             --dns-cloudflare \
             --dns-cloudflare-credentials $SSL_CONFIG_DIR/cloudflare.ini \
@@ -1011,21 +1043,37 @@ setup_ssl() {
             -d $DOMAIN \
             --email $EMAIL \
             --agree-tos \
-            --non-interactive; then
+            --non-interactive \
+            --verbose; then
             
             print_success "SSL certificate obtained successfully"
             
-            # Update Nginx configuration for SSL
-            update_nginx_ssl_config
-            
-            # Setup weekly SSL renewal check
-            setup_ssl_renewal_cron
+            # Verify certificate files exist
+            if [[ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" && -f "/etc/letsencrypt/live/$DOMAIN/privkey.pem" ]]; then
+                print_success "Certificate files verified"
+                
+                # Update Nginx configuration for SSL
+                update_nginx_ssl_config
+                
+                # Setup weekly SSL renewal check
+                setup_ssl_renewal_cron
+            else
+                print_error "Certificate files not found after successful certbot run"
+                print_status "Expected files:"
+                print_status "  - /etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+                print_status "  - /etc/letsencrypt/live/$DOMAIN/privkey.pem"
+                exit 1
+            fi
         else
             print_error "Failed to obtain SSL certificate"
+            print_status "Certbot exit code: $?"
             print_status "Check the logs for more details:"
             print_status "  - Certbot logs: /var/log/letsencrypt/letsencrypt.log"
-            print_status "  - Verify your Cloudflare API token has correct permissions"
+            print_status "  - Installation log: $INSTALL_LOG"
+            print_status "Common issues:"
+            print_status "  - Verify your Cloudflare API token has correct permissions (Zone:Read, DNS:Edit)"
             print_status "  - Ensure your domain is managed by Cloudflare"
+            print_status "  - Check if domain DNS is properly configured"
             print_warning "Continuing without SSL..."
             USE_SSL=false
         fi
@@ -1034,17 +1082,137 @@ setup_ssl() {
 
 # Function to update Nginx configuration for SSL
 update_nginx_ssl_config() {
-    if [[ -z "$EXISTING_SSL_CERT" ]]; then
-        print_status "Updating Nginx configuration for SSL..."
+    print_status "Updating Nginx configuration for SSL..."
+    
+    # Create full SSL configuration
+    cat > /tmp/focusflow-ssl.nginx << EOF
+# HTTP server - redirect all traffic to HTTPS
+server {
+    listen 80;
+    server_name $DOMAIN;
+    
+    # Redirect all HTTP traffic to HTTPS
+    return 301 https://\$server_name\$request_uri;
+}
+
+# HTTPS server
+server {
+    listen 443 ssl http2;
+    server_name $DOMAIN;
+    
+    # SSL configuration
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:MozTLS:10m;
+    ssl_session_tickets off;
+    
+    # Modern SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    
+    # HSTS
+    add_header Strict-Transport-Security "max-age=63072000" always;
+    
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+EOF
+
+    # Add Kiosk Portal configuration if enabled
+    if [[ "$ENABLE_KIOSK" == true ]]; then
+        cat >> /tmp/focusflow-ssl.nginx << EOF
+    
+    # Kiosk Portal - Secure random path
+    location /kiosk/$KIOSK_PATH/ {
+        alias $APP_DIR/kiosk/$KIOSK_PATH/;
+        try_files \$uri \$uri/ /kiosk/$KIOSK_PATH/index.html;
         
-        # Replace the temporary SSL certificate paths with the real ones
-        sudo sed -i "s|ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;|ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;|g" /etc/nginx/sites-available/focusflow
-        sudo sed -i "s|ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;|ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;|g" /etc/nginx/sites-available/focusflow
+        # Additional security headers for kiosk
+        add_header X-Frame-Options "DENY" always;
+        add_header Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https:; img-src 'self' data: https:;" always;
         
-        # Test and reload Nginx
-        sudo nginx -t && sudo systemctl reload nginx
+        # Cache static assets
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
         
-        print_success "Nginx SSL configuration updated"
+        # Don't cache HTML files
+        location ~* \.html$ {
+            expires -1;
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+        }
+    }
+EOF
+    fi
+
+    cat >> /tmp/focusflow-ssl.nginx << EOF
+    
+    # API routes - proxy to Node.js backend
+    location /api/ {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_read_timeout 86400;
+    }
+    
+    # Static files - serve from built frontend
+    location / {
+        root $APP_DIR/dist;
+        try_files \$uri \$uri/ /index.html;
+        
+        # Cache static assets
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+        
+        # Don't cache HTML files
+        location ~* \.html$ {
+            expires -1;
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+        }
+    }
+    
+    # Security: deny access to sensitive files
+    location ~ /\. {
+        deny all;
+    }
+    
+    location ~ /(package\.json|server/|src/|node_modules/) {
+        deny all;
+    }
+}
+EOF
+    
+    # Replace the HTTP-only configuration with SSL configuration
+    sudo mv /tmp/focusflow-ssl.nginx /etc/nginx/sites-available/focusflow
+    
+    # Test and reload Nginx
+    print_status "Testing SSL Nginx configuration..."
+    if sudo nginx -t; then
+        print_success "SSL Nginx configuration is valid"
+        sudo systemctl reload nginx
+        print_success "Nginx SSL configuration updated and reloaded"
+    else
+        print_error "SSL Nginx configuration test failed"
+        exit 1
     fi
 }
 
@@ -1279,6 +1447,49 @@ EOF
     fi
 }
 
+# Function to test final installation
+test_installation() {
+    print_status "Testing installation..."
+    
+    # Test application health
+    local max_attempts=10
+    local attempt=1
+    
+    print_status "Waiting for application to start..."
+    while [[ $attempt -le $max_attempts ]]; do
+        if curl -s -f http://localhost:3001/api/health >/dev/null 2>&1; then
+            print_success "Application health check passed"
+            break
+        else
+            print_status "Waiting for application... (attempt $attempt/$max_attempts)"
+            sleep 3
+            ((attempt++))
+        fi
+    done
+    
+    if [[ $attempt -gt $max_attempts ]]; then
+        print_warning "Application health check failed"
+        print_status "Check application logs: sudo -u $APP_USER pm2 logs focusflow"
+    fi
+    
+    # Test web server
+    print_status "Testing web server..."
+    if curl -s -f "http://localhost/" >/dev/null 2>&1; then
+        print_success "Web server responding"
+    else
+        print_warning "Web server not responding on HTTP"
+    fi
+    
+    if [[ "$USE_SSL" == true ]]; then
+        print_status "Testing HTTPS..."
+        if curl -s -f -k "https://localhost/" >/dev/null 2>&1; then
+            print_success "HTTPS responding"
+        else
+            print_warning "HTTPS not responding"
+        fi
+    fi
+}
+
 # Function to display final information
 display_final_info() {
     echo
@@ -1291,6 +1502,7 @@ display_final_info() {
     print_success "Application directory: $APP_DIR"
     print_success "Application user: $APP_USER"
     print_success "Logs: /var/log/focusflow/"
+    print_success "Installation log: $INSTALL_LOG"
     print_success "Container Environment: ${IS_LXC_CONTAINER}"
     print_success "PM2 Config: ecosystem.config.cjs (CommonJS format)"
     if [[ -n "$EXISTING_SSL_CERT" ]]; then
@@ -1304,6 +1516,7 @@ display_final_info() {
     echo "  View Nginx status: sudo systemctl status nginx"
     echo "  View Nginx logs: sudo tail -f /var/log/nginx/error.log"
     echo "  Manual backup: sudo /usr/local/bin/backup-focusflow.sh"
+    echo "  View installation log: cat $INSTALL_LOG"
     echo
     if [[ "$ENABLE_KIOSK" == true ]]; then
         print_status "Kiosk Portal:"
@@ -1352,6 +1565,12 @@ display_final_info() {
         print_warning "Certbot installed in isolated virtual environment for PEP 668 compliance"
     fi
     echo
+    
+    log_message "INFO" "Installation completed successfully"
+    log_message "INFO" "Application URL: http${USE_SSL:+s}://$DOMAIN"
+    if [[ "$ENABLE_KIOSK" == true ]]; then
+        log_message "INFO" "Kiosk Portal URL: http${USE_SSL:+s}://$DOMAIN/kiosk/$KIOSK_PATH/"
+    fi
 }
 
 # Main execution
@@ -1364,8 +1583,12 @@ main() {
     echo "║            Fixed Cloudflare API Token Support              ║"
     echo "║              Now with Kiosk Portal Support                 ║"
     echo "║            Enhanced SSL Certificate Detection              ║"
+    echo "║              Complete Installation Logging                 ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
+    
+    # Setup logging first
+    setup_logging
     
     check_root
     check_sudo
@@ -1373,6 +1596,7 @@ main() {
     get_user_input
     
     print_status "Starting deployment process..."
+    log_message "INFO" "Starting FocusFlow deployment"
     
     update_system
     install_nodejs
@@ -1387,15 +1611,18 @@ main() {
     create_env_file
     create_pm2_config
     start_application
-    configure_nginx
+    configure_nginx_http  # Configure HTTP first
     setup_cloudflare_credentials
-    setup_ssl
+    setup_ssl  # Then add SSL if requested
     configure_firewall
     create_systemd_service
     create_backup_script
     save_kiosk_config
+    test_installation
     
     display_final_info
+    
+    log_message "SUCCESS" "FocusFlow deployment completed successfully"
 }
 
 # Run main function
