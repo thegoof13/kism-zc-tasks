@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { X, Save, Download, Upload, AlertTriangle, Trash2, Plus, Edit2, Users, Brain, Bell, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { X, Download, Upload, Trash2, Plus, Edit, GripVertical, Settings, Users, BarChart3, Shield, Database, Brain, AlertTriangle, Sparkles } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { TaskGroup, UserProfile, AISettings } from '../types';
 import { getIconComponent, getAvailableIcons } from '../utils/icons';
-import { AIQueryModal } from './AIQueryModal';
 import { HistoryAnalytics } from './HistoryAnalytics';
+import { AIQueryModal } from './AIQueryModal';
 import { PasswordModal } from './PasswordModal';
 
 interface SettingsModalProps {
@@ -14,299 +14,50 @@ interface SettingsModalProps {
   isSettingsPasswordSet: boolean;
 }
 
+type SettingsTab = 'general' | 'groups' | 'profiles' | 'data' | 'history' | 'ai' | 'security';
+
 export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettingsPasswordSet }: SettingsModalProps) {
   const { state, dispatch } = useApp();
-  const [activeTab, setActiveTab] = useState('general');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+  const [showAddGroup, setShowAddGroup] = useState(false);
+  const [showAddProfile, setShowAddProfile] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<TaskGroup | null>(null);
+  const [editingProfile, setEditingProfile] = useState<UserProfile | null>(null);
   const [showAIModal, setShowAIModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [passwordModalConfig, setPasswordModalConfig] = useState<{
-    title: string;
-    description: string;
-    onSuccess: () => void;
-    isSettingPassword?: boolean;
-  } | null>(null);
-  const [showTaskIconsSection, setShowTaskIconsSection] = useState(false);
-  const [taskIconsStatus, setTaskIconsStatus] = useState<'idle' | 'generating' | 'success' | 'error'>('idle');
-  const [taskIconsMessage, setTaskIconsMessage] = useState('');
+  const [passwordModalType, setPasswordModalType] = useState<'set' | 'change'>('set');
+  const [draggedGroupIndex, setDraggedGroupIndex] = useState<number | null>(null);
+  const [draggedProfileIndex, setDraggedProfileIndex] = useState<number | null>(null);
+  const [importData, setImportData] = useState<string>('');
+  const [importError, setImportError] = useState<string>('');
+  const [taskIcons, setTaskIcons] = useState<any>({});
+  const [generatingIcons, setGeneratingIcons] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Group management state
-  const [editingGroup, setEditingGroup] = useState<TaskGroup | null>(null);
-  const [newGroupName, setNewGroupName] = useState('');
-  const [newGroupColor, setNewGroupColor] = useState('#6366F1');
-  const [newGroupIcon, setNewGroupIcon] = useState('User');
+  // Load task icons on mount
+  React.useEffect(() => {
+    if (isOpen) {
+      loadTaskIcons();
+    }
+  }, [isOpen]);
 
-  // Profile management state
-  const [editingProfile, setEditingProfile] = useState<UserProfile | null>(null);
-  const [newProfileName, setNewProfileName] = useState('');
-  const [newProfileAvatar, setNewProfileAvatar] = useState('👤');
-  const [newProfileColor, setNewProfileColor] = useState('#6366F1');
-  const [newProfilePin, setNewProfilePin] = useState('');
-  const [newProfilePermissions, setNewProfilePermissions] = useState({
-    canEditTasks: true,
-    canCreateTasks: true,
-    canDeleteTasks: true,
-  });
-  const [newProfileIsCompetitor, setNewProfileIsCompetitor] = useState(false);
-  const [newProfileMealTimes, setNewProfileMealTimes] = useState({
-    breakfast: '07:00',
-    lunch: '12:00',
-    dinner: '18:00',
-    nightcap: '21:00',
-  });
-
-  const availableIcons = getAvailableIcons();
-
-  const handleExportData = () => {
-    const dataStr = JSON.stringify(state, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `focusflow-data-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const importedData = JSON.parse(e.target?.result as string);
-        
-        // Validate the imported data structure
-        if (!importedData.tasks || !importedData.groups || !importedData.profiles) {
-          alert('Invalid data format. Please ensure you\'re importing a valid FocusFlow backup file.');
-          return;
-        }
-
-        // Show confirmation dialog
-        const confirmImport = window.confirm(
-          'This will replace all current data with the imported data. This action cannot be undone. Are you sure you want to continue?'
-        );
-
-        if (confirmImport) {
-          dispatch({ type: 'LOAD_STATE', state: importedData });
-          alert('Data imported successfully!');
-          onClose();
-        }
-      } catch (error) {
-        alert('Error importing data. Please check the file format.');
-        console.error('Import error:', error);
-      }
-    };
-    reader.readAsText(file);
-    
-    // Reset the input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const loadTaskIcons = async () => {
+    try {
+      const response = await fetch('/api/task-icons');
+      const icons = await response.json();
+      setTaskIcons(icons);
+    } catch (error) {
+      console.error('Failed to load task icons:', error);
     }
   };
 
-  const handleAddGroup = () => {
-    if (!newGroupName.trim()) return;
-
-    dispatch({
-      type: 'ADD_GROUP',
-      group: {
-        name: newGroupName.trim(),
-        color: newGroupColor,
-        icon: newGroupIcon,
-        completedDisplayMode: 'grey-out',
-        isCollapsed: false,
-        enableDueDates: false,
-        sortByDueDate: false,
-        defaultNotifications: false,
-      },
-    });
-
-    setNewGroupName('');
-    setNewGroupColor('#6366F1');
-    setNewGroupIcon('User');
-  };
-
-  const handleUpdateGroup = () => {
-    if (!editingGroup || !newGroupName.trim()) return;
-
-    dispatch({
-      type: 'UPDATE_GROUP',
-      groupId: editingGroup.id,
-      updates: {
-        name: newGroupName.trim(),
-        color: newGroupColor,
-        icon: newGroupIcon,
-      },
-    });
-
-    setEditingGroup(null);
-    setNewGroupName('');
-    setNewGroupColor('#6366F1');
-    setNewGroupIcon('User');
-  };
-
-  const handleEditGroup = (group: TaskGroup) => {
-    setEditingGroup(group);
-    setNewGroupName(group.name);
-    setNewGroupColor(group.color);
-    setNewGroupIcon(group.icon);
-  };
-
-  const handleDeleteGroup = (groupId: string) => {
-    const group = state.groups.find(g => g.id === groupId);
-    const tasksInGroup = state.tasks.filter(t => t.groupId === groupId);
-    
-    const confirmMessage = tasksInGroup.length > 0
-      ? `Are you sure you want to delete "${group?.name}"? This will also delete ${tasksInGroup.length} task(s) in this group.`
-      : `Are you sure you want to delete "${group?.name}"?`;
-
-    if (window.confirm(confirmMessage)) {
-      dispatch({ type: 'DELETE_GROUP', groupId });
-    }
-  };
-
-  const handleAddProfile = () => {
-    if (!newProfileName.trim()) return;
-
-    dispatch({
-      type: 'ADD_PROFILE',
-      profile: {
-        name: newProfileName.trim(),
-        avatar: newProfileAvatar,
-        color: newProfileColor,
-        isActive: true,
-        isTaskCompetitor: newProfileIsCompetitor,
-        pin: newProfilePin.trim() || undefined,
-        permissions: newProfilePermissions,
-        mealTimes: newProfileMealTimes,
-      },
-    });
-
-    // Reset form
-    setNewProfileName('');
-    setNewProfileAvatar('👤');
-    setNewProfileColor('#6366F1');
-    setNewProfilePin('');
-    setNewProfilePermissions({
-      canEditTasks: true,
-      canCreateTasks: true,
-      canDeleteTasks: true,
-    });
-    setNewProfileIsCompetitor(false);
-    setNewProfileMealTimes({
-      breakfast: '07:00',
-      lunch: '12:00',
-      dinner: '18:00',
-      nightcap: '21:00',
-    });
-  };
-
-  const handleUpdateProfile = () => {
-    if (!editingProfile || !newProfileName.trim()) return;
-
-    dispatch({
-      type: 'UPDATE_PROFILE',
-      profileId: editingProfile.id,
-      updates: {
-        name: newProfileName.trim(),
-        avatar: newProfileAvatar,
-        color: newProfileColor,
-        isTaskCompetitor: newProfileIsCompetitor,
-        pin: newProfilePin.trim() || undefined,
-        permissions: newProfilePermissions,
-        mealTimes: newProfileMealTimes,
-      },
-    });
-
-    // Reset form
-    setEditingProfile(null);
-    setNewProfileName('');
-    setNewProfileAvatar('👤');
-    setNewProfileColor('#6366F1');
-    setNewProfilePin('');
-    setNewProfilePermissions({
-      canEditTasks: true,
-      canCreateTasks: true,
-      canDeleteTasks: true,
-    });
-    setNewProfileIsCompetitor(false);
-    setNewProfileMealTimes({
-      breakfast: '07:00',
-      lunch: '12:00',
-      dinner: '18:00',
-      nightcap: '21:00',
-    });
-  };
-
-  const handleEditProfile = (profile: UserProfile) => {
-    setEditingProfile(profile);
-    setNewProfileName(profile.name);
-    setNewProfileAvatar(profile.avatar);
-    setNewProfileColor(profile.color);
-    setNewProfilePin(profile.pin || '');
-    setNewProfilePermissions(profile.permissions || {
-      canEditTasks: true,
-      canCreateTasks: true,
-      canDeleteTasks: true,
-    });
-    setNewProfileIsCompetitor(profile.isTaskCompetitor || false);
-    setNewProfileMealTimes(profile.mealTimes || {
-      breakfast: '07:00',
-      lunch: '12:00',
-      dinner: '18:00',
-      nightcap: '21:00',
-    });
-  };
-
-  const handleDeleteProfile = (profileId: string) => {
-    const profile = state.profiles.find(p => p.id === profileId);
-    
-    if (state.profiles.length <= 1) {
-      alert('Cannot delete the last profile. At least one profile must exist.');
-      return;
-    }
-
-    if (window.confirm(`Are you sure you want to delete "${profile?.name}"?`)) {
-      dispatch({ type: 'DELETE_PROFILE', profileId });
-    }
-  };
-
-  const handleSetSettingsPassword = () => {
-    setPasswordModalConfig({
-      title: 'Set Settings Password',
-      description: 'Create a password to protect access to settings. This will be required every time someone tries to access the settings.',
-      onSuccess: () => {
-        setShowPasswordModal(false);
-        setPasswordModalConfig(null);
-      },
-      isSettingPassword: true,
-    });
-    setShowPasswordModal(true);
-  };
-
-  const handleRemoveSettingsPassword = () => {
-    if (window.confirm('Are you sure you want to remove the settings password? Anyone will be able to access settings without authentication.')) {
-      dispatch({
-        type: 'UPDATE_SETTINGS',
-        updates: { settingsPassword: undefined }
-      });
-    }
-  };
-
-  const handleGenerateTaskIcons = async () => {
+  const generateTaskIcons = async () => {
     if (!state.settings.ai.enabled || !state.settings.ai.apiKey) {
-      setTaskIconsMessage('AI must be configured first. Please set up AI in the AI Assistant section.');
-      setTaskIconsStatus('error');
+      alert('AI is not configured. Please set up AI in the AI Assistant tab first.');
       return;
     }
 
-    setTaskIconsStatus('generating');
-    setTaskIconsMessage('Generating task icons with AI...');
-
+    setGeneratingIcons(true);
     try {
       const response = await fetch('/api/generate-task-icons', {
         method: 'POST',
@@ -324,714 +75,738 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
         throw new Error('Failed to generate task icons');
       }
 
-      const taskIcons = await response.json();
-      const iconCount = Object.keys(taskIcons).length;
-      
-      setTaskIconsStatus('success');
-      setTaskIconsMessage(`Successfully generated icons for ${iconCount} tasks! Icons will appear in the Kiosk Portal.`);
-      
-      // Clear success message after 5 seconds
-      setTimeout(() => {
-        setTaskIconsStatus('idle');
-        setTaskIconsMessage('');
-      }, 5000);
-
+      const icons = await response.json();
+      setTaskIcons(icons);
+      alert('Task icons generated successfully!');
     } catch (error) {
-      console.error('Error generating task icons:', error);
-      setTaskIconsStatus('error');
-      setTaskIconsMessage('Failed to generate task icons. Please check your AI configuration and try again.');
-      
-      // Clear error message after 10 seconds
-      setTimeout(() => {
-        setTaskIconsStatus('idle');
-        setTaskIconsMessage('');
-      }, 10000);
+      console.error('Failed to generate task icons:', error);
+      alert('Failed to generate task icons. Please try again.');
+    } finally {
+      setGeneratingIcons(false);
     }
+  };
+
+  const handleExportData = () => {
+    const dataToExport = {
+      tasks: state.tasks,
+      groups: state.groups,
+      profiles: state.profiles,
+      history: state.history,
+      settings: state.settings,
+      exportedAt: new Date().toISOString(),
+      version: '1.0'
+    };
+
+    const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `focusflow-data-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportData = () => {
+    try {
+      const data = JSON.parse(importData);
+      
+      // Validate the data structure
+      if (!data.tasks || !data.groups || !data.profiles) {
+        throw new Error('Invalid data format');
+      }
+
+      // Convert date strings back to Date objects
+      if (data.tasks) {
+        data.tasks = data.tasks.map((task: any) => ({
+          ...task,
+          createdAt: new Date(task.createdAt),
+          completedAt: task.completedAt ? new Date(task.completedAt) : undefined,
+          dueDate: task.dueDate ? new Date(task.dueDate) : undefined,
+          recurrenceFromDate: task.recurrenceFromDate ? new Date(task.recurrenceFromDate) : undefined,
+        }));
+      }
+      
+      if (data.groups) {
+        data.groups = data.groups.map((group: any) => ({
+          ...group,
+          createdAt: new Date(group.createdAt),
+        }));
+      }
+      
+      if (data.profiles) {
+        data.profiles = data.profiles.map((profile: any) => ({
+          ...profile,
+          createdAt: new Date(profile.createdAt),
+        }));
+      }
+      
+      if (data.history) {
+        data.history = data.history.map((entry: any) => ({
+          ...entry,
+          timestamp: new Date(entry.timestamp),
+        }));
+      }
+
+      dispatch({ type: 'LOAD_STATE', state: data });
+      setImportData('');
+      setImportError('');
+      alert('Data imported successfully!');
+    } catch (error) {
+      setImportError('Invalid JSON data. Please check the format and try again.');
+    }
+  };
+
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        setImportData(content);
+        setImportError('');
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  // Group management functions
+  const handleAddGroup = (groupData: Omit<TaskGroup, 'id' | 'createdAt' | 'order'>) => {
+    dispatch({ type: 'ADD_GROUP', group: groupData });
+    setShowAddGroup(false);
+  };
+
+  const handleUpdateGroup = (groupId: string, updates: Partial<TaskGroup>) => {
+    dispatch({ type: 'UPDATE_GROUP', groupId, updates });
+    setEditingGroup(null);
+  };
+
+  const handleDeleteGroup = (groupId: string) => {
+    if (window.confirm('Are you sure you want to delete this group? All tasks in this group will also be deleted.')) {
+      dispatch({ type: 'DELETE_GROUP', groupId });
+    }
+  };
+
+  // Profile management functions
+  const handleAddProfile = (profileData: Omit<UserProfile, 'id' | 'createdAt'>) => {
+    dispatch({ type: 'ADD_PROFILE', profile: profileData });
+    setShowAddProfile(false);
+  };
+
+  const handleUpdateProfile = (profileId: string, updates: Partial<UserProfile>) => {
+    dispatch({ type: 'UPDATE_PROFILE', profileId, updates });
+    setEditingProfile(null);
+  };
+
+  const handleDeleteProfile = (profileId: string) => {
+    if (state.profiles.length <= 1) {
+      alert('Cannot delete the last profile');
+      return;
+    }
+    
+    if (window.confirm('Are you sure you want to delete this profile?')) {
+      dispatch({ type: 'DELETE_PROFILE', profileId });
+    }
+  };
+
+  // Drag and drop for groups
+  const handleGroupDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedGroupIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleGroupDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleGroupDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (draggedGroupIndex === null || draggedGroupIndex === dropIndex) {
+      setDraggedGroupIndex(null);
+      return;
+    }
+
+    const sortedGroups = [...state.groups].sort((a, b) => a.order - b.order);
+    const draggedGroup = sortedGroups[draggedGroupIndex];
+    const newGroups = [...sortedGroups];
+    
+    newGroups.splice(draggedGroupIndex, 1);
+    newGroups.splice(dropIndex, 0, draggedGroup);
+    
+    const reorderedGroupIds = newGroups.map(group => group.id);
+    dispatch({ type: 'REORDER_GROUPS', groupIds: reorderedGroupIds });
+    
+    setDraggedGroupIndex(null);
+  };
+
+  // Drag and drop for profiles
+  const handleProfileDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedProfileIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleProfileDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleProfileDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (draggedProfileIndex === null || draggedProfileIndex === dropIndex) {
+      setDraggedProfileIndex(null);
+      return;
+    }
+
+    const sortedProfiles = [...state.profiles].sort((a, b) => (a.order || 0) - (b.order || 0));
+    const draggedProfile = sortedProfiles[draggedProfileIndex];
+    const newProfiles = [...sortedProfiles];
+    
+    newProfiles.splice(draggedProfileIndex, 1);
+    newProfiles.splice(dropIndex, 0, draggedProfile);
+    
+    const reorderedProfileIds = newProfiles.map(profile => profile.id);
+    dispatch({ type: 'REORDER_PROFILES', profileIds: reorderedProfileIds });
+    
+    setDraggedProfileIndex(null);
+  };
+
+  const handlePasswordSet = (password: string) => {
+    onSetSettingsPassword(password);
+    setShowPasswordModal(false);
   };
 
   if (!isOpen) return null;
 
   const tabs = [
-    { id: 'general', label: 'General', icon: Save },
+    { id: 'general', label: 'General', icon: Settings },
     { id: 'groups', label: 'Groups', icon: Users },
     { id: 'profiles', label: 'Profiles', icon: Users },
+    { id: 'data', label: 'Data', icon: Database },
+    { id: 'history', label: 'History', icon: BarChart3 },
     { id: 'ai', label: 'AI Assistant', icon: Brain },
-    { id: 'data', label: 'Data', icon: Download },
-    { id: 'analytics', label: 'Analytics', icon: Brain },
-  ];
+    { id: 'security', label: 'Security', icon: Shield },
+  ] as const;
 
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
         
-        <div className="relative w-full max-w-4xl mx-4 bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in max-h-[90vh] overflow-hidden settings-modal">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
-            <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
-              Settings
-            </h2>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
-            >
-              <X className="w-5 h-5 text-neutral-500" />
-            </button>
-          </div>
-
-          <div className="flex h-[calc(90vh-80px)]">
+        <div className="relative w-full max-w-6xl mx-4 bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in max-h-[90vh] overflow-hidden settings-modal">
+          <div className="flex h-full">
             {/* Sidebar */}
-            <div className="w-64 border-r border-neutral-200 dark:border-neutral-700 p-4 overflow-y-auto">
-              <nav className="space-y-1">
-                {tabs.map(tab => {
-                  const Icon = tab.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors duration-200 ${
-                        activeTab === tab.id
-                          ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                          : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700'
-                      }`}
-                    >
-                      <Icon className="w-4 h-4" />
-                      <span className="text-sm font-medium">{tab.label}</span>
-                    </button>
-                  );
-                })}
+            <div className="w-64 bg-neutral-50 dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-700 flex flex-col">
+              <div className="p-6 border-b border-neutral-200 dark:border-neutral-700">
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                  Settings
+                </h2>
+              </div>
+              
+              <nav className="flex-1 p-4">
+                <div className="space-y-1">
+                  {tabs.map(tab => {
+                    const Icon = tab.icon;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id as SettingsTab)}
+                        className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors duration-200 ${
+                          activeTab === tab.id
+                            ? 'bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
+                            : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                        }`}
+                      >
+                        <Icon className="w-5 h-5" />
+                        <span className="font-medium">{tab.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </nav>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto">
-              {activeTab === 'general' && (
-                <div className="p-6 space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
-                      General Settings
-                    </h3>
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col">
+              <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
+                <h3 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">
+                  {tabs.find(tab => tab.id === activeTab)?.label}
+                </h3>
+                <button
+                  onClick={onClose}
+                  className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+                >
+                  <X className="w-5 h-5 text-neutral-500" />
+                </button>
+              </div>
 
+              <div className="flex-1 overflow-y-auto p-6">
+                {/* General Settings */}
+                {activeTab === 'general' && (
+                  <div className="space-y-6">
                     {/* Theme Setting */}
-                    <div className="space-y-4">
+                    <div className="flex items-center justify-between">
                       <div>
-                        <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                          Theme
-                        </label>
-                        <select
-                          value={state.settings.theme}
+                        <h4 className="font-medium text-neutral-900 dark:text-neutral-100">Theme</h4>
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400">Choose your preferred theme</p>
+                      </div>
+                      <select
+                        value={state.settings.theme}
+                        onChange={(e) => dispatch({
+                          type: 'UPDATE_SETTINGS',
+                          updates: { theme: e.target.value as any }
+                        })}
+                        className="input-primary w-32"
+                      >
+                        <option value="light">Light</option>
+                        <option value="dark">Dark</option>
+                        <option value="system">System</option>
+                      </select>
+                    </div>
+
+                    {/* Notifications */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-neutral-900 dark:text-neutral-100">Notifications</h4>
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400">Enable browser notifications</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={state.settings.enableNotifications}
                           onChange={(e) => dispatch({
                             type: 'UPDATE_SETTINGS',
-                            updates: { theme: e.target.value as any }
+                            updates: { enableNotifications: e.target.checked }
                           })}
-                          className="input-primary"
-                        >
-                          <option value="light">Light</option>
-                          <option value="dark">Dark</option>
-                          <option value="system">System</option>
-                        </select>
-                      </div>
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-neutral-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-neutral-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-neutral-600 peer-checked:bg-primary-600"></div>
+                      </label>
+                    </div>
 
-                      {/* Show Completed Count */}
+                    {/* Show Completed Count */}
+                    <div className="flex items-center justify-between">
                       <div>
-                        <label className="flex items-center space-x-3">
-                          <input
-                            type="checkbox"
-                            checked={state.settings.showCompletedCount}
-                            onChange={(e) => dispatch({
-                              type: 'UPDATE_SETTINGS',
-                              updates: { showCompletedCount: e.target.checked }
-                            })}
-                            className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                          />
-                          <div>
-                            <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                              Show completed count in header
-                            </span>
-                            <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                              Display task completion progress in the header
-                            </p>
-                          </div>
-                        </label>
+                        <h4 className="font-medium text-neutral-900 dark:text-neutral-100">Show Completed Count</h4>
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400">Display task completion progress in header</p>
                       </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={state.settings.showCompletedCount}
+                          onChange={(e) => dispatch({
+                            type: 'UPDATE_SETTINGS',
+                            updates: { showCompletedCount: e.target.checked }
+                          })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-neutral-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-neutral-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-neutral-600 peer-checked:bg-primary-600"></div>
+                      </label>
+                    </div>
 
-                      {/* Enable Notifications */}
+                    {/* Show Top Collaborator */}
+                    <div className="flex items-center justify-between">
                       <div>
-                        <label className="flex items-center space-x-3">
-                          <input
-                            type="checkbox"
-                            checked={state.settings.enableNotifications}
-                            onChange={(e) => dispatch({
-                              type: 'UPDATE_SETTINGS',
-                              updates: { enableNotifications: e.target.checked }
-                            })}
-                            className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                          />
-                          <div>
-                            <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                              Enable notifications
-                            </span>
-                            <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                              Show browser notifications for due dates and task resets
-                            </p>
-                          </div>
-                        </label>
+                        <h4 className="font-medium text-neutral-900 dark:text-neutral-100">Show Top Collaborator</h4>
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400">Display collaboration leaderboard</p>
                       </div>
-
-                      {/* Show Top Collaborator */}
-                      <div>
-                        <label className="flex items-center space-x-3">
-                          <input
-                            type="checkbox"
-                            checked={state.settings.showTopCollaborator}
-                            onChange={(e) => dispatch({
-                              type: 'UPDATE_SETTINGS',
-                              updates: { showTopCollaborator: e.target.checked }
-                            })}
-                            className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                          />
-                          <div>
-                            <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                              Show Top Collaborator
-                            </span>
-                            <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                              Display collaboration rankings in the trophy modal
-                            </p>
-                          </div>
-                        </label>
-                      </div>
-
-                      {/* Settings Password */}
-                      <div className="pt-4 border-t border-neutral-200 dark:border-neutral-700">
-                        <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-3">
-                          Settings Protection
-                        </h4>
-                        
-                        {isSettingsPasswordSet ? (
-                          <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                            <div className="flex items-center space-x-2">
-                              <Eye className="w-4 h-4 text-green-600 dark:text-green-400" />
-                              <span className="text-sm text-green-700 dark:text-green-400">
-                                Settings are password protected
-                              </span>
-                            </div>
-                            <button
-                              onClick={handleRemoveSettingsPassword}
-                              className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium"
-                            >
-                              Remove Password
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                            <div className="flex items-center space-x-2">
-                              <EyeOff className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                              <span className="text-sm text-amber-700 dark:text-amber-400">
-                                Settings are not protected
-                              </span>
-                            </div>
-                            <button
-                              onClick={handleSetSettingsPassword}
-                              className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
-                            >
-                              Set Password
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Kiosk Task Icons Section */}
-                      <div className="pt-4 border-t border-neutral-200 dark:border-neutral-700">
-                        <button
-                          onClick={() => setShowTaskIconsSection(!showTaskIconsSection)}
-                          className="flex items-center justify-between w-full p-3 bg-neutral-50 dark:bg-neutral-700 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-600 transition-colors duration-200"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <Sparkles className="w-5 h-5 text-primary-500" />
-                            <div className="text-left">
-                              <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                                Kiosk Task Icons
-                              </h4>
-                              <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                                Generate AI-powered icons for child-friendly task recognition
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-neutral-400">
-                            {showTaskIconsSection ? '−' : '+'}
-                          </div>
-                        </button>
-
-                        {showTaskIconsSection && (
-                          <div className="mt-4 p-4 bg-neutral-50 dark:bg-neutral-700 rounded-lg space-y-4">
-                            <div className="text-sm text-neutral-600 dark:text-neutral-400">
-                              <p className="mb-2">
-                                Generate emoji icons for tasks to help young children understand what each task is about in the Kiosk Portal.
-                              </p>
-                              <ul className="list-disc list-inside space-y-1 text-xs">
-                                <li>AI analyzes task names and generates 2 relevant emoji icons per task</li>
-                                <li>Icons are designed for children ages 4-10</li>
-                                <li>Icons appear on both sides of task names in the Kiosk Portal</li>
-                                <li>Requires AI to be configured in the AI Assistant section</li>
-                              </ul>
-                            </div>
-
-                            <button
-                              onClick={handleGenerateTaskIcons}
-                              disabled={taskIconsStatus === 'generating' || !state.settings.ai.enabled}
-                              className={`w-full flex items-center justify-center space-x-2 p-3 rounded-lg font-medium transition-colors duration-200 ${
-                                taskIconsStatus === 'generating' || !state.settings.ai.enabled
-                                  ? 'bg-neutral-200 dark:bg-neutral-600 text-neutral-500 dark:text-neutral-400 cursor-not-allowed'
-                                  : 'bg-primary-500 hover:bg-primary-600 text-white'
-                              }`}
-                            >
-                              {taskIconsStatus === 'generating' ? (
-                                <>
-                                  <div className="w-4 h-4 border-2 border-neutral-400 border-t-transparent rounded-full animate-spin" />
-                                  <span>Generating Icons...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Sparkles className="w-4 h-4" />
-                                  <span>Generate Task Icons</span>
-                                </>
-                              )}
-                            </button>
-
-                            {taskIconsMessage && (
-                              <div className={`p-3 rounded-lg text-sm ${
-                                taskIconsStatus === 'success'
-                                  ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
-                                  : taskIconsStatus === 'error'
-                                    ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
-                                    : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400'
-                              }`}>
-                                {taskIconsMessage}
-                              </div>
-                            )}
-
-                            {!state.settings.ai.enabled && (
-                              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                                <p className="text-sm text-amber-700 dark:text-amber-400">
-                                  AI must be configured first. Please set up your AI provider and API key in the AI Assistant section.
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={state.settings.showTopCollaborator}
+                          onChange={(e) => dispatch({
+                            type: 'UPDATE_SETTINGS',
+                            updates: { showTopCollaborator: e.target.checked }
+                          })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-neutral-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-neutral-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-neutral-600 peer-checked:bg-primary-600"></div>
+                      </label>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {activeTab === 'groups' && (
-                <div className="p-6 space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
-                      Task Groups
-                    </h3>
-
-                    {/* Add/Edit Group Form */}
-                    <div className="card p-4 mb-6">
-                      <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-3">
-                        {editingGroup ? 'Edit Group' : 'Add New Group'}
-                      </h4>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                            Name
-                          </label>
-                          <input
-                            type="text"
-                            value={newGroupName}
-                            onChange={(e) => setNewGroupName(e.target.value)}
-                            placeholder="Group name"
-                            className="input-primary"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                            Color
-                          </label>
-                          <input
-                            type="color"
-                            value={newGroupColor}
-                            onChange={(e) => setNewGroupColor(e.target.value)}
-                            className="w-full h-10 rounded-lg border border-neutral-300 dark:border-neutral-600"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                            Icon
-                          </label>
-                          <select
-                            value={newGroupIcon}
-                            onChange={(e) => setNewGroupIcon(e.target.value)}
-                            className="input-primary"
-                          >
-                            {availableIcons.map(icon => (
-                              <option key={icon.name} value={icon.name}>
-                                {icon.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      
-                      <div className="flex space-x-2 mt-4">
-                        <button
-                          onClick={editingGroup ? handleUpdateGroup : handleAddGroup}
-                          disabled={!newGroupName.trim()}
-                          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {editingGroup ? 'Update Group' : 'Add Group'}
-                        </button>
-                        
-                        {editingGroup && (
-                          <button
-                            onClick={() => {
-                              setEditingGroup(null);
-                              setNewGroupName('');
-                              setNewGroupColor('#6366F1');
-                              setNewGroupIcon('User');
-                            }}
-                            className="btn-secondary"
-                          >
-                            Cancel
-                          </button>
-                        )}
-                      </div>
+                {/* Groups Tab */}
+                {activeTab === 'groups' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Task Groups</h4>
+                      <button
+                        onClick={() => setShowAddGroup(true)}
+                        className="btn-primary"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Group
+                      </button>
                     </div>
 
-                    {/* Groups List */}
                     <div className="space-y-3">
-                      {state.groups.map(group => {
-                        const IconComponent = getIconComponent(group.icon);
-                        const tasksCount = state.tasks.filter(t => t.groupId === group.id).length;
-                        
-                        return (
-                          <div key={group.id} className="card p-4">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <div 
-                                  className="w-3 h-3 rounded-full"
-                                  style={{ backgroundColor: group.color }}
-                                />
-                                <IconComponent className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
-                                <div>
-                                  <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
-                                    {group.name}
-                                  </h4>
-                                  <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                                    {tasksCount} task{tasksCount !== 1 ? 's' : ''}
-                                    {group.enableDueDates && ' • Due dates enabled'}
-                                    {group.defaultNotifications && ' • Notifications enabled'}
-                                  </p>
-                                </div>
+                      {[...state.groups]
+                        .sort((a, b) => a.order - b.order)
+                        .map((group, index) => {
+                          const IconComponent = getIconComponent(group.icon);
+                          return (
+                            <div
+                              key={group.id}
+                              draggable
+                              onDragStart={(e) => handleGroupDragStart(e, index)}
+                              onDragOver={handleGroupDragOver}
+                              onDrop={(e) => handleGroupDrop(e, index)}
+                              className="flex items-center space-x-4 p-4 bg-neutral-50 dark:bg-neutral-700 rounded-lg border border-neutral-200 dark:border-neutral-600 cursor-move hover:bg-neutral-100 dark:hover:bg-neutral-600 transition-colors duration-200"
+                            >
+                              <GripVertical className="w-5 h-5 text-neutral-400" />
+                              <div 
+                                className="w-4 h-4 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: group.color }}
+                              />
+                              <IconComponent className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
+                              <div className="flex-1">
+                                <h5 className="font-medium text-neutral-900 dark:text-neutral-100">{group.name}</h5>
+                                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                                  {group.completedDisplayMode.replace('-', ' ')}
+                                  {group.enableDueDates && ' • Due dates enabled'}
+                                  {group.sortByDueDate && ' • Sorted by due date'}
+                                </p>
                               </div>
-                              
                               <div className="flex items-center space-x-2">
                                 <button
-                                  onClick={() => handleEditGroup(group)}
-                                  className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+                                  onClick={() => setEditingGroup(group)}
+                                  className="p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors duration-200"
                                 >
-                                  <Edit2 className="w-4 h-4 text-neutral-500" />
+                                  <Edit className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
                                 </button>
-                                
                                 <button
                                   onClick={() => handleDeleteGroup(group.id)}
-                                  className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+                                  className="p-2 rounded-lg hover:bg-error-100 dark:hover:bg-error-900/20 transition-colors duration-200"
                                 >
-                                  <Trash2 className="w-4 h-4 text-error-500" />
+                                  <Trash2 className="w-4 h-4 text-error-600 dark:text-error-400" />
                                 </button>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {activeTab === 'profiles' && (
-                <div className="p-6 space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
-                      User Profiles
-                    </h3>
+                {/* Profiles Tab */}
+                {activeTab === 'profiles' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">User Profiles</h4>
+                      <button
+                        onClick={() => setShowAddProfile(true)}
+                        className="btn-primary"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Profile
+                      </button>
+                    </div>
 
-                    {/* Add/Edit Profile Form */}
-                    <div className="card p-4 mb-6">
-                      <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-3">
-                        {editingProfile ? 'Edit Profile' : 'Add New Profile'}
-                      </h4>
-                      
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                              Name
-                            </label>
-                            <input
-                              type="text"
-                              value={newProfileName}
-                              onChange={(e) => setNewProfileName(e.target.value)}
-                              placeholder="Profile name"
-                              className="input-primary"
-                            />
-                          </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                              Avatar (Emoji)
-                            </label>
-                            <input
-                              type="text"
-                              value={newProfileAvatar}
-                              onChange={(e) => setNewProfileAvatar(e.target.value)}
-                              placeholder="👤"
-                              className="input-primary"
-                              maxLength={2}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                              Color
-                            </label>
-                            <input
-                              type="color"
-                              value={newProfileColor}
-                              onChange={(e) => setNewProfileColor(e.target.value)}
-                              className="w-full h-10 rounded-lg border border-neutral-300 dark:border-neutral-600"
-                            />
-                          </div>
-                          
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-                              PIN (Optional)
-                            </label>
-                            <input
-                              type="password"
-                              value={newProfilePin}
-                              onChange={(e) => setNewProfilePin(e.target.value)}
-                              placeholder="Leave empty for no PIN"
-                              className="input-primary"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Meal Times */}
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                            Meal Times
-                          </label>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {Object.entries(newProfileMealTimes).map(([meal, time]) => (
-                              <div key={meal}>
-                                <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1 capitalize">
-                                  {meal}
-                                </label>
-                                <input
-                                  type="time"
-                                  value={time}
-                                  onChange={(e) => setNewProfileMealTimes(prev => ({
-                                    ...prev,
-                                    [meal]: e.target.value
-                                  }))}
-                                  className="input-primary text-sm"
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Permissions */}
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                            Permissions
-                          </label>
-                          <div className="space-y-2">
-                            {Object.entries(newProfilePermissions).map(([permission, enabled]) => (
-                              <label key={permission} className="flex items-center space-x-3">
-                                <input
-                                  type="checkbox"
-                                  checked={enabled}
-                                  onChange={(e) => setNewProfilePermissions(prev => ({
-                                    ...prev,
-                                    [permission]: e.target.checked
-                                  }))}
-                                  className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                                />
-                                <span className="text-sm text-neutral-700 dark:text-neutral-300">
-                                  {permission === 'canCreateTasks' ? 'Can create tasks' :
-                                   permission === 'canEditTasks' ? 'Can edit tasks' :
-                                   permission === 'canDeleteTasks' ? 'Can delete tasks' : permission}
-                                </span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Task Competitor */}
-                        <div>
-                          <label className="flex items-center space-x-3">
-                            <input
-                              type="checkbox"
-                              checked={newProfileIsCompetitor}
-                              onChange={(e) => setNewProfileIsCompetitor(e.target.checked)}
-                              className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                            />
-                            <div>
-                              <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                                Task Competitor
-                              </span>
-                              <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                                Participate in task completion rankings
+                    <div className="space-y-3">
+                      {[...state.profiles]
+                        .sort((a, b) => (a.order || 0) - (b.order || 0))
+                        .map((profile, index) => (
+                          <div
+                            key={profile.id}
+                            draggable
+                            onDragStart={(e) => handleProfileDragStart(e, index)}
+                            onDragOver={handleProfileDragOver}
+                            onDrop={(e) => handleProfileDrop(e, index)}
+                            className="flex items-center space-x-4 p-4 bg-neutral-50 dark:bg-neutral-700 rounded-lg border border-neutral-200 dark:border-neutral-600 cursor-move hover:bg-neutral-100 dark:hover:bg-neutral-600 transition-colors duration-200"
+                          >
+                            <GripVertical className="w-5 h-5 text-neutral-400" />
+                            <div className="w-12 h-12 rounded-full bg-neutral-200 dark:bg-neutral-600 flex items-center justify-center text-lg">
+                              {profile.avatar}
+                            </div>
+                            <div className="flex-1">
+                              <h5 className="font-medium text-neutral-900 dark:text-neutral-100">{profile.name}</h5>
+                              <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                                {profile.isTaskCompetitor ? 'Task Competitor' : 'Regular User'}
+                                {profile.pin && ' • PIN Protected'}
                               </p>
                             </div>
-                          </label>
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => setEditingProfile(profile)}
+                                className="p-2 rounded-lg hover:bg-neutral-200 dark:hover:bg-neutral-600 transition-colors duration-200"
+                              >
+                                <Edit className="w-4 h-4 text-neutral-600 dark:text-neutral-400" />
+                              </button>
+                              {state.profiles.length > 1 && (
+                                <button
+                                  onClick={() => handleDeleteProfile(profile.id)}
+                                  className="p-2 rounded-lg hover:bg-error-100 dark:hover:bg-error-900/20 transition-colors duration-200"
+                                >
+                                  <Trash2 className="w-4 h-4 text-error-600 dark:text-error-400" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Data Tab */}
+                {activeTab === 'data' && (
+                  <div className="space-y-8">
+                    {/* Data Overview */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="card p-4 text-center">
+                        <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
+                          {state.tasks.length}
                         </div>
+                        <div className="text-sm text-neutral-600 dark:text-neutral-400">Tasks</div>
                       </div>
-                      
-                      <div className="flex space-x-2 mt-4">
+                      <div className="card p-4 text-center">
+                        <div className="text-2xl font-bold text-success-600 dark:text-success-400">
+                          {state.groups.length}
+                        </div>
+                        <div className="text-sm text-neutral-600 dark:text-neutral-400">Groups</div>
+                      </div>
+                      <div className="card p-4 text-center">
+                        <div className="text-2xl font-bold text-warning-600 dark:text-warning-400">
+                          {state.profiles.length}
+                        </div>
+                        <div className="text-sm text-neutral-600 dark:text-neutral-400">Profiles</div>
+                      </div>
+                      <div className="card p-4 text-center">
+                        <div className="text-2xl font-bold text-accent-600 dark:text-accent-400">
+                          {state.history.length}
+                        </div>
+                        <div className="text-sm text-neutral-600 dark:text-neutral-400">History Entries</div>
+                      </div>
+                    </div>
+
+                    {/* Task Icons for Kiosk */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                            Task Icons for Kiosk
+                          </h4>
+                          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                            AI-generated icons to help children understand tasks
+                          </p>
+                        </div>
                         <button
-                          onClick={editingProfile ? handleUpdateProfile : handleAddProfile}
-                          disabled={!newProfileName.trim()}
+                          onClick={generateTaskIcons}
+                          disabled={generatingIcons || !state.settings.ai.enabled || !state.settings.ai.apiKey}
                           className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {editingProfile ? 'Update Profile' : 'Add Profile'}
+                          {generatingIcons ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4 mr-2" />
+                              Generate Icons
+                            </>
+                          )}
                         </button>
-                        
-                        {editingProfile && (
+                      </div>
+
+                      {!state.settings.ai.enabled || !state.settings.ai.apiKey ? (
+                        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                          <div className="flex items-start space-x-3">
+                            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <h5 className="font-medium text-amber-800 dark:text-amber-200">
+                                AI Not Configured
+                              </h5>
+                              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                                Please configure AI in the AI Assistant tab to generate task icons for the kiosk.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : Object.keys(taskIcons).length > 0 ? (
+                        <div className="space-y-3">
+                          {Object.entries(taskIcons).map(([taskId, iconData]: [string, any]) => {
+                            const task = state.tasks.find(t => t.id === taskId);
+                            if (!task) return null;
+                            
+                            return (
+                              <div key={taskId} className="flex items-center space-x-4 p-3 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-2xl">{iconData.icons[0]}</span>
+                                  <span className="text-2xl">{iconData.icons[1]}</span>
+                                </div>
+                                <div className="flex-1">
+                                  <h6 className="font-medium text-neutral-900 dark:text-neutral-100">
+                                    {task.title}
+                                  </h6>
+                                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                                    {iconData.groupName}
+                                  </p>
+                                </div>
+                                <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                                  Generated {new Date(iconData.generatedAt).toLocaleDateString()}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-neutral-500 dark:text-neutral-400">
+                          <Sparkles className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                          <p>No task icons generated yet</p>
+                          <p className="text-sm">Click "Generate Icons" to create child-friendly task icons</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Export Data */}
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Export Data</h4>
+                      <p className="text-neutral-600 dark:text-neutral-400">
+                        Download your data for backup or migration purposes.
+                      </p>
+                      <div className="flex space-x-4">
+                        <button
+                          onClick={handleExportData}
+                          className="btn-primary"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download JSON Data
+                        </button>
+                        <button
+                          onClick={() => window.open('/api/activity/download')}
+                          className="btn-secondary"
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download Activity Log
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Import Data */}
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Import Data</h4>
+                      
+                      {/* FIXED: Import Data Warning Box with proper dark mode styling */}
+                      <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                        <div className="flex items-start space-x-3">
+                          <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <h5 className="font-medium text-amber-800 dark:text-amber-200">
+                              Warning: Data Import
+                            </h5>
+                            <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                              Importing data will replace all current data. Make sure to export your current data first as a backup.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".json"
+                            onChange={handleFileImport}
+                            className="hidden"
+                          />
                           <button
-                            onClick={() => {
-                              setEditingProfile(null);
-                              setNewProfileName('');
-                              setNewProfileAvatar('👤');
-                              setNewProfileColor('#6366F1');
-                              setNewProfilePin('');
-                              setNewProfilePermissions({
-                                canEditTasks: true,
-                                canCreateTasks: true,
-                                canDeleteTasks: true,
-                              });
-                              setNewProfileIsCompetitor(false);
-                              setNewProfileMealTimes({
-                                breakfast: '07:00',
-                                lunch: '12:00',
-                                dinner: '18:00',
-                                nightcap: '21:00',
-                              });
-                            }}
+                            onClick={() => fileInputRef.current?.click()}
                             className="btn-secondary"
                           >
-                            Cancel
+                            <Upload className="w-4 h-4 mr-2" />
+                            Choose File
                           </button>
+                          <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-2">
+                            Select a JSON file exported from FocusFlow to import your data.
+                          </p>
+                        </div>
+
+                        {importData && (
+                          <div className="space-y-4">
+                            <textarea
+                              value={importData}
+                              onChange={(e) => setImportData(e.target.value)}
+                              placeholder="Paste JSON data here..."
+                              className="w-full h-32 input-primary font-mono text-sm"
+                            />
+                            {importError && (
+                              <div className="p-3 bg-error-50 dark:bg-error-900/20 border border-error-200 dark:border-error-800 rounded-lg">
+                                <p className="text-error-700 dark:text-error-400 text-sm">{importError}</p>
+                              </div>
+                            )}
+                            <button
+                              onClick={handleImportData}
+                              className="btn-primary"
+                            >
+                              <Upload className="w-4 h-4 mr-2" />
+                              Import Data
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Profiles List */}
-                    <div className="space-y-3">
-                      {state.profiles.map(profile => (
-                        <div key={profile.id} className="card p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <div className="text-2xl">{profile.avatar}</div>
-                              <div>
-                                <div className="flex items-center space-x-2">
-                                  <h4 className="font-medium text-neutral-900 dark:text-neutral-100">
-                                    {profile.name}
-                                  </h4>
-                                  {profile.pin && (
-                                    <span className="px-2 py-1 bg-warning-100 dark:bg-warning-900/20 text-warning-700 dark:text-warning-400 text-xs rounded-full">
-                                      PIN Protected
-                                    </span>
-                                  )}
-                                  {profile.isTaskCompetitor && (
-                                    <span className="px-2 py-1 bg-primary-100 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 text-xs rounded-full">
-                                      Competitor
-                                    </span>
-                                  )}
-                                  {profile.id === state.activeProfileId && (
-                                    <span className="px-2 py-1 bg-success-100 dark:bg-success-900/20 text-success-700 dark:text-success-400 text-xs rounded-full">
-                                      Active
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                                  {profile.permissions?.canCreateTasks ? 'Can create' : 'Cannot create'} • 
-                                  {profile.permissions?.canEditTasks ? ' Can edit' : ' Cannot edit'} • 
-                                  {profile.permissions?.canDeleteTasks ? ' Can delete' : ' Cannot delete'}
-                                </p>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => handleEditProfile(profile)}
-                                className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
-                              >
-                                <Edit2 className="w-4 h-4 text-neutral-500" />
-                              </button>
-                              
-                              <button
-                                onClick={() => handleDeleteProfile(profile.id)}
-                                disabled={state.profiles.length <= 1}
-                                className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                <Trash2 className="w-4 h-4 text-error-500" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'ai' && (
-                <div className="p-6 space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
-                      AI Assistant
-                    </h3>
-
+                    {/* Data Storage Information */}
                     <div className="space-y-4">
-                      {/* Enable AI */}
-                      <div>
-                        <label className="flex items-center space-x-3">
-                          <input
-                            type="checkbox"
-                            checked={state.settings.ai.enabled}
-                            onChange={(e) => dispatch({
-                              type: 'UPDATE_SETTINGS',
-                              updates: { 
-                                ai: { ...state.settings.ai, enabled: e.target.checked }
-                              }
-                            })}
-                            className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
-                          />
+                      <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Data Storage Information</h4>
+                      <div className="space-y-3">
+                        <div className="flex items-start space-x-3">
+                          <div className="w-2 h-2 bg-primary-500 rounded-full mt-2"></div>
                           <div>
-                            <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                              Enable AI Assistant
-                            </span>
-                            <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                              Get insights about your task patterns and productivity
+                            <p className="font-medium text-neutral-900 dark:text-neutral-100">JSON Data</p>
+                            <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                              All application data (tasks, groups, profiles, settings) is stored in a JSON file on the server
                             </p>
                           </div>
-                        </label>
+                        </div>
+                        <div className="flex items-start space-x-3">
+                          <div className="w-2 h-2 bg-success-500 rounded-full mt-2"></div>
+                          <div>
+                            <p className="font-medium text-neutral-900 dark:text-neutral-100">Activity Log</p>
+                            <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                              All user actions and history are logged to a separate activity log file for data integrity
+                            </p>
+                          </div>
+                        </div>
                       </div>
+                    </div>
+                  </div>
+                )}
 
+                {/* History Tab */}
+                {activeTab === 'history' && (
+                  <HistoryAnalytics 
+                    history={state.history} 
+                    tasks={state.tasks}
+                    profiles={state.profiles}
+                  />
+                )}
+
+                {/* AI Assistant Tab */}
+                {activeTab === 'ai' && (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">AI Assistant</h4>
+                        <p className="text-neutral-600 dark:text-neutral-400">Configure AI for task insights and analysis</p>
+                      </div>
+                      {state.settings.ai.enabled && state.settings.ai.apiKey && (
+                        <button
+                          onClick={() => setShowAIModal(true)}
+                          className="btn-primary"
+                        >
+                          <Brain className="w-4 h-4 mr-2" />
+                          Open AI Assistant
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-4">
                       {/* AI Provider */}
                       <div>
                         <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
@@ -1041,7 +816,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                           value={state.settings.ai.provider}
                           onChange={(e) => dispatch({
                             type: 'UPDATE_SETTINGS',
-                            updates: { 
+                            updates: {
                               ai: { ...state.settings.ai, provider: e.target.value as any }
                             }
                           })}
@@ -1053,7 +828,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                         </select>
                       </div>
 
-                      {/* Model Selection */}
+                      {/* AI Model */}
                       <div>
                         <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
                           Model
@@ -1062,7 +837,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                           value={state.settings.ai.model}
                           onChange={(e) => dispatch({
                             type: 'UPDATE_SETTINGS',
-                            updates: { 
+                            updates: {
                               ai: { ...state.settings.ai, model: e.target.value }
                             }
                           })}
@@ -1101,7 +876,7 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                           value={state.settings.ai.apiKey}
                           onChange={(e) => dispatch({
                             type: 'UPDATE_SETTINGS',
-                            updates: { 
+                            updates: {
                               ai: { ...state.settings.ai, apiKey: e.target.value }
                             }
                           })}
@@ -1110,115 +885,122 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
                         />
                       </div>
 
-                      {/* AI Query Button */}
-                      {state.settings.ai.enabled && state.settings.ai.apiKey && (
-                        <div className="pt-4">
-                          <button
-                            onClick={() => setShowAIModal(true)}
-                            className="btn-primary"
-                          >
-                            <Brain className="w-4 h-4 mr-2" />
-                            Open AI Assistant
-                          </button>
+                      {/* Enable AI */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h5 className="font-medium text-neutral-900 dark:text-neutral-100">Enable AI Assistant</h5>
+                          <p className="text-sm text-neutral-600 dark:text-neutral-400">Allow AI analysis of your task data</p>
                         </div>
-                      )}
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={state.settings.ai.enabled}
+                            onChange={(e) => dispatch({
+                              type: 'UPDATE_SETTINGS',
+                              updates: {
+                                ai: { ...state.settings.ai, enabled: e.target.checked }
+                              }
+                            })}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-neutral-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-neutral-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-neutral-600 peer-checked:bg-primary-600"></div>
+                        </label>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {activeTab === 'data' && (
-                <div className="p-6 space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
-                      Data Management
-                    </h3>
-
+                {/* Security Tab */}
+                {activeTab === 'security' && (
+                  <div className="space-y-6">
+                    {/* Settings Password */}
                     <div className="space-y-4">
-                      {/* Export Data */}
-                      <div className="card p-4">
-                        <div className="flex items-start space-x-3">
-                          <Download className="w-5 h-5 text-primary-500 mt-0.5" />
-                          <div className="flex-1">
-                            <h4 className="font-medium text-neutral-900 dark:text-neutral-100 mb-1">
-                              Export Data
-                            </h4>
-                            <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
-                              Download all your tasks, groups, profiles, and settings as a JSON file.
-                            </p>
-                            <button
-                              onClick={handleExportData}
-                              className="btn-primary"
-                            >
-                              <Download className="w-4 h-4 mr-2" />
-                              Export Data
-                            </button>
-                          </div>
+                      <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Settings Password</h4>
+                      <div className="flex items-center justify-between p-4 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+                        <div>
+                          <h5 className="font-medium text-neutral-900 dark:text-neutral-100">Settings Password</h5>
+                          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                            {isSettingsPasswordSet ? 'Password is set' : 'No password set'}
+                          </p>
                         </div>
+                        <button
+                          onClick={() => {
+                            setPasswordModalType(isSettingsPasswordSet ? 'change' : 'set');
+                            setShowPasswordModal(true);
+                          }}
+                          className="btn-primary"
+                        >
+                          {isSettingsPasswordSet ? 'Change Password' : 'Set Password'}
+                        </button>
                       </div>
+                    </div>
 
-                      {/* Import Data */}
-                      <div className="card p-4">
-                        <div className="flex items-start space-x-3">
-                          <Upload className="w-5 h-5 text-warning-500 mt-0.5" />
-                          <div className="flex-1">
-                            <h4 className="font-medium text-neutral-900 dark:text-neutral-100 mb-1">
-                              Import Data
-                            </h4>
-                            <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
-                              Replace all current data with data from a backup file.
-                            </p>
-                            
-                            {/* FIXED: Import Data Warning with proper dark mode styling */}
-                            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg mb-3">
-                              <div className="flex items-start space-x-2">
-                                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                                <div>
-                                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                                    Warning: This will replace all current data
-                                  </p>
-                                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                                    Make sure to export your current data first if you want to keep it.
-                                  </p>
-                                </div>
+                    {/* Profile Security */}
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Profile Security</h4>
+                      <div className="space-y-3">
+                        {state.profiles.map(profile => (
+                          <div key={profile.id} className="flex items-center justify-between p-4 bg-neutral-50 dark:bg-neutral-700 rounded-lg">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 rounded-full bg-neutral-200 dark:bg-neutral-600 flex items-center justify-center">
+                                {profile.avatar}
+                              </div>
+                              <div>
+                                <h5 className="font-medium text-neutral-900 dark:text-neutral-100">{profile.name}</h5>
+                                <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                                  {profile.pin ? 'PIN Protected' : 'No PIN'}
+                                </p>
                               </div>
                             </div>
-                            
-                            <input
-                              ref={fileInputRef}
-                              type="file"
-                              accept=".json"
-                              onChange={handleImportData}
-                              className="hidden"
-                            />
                             <button
-                              onClick={() => fileInputRef.current?.click()}
-                              className="btn-secondary"
+                              onClick={() => setEditingProfile(profile)}
+                              className="btn-secondary text-sm"
                             >
-                              <Upload className="w-4 h-4 mr-2" />
-                              Import Data
+                              {profile.pin ? 'Change PIN' : 'Set PIN'}
                             </button>
                           </div>
-                        </div>
+                        ))}
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
-
-              {activeTab === 'analytics' && (
-                <div className="p-6">
-                  <HistoryAnalytics 
-                    history={state.history} 
-                    tasks={state.tasks}
-                    profiles={state.profiles}
-                  />
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Add/Edit Group Modal */}
+      {(showAddGroup || editingGroup) && (
+        <GroupModal
+          isOpen={true}
+          onClose={() => {
+            setShowAddGroup(false);
+            setEditingGroup(null);
+          }}
+          group={editingGroup}
+          onSave={editingGroup ? 
+            (updates) => handleUpdateGroup(editingGroup.id, updates) :
+            handleAddGroup
+          }
+        />
+      )}
+
+      {/* Add/Edit Profile Modal */}
+      {(showAddProfile || editingProfile) && (
+        <ProfileModal
+          isOpen={true}
+          onClose={() => {
+            setShowAddProfile(false);
+            setEditingProfile(null);
+          }}
+          profile={editingProfile}
+          onSave={editingProfile ?
+            (updates) => handleUpdateProfile(editingProfile.id, updates) :
+            handleAddProfile
+          }
+        />
+      )}
 
       {/* AI Query Modal */}
       <AIQueryModal
@@ -1236,20 +1018,438 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
       />
 
       {/* Password Modal */}
-      {passwordModalConfig && (
-        <PasswordModal
-          isOpen={showPasswordModal}
-          onClose={() => {
-            setShowPasswordModal(false);
-            setPasswordModalConfig(null);
-          }}
-          onSuccess={passwordModalConfig.onSuccess}
-          title={passwordModalConfig.title}
-          description={passwordModalConfig.description}
-          onPasswordSet={passwordModalConfig.isSettingPassword ? onSetSettingsPassword : undefined}
-          isSettingPassword={passwordModalConfig.isSettingPassword}
-        />
-      )}
+      <PasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        onSuccess={handlePasswordSet}
+        title={passwordModalType === 'set' ? 'Set Settings Password' : 'Change Settings Password'}
+        description={passwordModalType === 'set' ? 
+          'Set a password to protect access to settings.' :
+          'Enter a new password to change the settings password.'
+        }
+        placeholder="Enter new password..."
+        isSettingPassword={true}
+        onPasswordSet={handlePasswordSet}
+      />
     </>
+  );
+}
+
+// Group Modal Component
+function GroupModal({ 
+  isOpen, 
+  onClose, 
+  group, 
+  onSave 
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  group?: TaskGroup | null;
+  onSave: (data: any) => void;
+}) {
+  const [name, setName] = useState(group?.name || '');
+  const [color, setColor] = useState(group?.color || '#6366F1');
+  const [icon, setIcon] = useState(group?.icon || 'User');
+  const [completedDisplayMode, setCompletedDisplayMode] = useState(group?.completedDisplayMode || 'grey-out');
+  const [enableDueDates, setEnableDueDates] = useState(group?.enableDueDates || false);
+  const [sortByDueDate, setSortByDueDate] = useState(group?.sortByDueDate || false);
+  const [defaultNotifications, setDefaultNotifications] = useState(group?.defaultNotifications || false);
+
+  const availableIcons = getAvailableIcons();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      name,
+      color,
+      icon,
+      completedDisplayMode,
+      enableDueDates,
+      sortByDueDate,
+      defaultNotifications,
+    });
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-60 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      
+      <div className="relative w-full max-w-md mx-4 bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in">
+        <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
+          <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+            {group ? 'Edit Group' : 'Add Group'}
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+          >
+            <X className="w-5 h-5 text-neutral-500" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Group Name
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="input-primary"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Color
+            </label>
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="w-full h-10 rounded-lg border border-neutral-300 dark:border-neutral-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Icon
+            </label>
+            <div className="grid grid-cols-6 gap-2">
+              {availableIcons.map(({ name: iconName, component: IconComponent }) => (
+                <button
+                  key={iconName}
+                  type="button"
+                  onClick={() => setIcon(iconName)}
+                  className={`p-3 rounded-lg border transition-colors duration-200 ${
+                    icon === iconName
+                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                      : 'border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-700'
+                  }`}
+                >
+                  <IconComponent className="w-5 h-5 text-neutral-600 dark:text-neutral-400" />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Completed Display Mode
+            </label>
+            <select
+              value={completedDisplayMode}
+              onChange={(e) => setCompletedDisplayMode(e.target.value as any)}
+              className="input-primary"
+            >
+              <option value="grey-out">Grey Out</option>
+              <option value="grey-drop">Grey Drop</option>
+              <option value="separate-completed">Separate Completed</option>
+            </select>
+          </div>
+
+          <div className="space-y-3">
+            <label className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                checked={enableDueDates}
+                onChange={(e) => setEnableDueDates(e.target.checked)}
+                className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+              />
+              <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                Enable Due Dates
+              </span>
+            </label>
+
+            {enableDueDates && (
+              <label className="flex items-center space-x-3 ml-7">
+                <input
+                  type="checkbox"
+                  checked={sortByDueDate}
+                  onChange={(e) => setSortByDueDate(e.target.checked)}
+                  className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                  Sort by Due Date
+                </span>
+              </label>
+            )}
+
+            <label className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                checked={defaultNotifications}
+                onChange={(e) => setDefaultNotifications(e.target.checked)}
+                className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+              />
+              <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                Default Notifications for New Tasks
+              </span>
+            </label>
+          </div>
+
+          <div className="flex space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 btn-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 btn-primary"
+            >
+              {group ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Profile Modal Component
+function ProfileModal({ 
+  isOpen, 
+  onClose, 
+  profile, 
+  onSave 
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  profile?: UserProfile | null;
+  onSave: (data: any) => void;
+}) {
+  const [name, setName] = useState(profile?.name || '');
+  const [avatar, setAvatar] = useState(profile?.avatar || '👤');
+  const [color, setColor] = useState(profile?.color || '#6366F1');
+  const [isTaskCompetitor, setIsTaskCompetitor] = useState(profile?.isTaskCompetitor || false);
+  const [pin, setPin] = useState(profile?.pin || '');
+  const [canCreateTasks, setCanCreateTasks] = useState(profile?.permissions?.canCreateTasks ?? true);
+  const [canEditTasks, setCanEditTasks] = useState(profile?.permissions?.canEditTasks ?? true);
+  const [canDeleteTasks, setCanDeleteTasks] = useState(profile?.permissions?.canDeleteTasks ?? true);
+  const [mealTimes, setMealTimes] = useState({
+    breakfast: profile?.mealTimes?.breakfast || '07:00',
+    lunch: profile?.mealTimes?.lunch || '12:00',
+    dinner: profile?.mealTimes?.dinner || '18:00',
+    nightcap: profile?.mealTimes?.nightcap || '21:00',
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave({
+      name,
+      avatar,
+      color,
+      isTaskCompetitor,
+      pin: pin.trim() || undefined,
+      permissions: {
+        canCreateTasks,
+        canEditTasks,
+        canDeleteTasks,
+      },
+      mealTimes,
+      isActive: true,
+    });
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-60 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      
+      <div className="relative w-full max-w-md mx-4 bg-white dark:bg-neutral-800 rounded-2xl shadow-xl animate-scale-in max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
+          <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+            {profile ? 'Edit Profile' : 'Add Profile'}
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors duration-200"
+          >
+            <X className="w-5 h-5 text-neutral-500" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Profile Name
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="input-primary"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Avatar (Emoji)
+            </label>
+            <input
+              type="text"
+              value={avatar}
+              onChange={(e) => setAvatar(e.target.value)}
+              className="input-primary"
+              placeholder="👤"
+              maxLength={2}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              Color
+            </label>
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="w-full h-10 rounded-lg border border-neutral-300 dark:border-neutral-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+              PIN (Optional)
+            </label>
+            <input
+              type="password"
+              value={pin}
+              onChange={(e) => setPin(e.target.value)}
+              className="input-primary"
+              placeholder="Leave empty for no PIN"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">
+              Meal Times
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">
+                  Breakfast
+                </label>
+                <input
+                  type="time"
+                  value={mealTimes.breakfast}
+                  onChange={(e) => setMealTimes(prev => ({ ...prev, breakfast: e.target.value }))}
+                  className="input-primary text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">
+                  Lunch
+                </label>
+                <input
+                  type="time"
+                  value={mealTimes.lunch}
+                  onChange={(e) => setMealTimes(prev => ({ ...prev, lunch: e.target.value }))}
+                  className="input-primary text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">
+                  Dinner
+                </label>
+                <input
+                  type="time"
+                  value={mealTimes.dinner}
+                  onChange={(e) => setMealTimes(prev => ({ ...prev, dinner: e.target.value }))}
+                  className="input-primary text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-neutral-600 dark:text-neutral-400 mb-1">
+                  Night Cap
+                </label>
+                <input
+                  type="time"
+                  value={mealTimes.nightcap}
+                  onChange={(e) => setMealTimes(prev => ({ ...prev, nightcap: e.target.value }))}
+                  className="input-primary text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="flex items-center space-x-3">
+              <input
+                type="checkbox"
+                checked={isTaskCompetitor}
+                onChange={(e) => setIsTaskCompetitor(e.target.checked)}
+                className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+              />
+              <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                Task Competitor
+              </span>
+            </label>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Permissions</p>
+              <label className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  checked={canCreateTasks}
+                  onChange={(e) => setCanCreateTasks(e.target.checked)}
+                  className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm text-neutral-700 dark:text-neutral-300">
+                  Can Create Tasks
+                </span>
+              </label>
+              <label className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  checked={canEditTasks}
+                  onChange={(e) => setCanEditTasks(e.target.checked)}
+                  className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm text-neutral-700 dark:text-neutral-300">
+                  Can Edit Tasks
+                </span>
+              </label>
+              <label className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  checked={canDeleteTasks}
+                  onChange={(e) => setCanDeleteTasks(e.target.checked)}
+                  className="w-4 h-4 text-primary-500 bg-neutral-100 border-neutral-300 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm text-neutral-700 dark:text-neutral-300">
+                  Can Delete Tasks
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className="flex space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 btn-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 btn-primary"
+            >
+              {profile ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
