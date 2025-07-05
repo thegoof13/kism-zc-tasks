@@ -856,6 +856,13 @@ start_application() {
 configure_nginx_http() {
     print_status "Configuring Nginx (HTTP only initially)..."
     
+    # If we have existing SSL certificates, configure SSL directly
+    if [[ "$USE_SSL" == true && -n "$EXISTING_SSL_CERT" ]]; then
+        print_status "Configuring Nginx with existing SSL certificate..."
+        configure_nginx_with_existing_ssl
+        return
+    fi
+    
     # Create basic HTTP configuration first
     cat > /tmp/focusflow.nginx << EOF
 # HTTP server
@@ -974,6 +981,151 @@ EOF
     fi
 }
 
+# Function to configure Nginx with existing SSL certificate
+configure_nginx_with_existing_ssl() {
+    print_status "Configuring Nginx with existing SSL certificate..."
+    
+    # Create full SSL configuration with existing certificate
+    cat > /tmp/focusflow-ssl.nginx << EOF
+# HTTP server - redirect all traffic to HTTPS
+server {
+    listen 80;
+    server_name $DOMAIN;
+    
+    # Redirect all HTTP traffic to HTTPS
+    return 301 https://\$server_name\$request_uri;
+}
+
+# HTTPS server
+server {
+    listen 443 ssl http2;
+    server_name $DOMAIN;
+    
+    # SSL configuration with existing certificate
+    ssl_certificate $EXISTING_SSL_CERT;
+    ssl_certificate_key $EXISTING_SSL_KEY;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:MozTLS:10m;
+    ssl_session_tickets off;
+    
+    # Modern SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    
+    # HSTS
+    add_header Strict-Transport-Security "max-age=63072000" always;
+    
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+EOF
+
+    # Add Kiosk Portal configuration if enabled
+    if [[ "$ENABLE_KIOSK" == true ]]; then
+        cat >> /tmp/focusflow-ssl.nginx << EOF
+    
+    # Kiosk Portal - Secure random path
+    location /kiosk/$KIOSK_PATH/ {
+        alias $APP_DIR/kiosk/$KIOSK_PATH/;
+        try_files \$uri \$uri/ /kiosk/$KIOSK_PATH/index.html;
+        
+        # Additional security headers for kiosk
+        add_header X-Frame-Options "DENY" always;
+        add_header Content-Security-Policy "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https:; img-src 'self' data: https:;" always;
+        
+        # Cache static assets
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+        
+        # Don't cache HTML files
+        location ~* \.html$ {
+            expires -1;
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+        }
+    }
+EOF
+    fi
+
+    cat >> /tmp/focusflow-ssl.nginx << EOF
+    
+    # API routes - proxy to Node.js backend
+    location /api/ {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_read_timeout 86400;
+    }
+    
+    # Static files - serve from built frontend
+    location / {
+        root $APP_DIR/dist;
+        try_files \$uri \$uri/ /index.html;
+        
+        # Cache static assets
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+        
+        # Don't cache HTML files
+        location ~* \.html$ {
+            expires -1;
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+        }
+    }
+    
+    # Security: deny access to sensitive files
+    location ~ /\. {
+        deny all;
+    }
+    
+    location ~ /(package\.json|server/|src/|node_modules/) {
+        deny all;
+    }
+}
+EOF
+    
+    # Install Nginx configuration
+    sudo mv /tmp/focusflow-ssl.nginx /etc/nginx/sites-available/focusflow
+    sudo ln -sf /etc/nginx/sites-available/focusflow /etc/nginx/sites-enabled/
+    
+    # Remove default site
+    sudo rm -f /etc/nginx/sites-enabled/default
+    
+    # Test Nginx configuration
+    print_status "Testing SSL Nginx configuration..."
+    if sudo nginx -t; then
+        print_success "SSL Nginx configuration is valid"
+        sudo systemctl reload nginx
+        print_success "Nginx SSL configuration updated and reloaded"
+    else
+        print_error "SSL Nginx configuration test failed"
+        exit 1
+    fi
+    
+    print_success "Nginx configured with existing SSL certificate"
+    if [[ "$ENABLE_KIOSK" == true ]]; then
+        print_success "Kiosk Portal configured at: /kiosk/$KIOSK_PATH/"
+    fi
+}
+
 # Function to setup Cloudflare credentials
 setup_cloudflare_credentials() {
     if [[ "$USE_SSL" == true && -z "$EXISTING_SSL_CERT" ]]; then
@@ -999,6 +1151,14 @@ EOF
 
 # Function to setup SSL with Let's Encrypt using Cloudflare DNS
 setup_ssl() {
+    # Handle existing SSL certificates
+    if [[ "$USE_SSL" == true && -n "$EXISTING_SSL_CERT" ]]; then
+        print_status "Using existing SSL certificate: $EXISTING_SSL_CERT"
+        print_status "SSL configuration already completed in configure_nginx_http()"
+        return 0
+    fi
+    
+    # Handle new Let's Encrypt certificates
     if [[ "$USE_SSL" == true && -z "$EXISTING_SSL_CERT" ]]; then
         print_status "Setting up SSL certificate with Let's Encrypt using Cloudflare DNS..."
         
@@ -1084,6 +1244,22 @@ setup_ssl() {
 update_nginx_ssl_config() {
     print_status "Updating Nginx configuration for SSL..."
     
+    # Determine certificate paths
+    local cert_path
+    local key_path
+    
+    if [[ -n "$EXISTING_SSL_CERT" ]]; then
+        # Use existing certificate
+        cert_path="$EXISTING_SSL_CERT"
+        key_path="$EXISTING_SSL_KEY"
+        print_status "Using existing SSL certificate: $cert_path"
+    else
+        # Use Let's Encrypt certificate
+        cert_path="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+        key_path="/etc/letsencrypt/live/$DOMAIN/privkey.pem"
+        print_status "Using Let's Encrypt certificate: $cert_path"
+    fi
+    
     # Create full SSL configuration
     cat > /tmp/focusflow-ssl.nginx << EOF
 # HTTP server - redirect all traffic to HTTPS
@@ -1101,8 +1277,8 @@ server {
     server_name $DOMAIN;
     
     # SSL configuration
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+    ssl_certificate $cert_path;
+    ssl_certificate_key $key_path;
     ssl_session_timeout 1d;
     ssl_session_cache shared:MozTLS:10m;
     ssl_session_tickets off;
@@ -1218,6 +1394,13 @@ EOF
 
 # Function to create SSL renewal script
 setup_ssl_renewal_cron() {
+    # Only set up renewal for Let's Encrypt certificates, not existing ones
+    if [[ -n "$EXISTING_SSL_CERT" ]]; then
+        print_status "Skipping SSL renewal setup for existing certificate: $EXISTING_SSL_CERT"
+        print_status "Existing certificates require manual renewal management"
+        return 0
+    fi
+    
     print_status "Setting up SSL certificate renewal..."
     
     # Create renewal script
