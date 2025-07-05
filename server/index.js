@@ -526,7 +526,205 @@ app.get('/api/ai/logs', async (req, res) => {
 });
 
 // Get activity log
-app.get('/api/activity/logs', async (req, res) => {
+// Serve static files in production (after all API routes)
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(__dirname, '..', 'dist');
+  app.use(express.static(distPath));
+  
+  // Serve index.html for all non-API routes (SPA support)
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
+
+// Error handling middleware
+app.use((error, req, res, next) => {
+  console.error('Server error:', error);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+// Create API router
+const apiRouter = express.Router();
+
+// Move all API routes to the router
+// Get user data
+apiRouter.get('/data/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const filename = getUserDataFile(userId);
+    let userData = await readJsonFile(filename);
+    
+    if (!userData) {
+      console.log('Creating default data for user:', userId);
+      userData = getDefaultUserData();
+      await writeJsonFile(filename, userData);
+      
+      // Log the creation
+      await logActivity({
+        action: 'user_created',
+        timestamp: new Date().toISOString(),
+        userId: userId,
+        details: 'Created new user with default data'
+      });
+    }
+    
+    // Load activity log and merge with history
+    const activityLog = await loadActivityLog();
+    
+    // Merge activity log with existing history, avoiding duplicates
+    const existingHistoryIds = new Set(userData.history?.map(h => h.id) || []);
+    const newLogEntries = activityLog
+      .filter(entry => !existingHistoryIds.has(entry.id))
+      .map(entry => ({
+        id: entry.id || `log-${Date.now()}-${Math.random()}`,
+        taskId: entry.taskId || 'system',
+        profileId: entry.profileId || 'system',
+        action: entry.action,
+        timestamp: new Date(entry.timestamp),
+        taskTitle: entry.taskTitle || 'System Action',
+        profileName: entry.profileName || 'System',
+        details: entry.details || ''
+      }));
+    
+    // Combine and sort by timestamp (newest first)
+    const combinedHistory = [...(userData.history || []), ...newLogEntries]
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    userData.history = combinedHistory;
+    
+    console.log('Sending user data for:', userId);
+    console.log('Total history entries:', userData.history.length);
+    res.json(userData);
+  } catch (error) {
+    console.error('Error reading user data:', error);
+    res.status(500).json({ error: 'Failed to read user data' });
+  }
+});
+
+// Save user data
+apiRouter.post('/data/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const userData = req.body;
+    const filename = getUserDataFile(userId);
+    
+    console.log('Received save request for user:', userId);
+    console.log('Data received - Tasks:', userData.tasks?.length || 0);
+    console.log('Data received - Groups:', userData.groups?.length || 0);
+    console.log('Data received - Profiles:', userData.profiles?.length || 0);
+    console.log('Data received - History:', userData.history?.length || 0);
+    
+    // Remove loading flag before saving
+    const { loading, taskUpdateStatuses, ...dataToSave } = userData;
+    
+    // Log any new history entries to the activity log
+    if (userData.history && Array.isArray(userData.history)) {
+      // Get existing data to compare
+      const existingData = await readJsonFile(filename);
+      const existingHistoryIds = new Set(existingData?.history?.map(h => h.id) || []);
+      
+      // Find new history entries
+      const newHistoryEntries = userData.history.filter(entry => 
+        !existingHistoryIds.has(entry.id)
+      );
+      
+      // Log each new history entry to activity log
+      for (const entry of newHistoryEntries) {
+        await logActivity({
+          id: entry.id,
+          action: entry.action,
+          taskId: entry.taskId,
+          profileId: entry.profileId,
+          timestamp: entry.timestamp,
+          taskTitle: entry.taskTitle,
+          profileName: entry.profileName,
+          details: entry.details,
+          userId: userId
+        });
+      }
+      
+      if (newHistoryEntries.length > 0) {
+        console.log(`Logged ${newHistoryEntries.length} new history entries to activity log`);
+      }
+    }
+    
+    await writeJsonFile(filename, dataToSave);
+    console.log('Successfully saved user data for:', userId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error saving user data:', error);
+    
+    // Log the save error
+    await logActivity({
+      action: 'save_error',
+      timestamp: new Date().toISOString(),
+      userId: userId,
+      details: `Failed to save user data: ${error.message}`
+    });
+    
+    res.status(500).json({ error: 'Failed to save user data' });
+  }
+});
+
+// Log AI queries
+apiRouter.post('/ai/log', async (req, res) => {
+  try {
+    const { query, response, timestamp } = req.body;
+    
+    const logEntry = {
+      query,
+      response: response.substring(0, 500) + (response.length > 500 ? '...' : ''), // Truncate long responses
+      timestamp,
+      userId: '1', // Simple user ID for now
+    };
+    
+    await appendToAILog(logEntry);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error logging AI query:', error);
+    res.status(500).json({ error: 'Failed to log AI query' });
+  }
+});
+
+// Get AI query logs (optional endpoint for viewing logs)
+apiRouter.get('/ai/logs', async (req, res) => {
+  try {
+    const logs = await fs.readFile(AI_LOG_FILE, 'utf8');
+    const logEntries = logs.split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        try {
+          const match = line.match(/^\[(.*?)\] (.*)$/);
+          if (match) {
+            return {
+              timestamp: match[1],
+              ...JSON.parse(match[2])
+            };
+          }
+          return null;
+        } catch {
+          return null;
+        }
+      })
+      .filter(entry => entry !== null)
+      .slice(-100); // Return last 100 entries
+    
+    res.json(logEntries);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      res.json([]); // No logs yet
+    } else {
+      console.error('Error reading AI logs:', error);
+      res.status(500).json({ error: 'Failed to read AI logs' });
+    }
+  }
+});
+
+// Get activity log
+apiRouter.get('/activity/logs', async (req, res) => {
   try {
     const activityLog = await loadActivityLog();
     res.json(activityLog.slice(-200)); // Return last 200 entries
@@ -537,7 +735,7 @@ app.get('/api/activity/logs', async (req, res) => {
 });
 
 // Download data endpoints for backup
-app.get('/api/data/:userId/download', async (req, res) => {
+apiRouter.get('/data/:userId/download', async (req, res) => {
   try {
     const { userId } = req.params;
     const filename = getUserDataFile(userId);
@@ -559,7 +757,7 @@ app.get('/api/data/:userId/download', async (req, res) => {
   }
 });
 
-app.get('/api/activity/download', async (req, res) => {
+apiRouter.get('/activity/download', async (req, res) => {
   try {
     const activityLog = await loadActivityLog();
     
@@ -581,7 +779,7 @@ app.get('/api/activity/download', async (req, res) => {
 });
 
 // Get task icons for kiosk
-app.get('/api/task-icons', async (req, res) => {
+apiRouter.get('/task-icons', async (req, res) => {
   try {
     const taskIconsData = await readJsonFile('task_icons.json');
     res.json(taskIconsData || {});
@@ -592,7 +790,7 @@ app.get('/api/task-icons', async (req, res) => {
 });
 
 // Generate task icons using AI
-app.post('/api/generate-task-icons', async (req, res) => {
+apiRouter.post('/generate-task-icons', async (req, res) => {
   try {
     const { tasks, groups, aiSettings } = req.body;
     
@@ -612,184 +810,8 @@ app.post('/api/generate-task-icons', async (req, res) => {
   }
 });
 
-// Function to generate task icons using AI
-async function generateTaskIcons(tasks, groups, aiSettings) {
-  const taskIcons = {};
-  
-  // Group tasks by their group for context
-  const tasksByGroup = {};
-  groups.forEach(group => {
-    tasksByGroup[group.id] = {
-      groupName: group.name,
-      tasks: tasks.filter(task => task.groupId === group.id)
-    };
-  });
-  
-  for (const groupId in tasksByGroup) {
-    const { groupName, tasks: groupTasks } = tasksByGroup[groupId];
-    
-    if (groupTasks.length === 0) continue;
-    
-    const taskList = groupTasks.map(task => `- ${task.title}`).join('\n');
-    
-    const prompt = `You are helping create child-friendly icons for a task management app. For each task in the "${groupName}" category, suggest 2 simple, recognizable emoji icons that would help young children (ages 4-10) understand what the task is about.
-
-Tasks in ${groupName}:
-${taskList}
-
-For each task, provide exactly 2 emoji icons that are:
-1. Simple and easily recognizable by children
-2. Directly related to the task activity
-3. Visually distinct from each other
-4. Appropriate for all ages
-
-Respond in this exact JSON format:
-{
-  "task_title_1": ["🏠", "🧹"],
-  "task_title_2": ["🍎", "🥛"]
-}
-
-Only include the task titles that were provided, and use exactly 2 emoji icons per task.`;
-
-    try {
-      let response;
-      
-      switch (aiSettings.provider) {
-        case 'openai':
-          response = await callOpenAI(prompt, aiSettings.apiKey, aiSettings.model);
-          break;
-        case 'anthropic':
-          response = await callAnthropic(prompt, aiSettings.apiKey, aiSettings.model);
-          break;
-        case 'gemini':
-          response = await callGemini(prompt, aiSettings.apiKey, aiSettings.model);
-          break;
-        default:
-          throw new Error(`Unsupported AI provider: ${aiSettings.provider}`);
-      }
-      
-      // Parse the AI response
-      const cleanResponse = response.replace(/```json\n?|\n?```/g, '').trim();
-      const groupIcons = JSON.parse(cleanResponse);
-      
-      // Map the icons to task IDs
-      groupTasks.forEach(task => {
-        if (groupIcons[task.title]) {
-          taskIcons[task.id] = {
-            title: task.title,
-            icons: groupIcons[task.title],
-            groupName: groupName,
-            generatedAt: new Date().toISOString()
-          };
-        }
-      });
-      
-    } catch (error) {
-      console.error(`Error generating icons for group ${groupName}:`, error);
-      // Continue with other groups even if one fails
-    }
-  }
-  
-  return taskIcons;
-}
-
-// AI API call functions
-async function callOpenAI(prompt, apiKey, model) {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a helpful assistant that generates child-friendly emoji icons for tasks. Always respond with valid JSON only.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      max_tokens: 1000,
-      temperature: 0.3,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'OpenAI API request failed');
-  }
-
-  const data = await response.json();
-  return data.choices[0]?.message?.content || 'No response generated';
-}
-
-async function callAnthropic(prompt, apiKey, model) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 1000,
-      messages: [
-        {
-          role: 'user',
-          content: `You are a helpful assistant that generates child-friendly emoji icons for tasks. Always respond with valid JSON only.\n\n${prompt}`
-        }
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'Anthropic API request failed');
-  }
-
-  const data = await response.json();
-  return data.content[0]?.text || 'No response generated';
-}
-
-async function callGemini(prompt, apiKey, model) {
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            {
-              text: `You are a helpful assistant that generates child-friendly emoji icons for tasks. Always respond with valid JSON only.\n\n${prompt}`
-            }
-          ]
-        }
-      ],
-      generationConfig: {
-        maxOutputTokens: 1000,
-        temperature: 0.3,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error?.message || 'Gemini API request failed');
-  }
-
-  const data = await response.json();
-  return data.candidates[0]?.content?.parts[0]?.text || 'No response generated';
-}
-
 // Health check
-app.get('/api/health', (req, res) => {
+apiRouter.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
@@ -799,25 +821,8 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Serve static files in production (after all API routes)
-if (process.env.NODE_ENV === 'production') {
-  const distPath = path.join(__dirname, '..', 'dist');
-  app.use(express.static(distPath));
-  
-  // Serve index.html for all non-API routes (SPA support)
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api/')) {
-      return next();
-    }
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
-}
-
-// Error handling middleware
-app.use((error, req, res, next) => {
-  console.error('Server error:', error);
-  res.status(500).json({ error: 'Internal server error' });
-});
+// Mount API router BEFORE static file serving
+app.use('/api', apiRouter);
 
 // Start server
 async function startServer() {
