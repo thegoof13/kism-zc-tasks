@@ -44,10 +44,24 @@ export function SettingsModal({ isOpen, onClose, onSetSettingsPassword, isSettin
   const loadTaskIcons = async () => {
     try {
       const response = await fetch('/api/task-icons');
+      
+      // Check if response is actually JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('Task icons API not available - endpoint returned HTML instead of JSON');
+        setTaskIcons({});
+        return;
+      }
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const icons = await response.json();
       setTaskIcons(icons);
     } catch (error) {
-      console.error('Failed to load task icons:', error);
+      console.warn('Task icons API not available:', error.message);
+      setTaskIcons({});
     }
   };
 
