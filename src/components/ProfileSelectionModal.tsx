@@ -102,7 +102,7 @@ export function ProfileSelectionModal({
 
           <div className="p-6">
             <p className="text-neutral-600 dark:text-neutral-400 text-sm mb-6">
-              Choose a profile to continue using ZenTasks
+              Choose a profile to continue using FocusFlow
             </p>
 
             <div className="space-y-3">

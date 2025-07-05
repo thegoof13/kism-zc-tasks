@@ -1,8 +1,8 @@
-# ZenTasks - Smart Task Management System
+# FocusFlow - Smart Task Management System
 
 A beautiful, production-ready task management application with smart recurring tasks, multi-profile support, AI-powered insights, advanced collaboration features, and comprehensive notification system.
 
-![ZenTasks](https://img.shields.io/badge/ZenTasks-v1.0-blue.svg)
+![FocusFlow](https://img.shields.io/badge/FocusFlow-v1.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Node.js](https://img.shields.io/badge/node.js-18+-brightgreen.svg)
 ![React](https://img.shields.io/badge/react-18.3-blue.svg)
@@ -68,10 +68,10 @@ A beautiful, production-ready task management application with smart recurring t
 For a complete automated deployment on Ubuntu with Nginx, SSL, and all dependencies:
 
 ```bash
-# Download and extract ZenTasks
-wget https://github.com/your-repo/zentasks/archive/main.zip
+# Download and extract FocusFlow
+wget https://github.com/your-repo/focusflow/archive/main.zip
 unzip main.zip
-cd zentasks-main
+cd focusflow-main
 
 # Make setup script executable
 chmod +x setup.sh
@@ -93,8 +93,8 @@ For local development:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/zentasks.git
-cd zentasks
+git clone https://github.com/your-repo/focusflow.git
+cd focusflow
 
 # Install dependencies
 npm install
@@ -748,4 +748,4 @@ For support and questions:
 
 ---
 
-**ZenTasks** - Bringing zen to your task management experience with smart notifications and beautiful design! 🧘‍♀️✨🔔
+**FocusFlow** - Bringing zen to your task management experience with smart notifications and beautiful design! 🧘‍♀️✨🔔

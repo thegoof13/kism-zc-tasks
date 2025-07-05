@@ -198,12 +198,12 @@ function AppContent() {
                 <Plus className="w-8 h-8 text-white" />
               </div>
               <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
-                Welcome to ZenTasks
+                Welcome to FocusFlow
               </h2>
               <p className="text-neutral-600 dark:text-neutral-400 mb-6 max-w-md mx-auto">
                 {isViewOnlyMode 
                   ? 'You are in view-only mode. You can see tasks but cannot modify them.'
-                  : 'Bring zen to your task management. Create your first task to get started.'
+                  : 'Start organizing your life with smart recurring tasks. Create your first task to get started.'
                 }
               </p>
               {canCreateTasks && (
