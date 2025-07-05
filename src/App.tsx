@@ -96,7 +96,7 @@ function AppContent() {
       <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
-          <p className="text-neutral-600 dark:text-neutral-400">Loading ZenTasks...</p>
+            <Plus className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-2">
             Welcome to FocusFlow
@@ -203,7 +203,7 @@ function AppContent() {
               <p className="text-neutral-600 dark:text-neutral-400 mb-6 max-w-md mx-auto">
                 {isViewOnlyMode 
                   ? 'You are in view-only mode. You can see tasks but cannot modify them.'
-                  : 'Start organizing your life with smart recurring tasks. Create your first task to get started.'
+                  : 'Bring zen to your task management. Create your first task to get started.'
                 }
               </p>
               {canCreateTasks && (
