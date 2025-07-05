@@ -14,6 +14,9 @@ const AI_LOG_FILE = path.join(DATA_DIR, 'ai_queries.log');
 const ACTIVITY_LOG_FILE = path.join(DATA_DIR, 'activity.log');
 const TASK_ICONS_FILE = path.join(DATA_DIR, 'task_icons.json');
 
+// Initialize API router
+const apiRouter = express.Router();
+
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
