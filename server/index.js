@@ -12,6 +12,7 @@ const PORT = process.env.PORT || 3001;
 const DATA_DIR = path.join(__dirname, 'data');
 const AI_LOG_FILE = path.join(DATA_DIR, 'ai_queries.log');
 const ACTIVITY_LOG_FILE = path.join(DATA_DIR, 'activity.log');
+const TASK_ICONS_FILE = path.join(DATA_DIR, 'task_icons.json');
 
 // Middleware
 app.use(cors({
@@ -593,13 +594,221 @@ app.get('/api/activity/download', async (req, res) => {
   }
 });
 
+// Get task icons for kiosk
+app.get('/api/task-icons', async (req, res) => {
+  try {
+    const taskIconsData = await readJsonFile('task_icons.json');
+    res.json(taskIconsData || {});
+  } catch (error) {
+    console.error('Error reading task icons:', error);
+    res.json({});
+  }
+});
+
+// Generate task icons using AI
+app.post('/api/generate-task-icons', async (req, res) => {
+  try {
+    const { tasks, groups, aiSettings } = req.body;
+    
+    if (!aiSettings.enabled || !aiSettings.apiKey) {
+      return res.status(400).json({ error: 'AI is not configured' });
+    }
+    
+    const taskIcons = await generateTaskIcons(tasks, groups, aiSettings);
+    
+    // Save task icons to file
+    await writeJsonFile('task_icons.json', taskIcons);
+    
+    res.json(taskIcons);
+  } catch (error) {
+    console.error('Error generating task icons:', error);
+    res.status(500).json({ error: 'Failed to generate task icons' });
+  }
+});
+
+// Function to generate task icons using AI
+async function generateTaskIcons(tasks, groups, aiSettings) {
+  const taskIcons = {};
+  
+  // Group tasks by their group for context
+  const tasksByGroup = {};
+  groups.forEach(group => {
+    tasksByGroup[group.id] = {
+      groupName: group.name,
+      tasks: tasks.filter(task => task.groupId === group.id)
+    };
+  });
+  
+  for (const groupId in tasksByGroup) {
+    const { groupName, tasks: groupTasks } = tasksByGroup[groupId];
+    
+    if (groupTasks.length === 0) continue;
+    
+    const taskList = groupTasks.map(task => `- ${task.title}`).join('\n');
+    
+    const prompt = `You are helping create child-friendly icons for a task management app. For each task in the "${groupName}" category, suggest 2 simple, recognizable emoji icons that would help young children (ages 4-10) understand what the task is about.
+
+Tasks in ${groupName}:
+${taskList}
+
+For each task, provide exactly 2 emoji icons that are:
+1. Simple and easily recognizable by children
+2. Directly related to the task activity
+3. Visually distinct from each other
+4. Appropriate for all ages
+
+Respond in this exact JSON format:
+{
+  "task_title_1": ["🏠", "🧹"],
+  "task_title_2": ["🍎", "🥛"]
+}
+
+Only include the task titles that were provided, and use exactly 2 emoji icons per task.`;
+
+    try {
+      let response;
+      
+      switch (aiSettings.provider) {
+        case 'openai':
+          response = await callOpenAI(prompt, aiSettings.apiKey, aiSettings.model);
+          break;
+        case 'anthropic':
+          response = await callAnthropic(prompt, aiSettings.apiKey, aiSettings.model);
+          break;
+        case 'gemini':
+          response = await callGemini(prompt, aiSettings.apiKey, aiSettings.model);
+          break;
+        default:
+          throw new Error(`Unsupported AI provider: ${aiSettings.provider}`);
+      }
+      
+      // Parse the AI response
+      const cleanResponse = response.replace(/```json\n?|\n?```/g, '').trim();
+      const groupIcons = JSON.parse(cleanResponse);
+      
+      // Map the icons to task IDs
+      groupTasks.forEach(task => {
+        if (groupIcons[task.title]) {
+          taskIcons[task.id] = {
+            title: task.title,
+            icons: groupIcons[task.title],
+            groupName: groupName,
+            generatedAt: new Date().toISOString()
+          };
+        }
+      });
+      
+    } catch (error) {
+      console.error(`Error generating icons for group ${groupName}:`, error);
+      // Continue with other groups even if one fails
+    }
+  }
+  
+  return taskIcons;
+}
+
+// AI API call functions
+async function callOpenAI(prompt, apiKey, model) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a helpful assistant that generates child-friendly emoji icons for tasks. Always respond with valid JSON only.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      max_tokens: 1000,
+      temperature: 0.3,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'OpenAI API request failed');
+  }
+
+  const data = await response.json();
+  return data.choices[0]?.message?.content || 'No response generated';
+}
+
+async function callAnthropic(prompt, apiKey, model) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1000,
+      messages: [
+        {
+          role: 'user',
+          content: `You are a helpful assistant that generates child-friendly emoji icons for tasks. Always respond with valid JSON only.\n\n${prompt}`
+        }
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Anthropic API request failed');
+  }
+
+  const data = await response.json();
+  return data.content[0]?.text || 'No response generated';
+}
+
+async function callGemini(prompt, apiKey, model) {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [
+            {
+              text: `You are a helpful assistant that generates child-friendly emoji icons for tasks. Always respond with valid JSON only.\n\n${prompt}`
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        maxOutputTokens: 1000,
+        temperature: 0.3,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Gemini API request failed');
+  }
+
+  const data = await response.json();
+  return data.candidates[0]?.content?.parts[0]?.text || 'No response generated';
+}
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
     dataDir: DATA_DIR,
-    features: ['tasks', 'ai-logging', 'activity-logging'],
+    features: ['tasks', 'ai-logging', 'activity-logging', 'task-icons'],
     environment: process.env.NODE_ENV || 'development'
   });
 });
