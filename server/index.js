@@ -593,6 +593,43 @@ apiRouter.get('/task-icons', async (req, res) => {
   }
 });
 
+// Placeholder function for generating task icons
+async function generateTaskIcons(tasks, groups, aiSettings) {
+  // This is a placeholder implementation
+  // In a real implementation, this would use AI to generate appropriate icons for tasks
+  const taskIcons = {};
+  
+  tasks.forEach(task => {
+    // Generate a simple icon mapping based on task title keywords
+    const title = task.title.toLowerCase();
+    let icon = 'CheckSquare'; // default icon
+    
+    if (title.includes('email') || title.includes('message')) {
+      icon = 'Mail';
+    } else if (title.includes('exercise') || title.includes('workout') || title.includes('fitness')) {
+      icon = 'Dumbbell';
+    } else if (title.includes('meditat') || title.includes('mindful')) {
+      icon = 'Brain';
+    } else if (title.includes('meal') || title.includes('cook') || title.includes('eat')) {
+      icon = 'ChefHat';
+    } else if (title.includes('vitamin') || title.includes('medicine') || title.includes('health')) {
+      icon = 'Pill';
+    } else if (title.includes('clean') || title.includes('tidy') || title.includes('household')) {
+      icon = 'Sparkles';
+    } else if (title.includes('work') || title.includes('project') || title.includes('meeting')) {
+      icon = 'Briefcase';
+    } else if (title.includes('read') || title.includes('book') || title.includes('study')) {
+      icon = 'BookOpen';
+    } else if (title.includes('shop') || title.includes('buy') || title.includes('purchase')) {
+      icon = 'ShoppingCart';
+    }
+    
+    taskIcons[task.id] = icon;
+  });
+  
+  return taskIcons;
+}
+
 // Generate task icons using AI
 apiRouter.post('/generate-task-icons', async (req, res) => {
   try {
